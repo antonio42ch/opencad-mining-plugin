@@ -1,0 +1,56 @@
+name: release
+
+# Pushing a `v*` tag builds the plugin for every desktop platform and attaches
+# the binaries plus `plugin.toml` to a GitHub Release. The Open CAD Studio
+# Plugin Manager picks the asset matching the user's OS/arch.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace --locked
+      - name: Tag matches plugin.toml version
+        run: |
+          v=$(grep -m1 '^version' plugin.toml | cut -d'"' -f2)
+          test "v$v" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != plugin.toml v$v"; exit 1; }
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            lib: libopencad_mining.so
+            asset: opencad.mining-linux-x86_64.so
+          - os: windows-latest
+            lib: opencad_mining.dll
+            asset: opencad.mining-windows-x86_64.dll
+          - os: macos-latest
+            lib: libopencad_mining.dylib
+            asset: opencad.mining-macos-aarch64.dylib
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build -p opencad_mining --release --locked
+      - name: Stage release asset
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/release/${{ matrix.lib }}" "dist/${{ matrix.asset }}"
+          cp plugin.toml dist/plugin.toml
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/${{ matrix.asset }}
+            dist/plugin.toml
+          generate_release_notes: true

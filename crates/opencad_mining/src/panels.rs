@@ -1,0 +1,395 @@
+//! Dockable panels. Buttons carry a command in `action`, which the host runs
+//! through its command line (so they behave exactly like the ribbon tools).
+
+use std::collections::HashMap;
+
+use ocs_plugin_api::dialog::{DialogControl, DialogValue, PanelDef};
+
+use crate::config::ProjectConfig;
+use crate::i18n::Strings;
+
+pub const DH: &str = "min_drillholes";
+pub const UG: &str = "min_workings";
+pub const GM: &str = "min_geomap";
+pub const ALL: [&str; 3] = [DH, UG, GM];
+pub const DH_STATUS: &str = "dh_status";
+
+const FILE_EXT: &[&str] = &["csv", "txt", "tsv", "xlsx", "xls", "ods"];
+
+fn file(id: &str, label: &str) -> DialogControl {
+    DialogControl::FilePicker {
+        id: id.into(),
+        label: label.into(),
+        default_path: String::new(),
+        filter_name: "CSV / Excel".into(),
+        extensions: FILE_EXT.iter().map(|s| s.to_string()).collect(),
+        save: false,
+    }
+}
+fn check(id: &str, label: &str, default: bool) -> DialogControl {
+    DialogControl::Checkbox {
+        id: id.into(),
+        label: label.into(),
+        default,
+    }
+}
+fn num(id: &str, label: &str, default: f64, min: Option<f64>, step: f64) -> DialogControl {
+    DialogControl::Number {
+        id: id.into(),
+        label: label.into(),
+        default,
+        min,
+        max: None,
+        step: Some(step),
+    }
+}
+fn text(id: &str, label: &str, default: &str) -> DialogControl {
+    DialogControl::Text {
+        id: id.into(),
+        label: label.into(),
+        default: default.into(),
+    }
+}
+fn choice(id: &str, label: &str, options: &[&str], default_index: usize) -> DialogControl {
+    DialogControl::Choice {
+        id: id.into(),
+        label: label.into(),
+        options: options.iter().map(|s| s.to_string()).collect(),
+        default_index,
+    }
+}
+fn button(id: &str, label: &str, command: &str) -> DialogControl {
+    DialogControl::Button {
+        id: id.into(),
+        label: label.into(),
+        action: Some(command.into()),
+        align_h: None,
+        width: None,
+    }
+}
+fn fields(id: &str, title: &str, controls: Vec<DialogControl>) -> DialogControl {
+    DialogControl::Fields {
+        id: id.into(),
+        title: Some(title.into()),
+        controls,
+        collapsed: false,
+    }
+}
+
+fn panel(id: &str, title: &str, command: &str, controls: Vec<DialogControl>) -> PanelDef {
+    let mut p = PanelDef::new(id, title);
+    p.command = Some(command.into());
+    p.width = Some(320.0);
+    p.controls = controls;
+    p
+}
+
+pub fn drillholes(s: &Strings, c: &ProjectConfig) -> PanelDef {
+    let d = &c.dh;
+    panel(
+        DH,
+        s.p_drillholes,
+        "MIN_DH_PANEL",
+        vec![
+            fields(
+                "dh_files",
+                s.sec_files,
+                vec![
+                    file("dh_collar", s.f_collar),
+                    file("dh_survey", s.f_survey),
+                    file("dh_assays", s.f_assays),
+                    file("dh_geo", s.f_geo),
+                ],
+            ),
+            button("dh_btn_load", s.btn_load, "MIN_DH_LOAD"),
+            DialogControl::Label {
+                id: DH_STATUS.into(),
+                text: String::new(),
+                align_h: None,
+            },
+            fields(
+                "dh_drawing",
+                s.sec_drawing,
+                vec![
+                    check("dh_draw_trace", s.chk_trace, d.draw_trace),
+                    check("dh_draw_collar", s.chk_collar, d.draw_collar),
+                    check("dh_draw_assays", s.chk_assays, d.draw_assays),
+                    check("dh_draw_geo", s.chk_geo, d.draw_geo),
+                    check("dh_draw_labels", s.chk_labels, d.draw_labels),
+                    num("dh_label_h", s.label_height, d.label_height, Some(0.01), 0.5),
+                ],
+            ),
+            fields(
+                "dh_colors",
+                s.sec_colors,
+                vec![
+                    choice("dh_assay_attr", s.assay_attr, &[], 0),
+                    choice("dh_scheme", s.scheme, &s.schemes, d.scheme),
+                    choice("dh_scope", s.scope, &s.scopes, d.scope),
+                    DialogControl::Table {
+                        id: "dh_ranges".into(),
+                        label: Some(s.custom_ranges.into()),
+                        headers: s.range_headers.iter().map(|h| h.to_string()).collect(),
+                        rows: Vec::new(),
+                        allow_add: true,
+                        allow_delete: true,
+                    },
+                    choice("dh_geo_attr", s.geo_attr, &[], 0),
+                    button("dh_btn_geo_colors", s.btn_geo_colors, "MIN_DH_GEOCOLORS"),
+                    DialogControl::Table {
+                        id: "dh_geo_colors".into(),
+                        label: Some(s.geo_colors.into()),
+                        headers: s.geo_color_headers.iter().map(|h| h.to_string()).collect(),
+                        rows: Vec::new(),
+                        allow_add: true,
+                        allow_delete: true,
+                    },
+                ],
+            ),
+            fields(
+                "or_fields",
+                s.sec_origin,
+                vec![
+                    check("or_enabled", s.use_origin, c.origin.enabled),
+                    num("or_x", "X", c.origin.x, None, 1000.0),
+                    num("or_y", "Y", c.origin.y, None, 1000.0),
+                    num("or_z", "Z", c.origin.z, None, 100.0),
+                    DialogControl::InfoText {
+                        text: s.origin_hint.into(),
+                        align_h: None,
+                    },
+                ],
+            ),
+            DialogControl::Row {
+                controls: vec![
+                    button("dh_btn_draw", s.btn_draw, "MIN_DH_DRAW"),
+                    button("dh_btn_clear", s.btn_clear, "MIN_DH_CLEAR"),
+                ],
+                align_h: None,
+                align_v: None,
+            },
+        ],
+    )
+}
+
+pub fn workings(s: &Strings, c: &ProjectConfig) -> PanelDef {
+    let u = &c.ug;
+    panel(
+        UG,
+        s.p_workings,
+        "MIN_UG_PANEL",
+        vec![
+            fields(
+                "ug_section",
+                s.sec_section,
+                vec![
+                    choice("ug_profile", s.profile, &s.profiles, u.profile),
+                    num("ug_width", s.width, u.width, Some(0.01), 0.5),
+                    num("ug_height", s.height, u.height, Some(0.01), 0.5),
+                    num("ug_top", s.top_width, u.top_width, Some(0.01), 0.5),
+                    num("ug_radius", s.radius, u.radius, Some(0.01), 0.25),
+                    num("ug_wall", s.wall_height, u.wall_height, Some(0.01), 0.5),
+                    choice("ug_halign", s.h_align, &s.h_aligns, u.h_align),
+                    choice("ug_valign", s.v_align, &s.v_aligns, u.v_align),
+                ],
+            ),
+            num("ug_interval", s.interval, u.interval, Some(0.01), 0.5),
+            check("ug_sections", s.draw_sections, u.draw_sections),
+            check("ug_tangent3d", s.tangent_3d, u.tangent_3d),
+            button("ug_btn_axis", s.tool_axis, "MIN_UG_AXIS"),
+            DialogControl::Row {
+                controls: vec![
+                    button("ug_btn_hb", s.tool_hbound, "MIN_UG_HBOUND"),
+                    button("ug_btn_vb", s.tool_vbound, "MIN_UG_VBOUND"),
+                ],
+                align_h: None,
+                align_v: None,
+            },
+        ],
+    )
+}
+
+pub fn geomap(s: &Strings, c: &ProjectConfig) -> PanelDef {
+    let g = &c.gm;
+    panel(
+        GM,
+        s.p_geology,
+        "MIN_GM_PANEL",
+        vec![
+            fields(
+                "gm_trace",
+                s.sec_trace,
+                vec![
+                    text("gm_bearing", s.bearing, &g.bearing),
+                    num("gm_length", s.length, g.length, Some(0.01), 0.5),
+                    choice("gm_anchor", s.anchor, &s.anchors, g.anchor),
+                    check("gm_annotate", s.annotate, g.annotate),
+                ],
+            ),
+            fields(
+                "gm_obs",
+                s.sec_observation,
+                vec![
+                    text("gm_rock", s.rock_type, &g.rock_type),
+                    text("gm_thickness", s.thickness, &g.thickness),
+                    text("gm_min", s.mineralization, &g.mineralization),
+                    text("gm_alt", s.alteration, &g.alteration),
+                    text("gm_struct", s.structure, &g.structure),
+                    text("gm_grade", s.grade, &g.grade),
+                    text("gm_dip", s.dip, &g.dip),
+                    text("gm_sample", s.sample, &g.sample),
+                ],
+            ),
+            button("gm_btn_trace", s.tool_trace, "MIN_GM_TRACE"),
+        ],
+    )
+}
+
+/// Values to push into the panels so they show `c` (after restoring settings
+/// from a drawing, or after a load fills the attribute lists).
+pub fn values_for(
+    c: &ProjectConfig,
+    assay_attrs: &[String],
+    geo_attrs: &[String],
+) -> HashMap<&'static str, HashMap<String, DialogValue>> {
+    let t = |s: &str| DialogValue::Text(s.to_string());
+    let n = DialogValue::Number;
+    let b = DialogValue::Bool;
+    let ch = |i: usize, opts: &[&str]| DialogValue::Choice {
+        index: i,
+        text: opts.get(i).map(|s| s.to_string()).unwrap_or_default(),
+    };
+    let options = |list: &[String], sel: &str| DialogValue::ChoiceOptions {
+        options: list.to_vec(),
+        selected_index: list.iter().position(|a| a == sel).unwrap_or(0),
+    };
+    let (d, u, g, o) = (&c.dh, &c.ug, &c.gm, &c.origin);
+    let mut dh: HashMap<String, DialogValue> = [
+        ("dh_collar", DialogValue::FilePath(d.collar.clone())),
+        ("dh_survey", DialogValue::FilePath(d.survey.clone())),
+        ("dh_assays", DialogValue::FilePath(d.assays.clone())),
+        ("dh_geo", DialogValue::FilePath(d.geo.clone())),
+        ("dh_draw_trace", b(d.draw_trace)),
+        ("dh_draw_collar", b(d.draw_collar)),
+        ("dh_draw_assays", b(d.draw_assays)),
+        ("dh_draw_geo", b(d.draw_geo)),
+        ("dh_draw_labels", b(d.draw_labels)),
+        ("dh_label_h", n(d.label_height)),
+        ("dh_scheme", ch(d.scheme, &["", "", "", ""])),
+        ("dh_scope", ch(d.scope, &["", ""])),
+        (
+            "dh_ranges",
+            DialogValue::Table(
+                d.custom_ranges
+                    .iter()
+                    .map(|(a, b, c)| vec![a.to_string(), b.to_string(), c.clone()])
+                    .collect(),
+            ),
+        ),
+        (
+            "dh_geo_colors",
+            DialogValue::Table(d.geo_colors.iter().map(|(k, v)| vec![k.clone(), v.clone()]).collect()),
+        ),
+        ("or_enabled", b(o.enabled)),
+        ("or_x", n(o.x)),
+        ("or_y", n(o.y)),
+        ("or_z", n(o.z)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+    if !assay_attrs.is_empty() {
+        dh.insert("dh_assay_attr".into(), options(assay_attrs, &d.assay_attr));
+    }
+    if !geo_attrs.is_empty() {
+        dh.insert("dh_geo_attr".into(), options(geo_attrs, &d.geo_attr));
+    }
+    let ug = [
+        ("ug_profile", ch(u.profile, &["", "", "", "", ""])),
+        ("ug_width", n(u.width)),
+        ("ug_height", n(u.height)),
+        ("ug_top", n(u.top_width)),
+        ("ug_radius", n(u.radius)),
+        ("ug_wall", n(u.wall_height)),
+        ("ug_interval", n(u.interval)),
+        ("ug_halign", ch(u.h_align, &["", "", ""])),
+        ("ug_valign", ch(u.v_align, &["", "", ""])),
+        ("ug_sections", b(u.draw_sections)),
+        ("ug_tangent3d", b(u.tangent_3d)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+    let gm = [
+        ("gm_bearing", t(&g.bearing)),
+        ("gm_length", n(g.length)),
+        ("gm_anchor", ch(g.anchor, &["", "", ""])),
+        ("gm_annotate", b(g.annotate)),
+        ("gm_rock", t(&g.rock_type)),
+        ("gm_thickness", t(&g.thickness)),
+        ("gm_min", t(&g.mineralization)),
+        ("gm_alt", t(&g.alteration)),
+        ("gm_struct", t(&g.structure)),
+        ("gm_grade", t(&g.grade)),
+        ("gm_dip", t(&g.dip)),
+        ("gm_sample", t(&g.sample)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+    HashMap::from([(DH, dh), (UG, ug), (GM, gm)])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n::{for_lang, Lang};
+
+    /// Every value written back must address a control declared in a panel.
+    #[test]
+    fn pushed_values_match_declared_controls() {
+        fn ids(c: &DialogControl, out: &mut Vec<String>) {
+            match c {
+                DialogControl::Fields { controls, .. }
+                | DialogControl::Row { controls, .. }
+                | DialogControl::Column { controls, .. } => controls.iter().for_each(|c| ids(c, out)),
+                other => {
+                    if let Some(id) = other.id() {
+                        out.push(id.to_string())
+                    }
+                }
+            }
+        }
+        let s = for_lang(Lang::Es);
+        let c = ProjectConfig::default();
+        let panels = [drillholes(s, &c), workings(s, &c), geomap(s, &c)];
+        let values = values_for(&c, &["cu".into()], &["rock".into()]);
+        for p in &panels {
+            let mut declared = Vec::new();
+            p.controls.iter().for_each(|c| ids(c, &mut declared));
+            for k in values[p.id.as_str()].keys() {
+                assert!(declared.contains(k), "{} not declared in {}", k, p.id);
+            }
+        }
+    }
+
+    /// Panel values flow back into the same config.
+    #[test]
+    fn panel_roundtrip() {
+        let mut c = ProjectConfig::default();
+        c.dh.collar = "c.csv".into();
+        c.ug.width = 5.5;
+        c.gm.bearing = "S30W".into();
+        c.dh.custom_ranges = vec![(0.0, 1.0, "Verde".into())];
+        let mut flat = HashMap::new();
+        for (_, m) in values_for(&c, &[], &[]) {
+            flat.extend(m);
+        }
+        let mut back = ProjectConfig::default();
+        back.apply(&flat);
+        assert_eq!(back.dh.collar, "c.csv");
+        assert_eq!(back.ug.width, 5.5);
+        assert_eq!(back.gm.bearing, "S30W");
+        assert_eq!(back.dh.custom_ranges, c.dh.custom_ranges);
+    }
+}

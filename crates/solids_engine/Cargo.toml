@@ -1,0 +1,9 @@
+[package]
+name = "solids_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Underground excavation solids for Open Mining: sections, axis and boundary methods, closed meshes. std + mining_core only."
+
+[dependencies]
+mining_core = { path = "../mining_core" }

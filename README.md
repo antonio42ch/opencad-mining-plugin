@@ -1,0 +1,45 @@
+# Open Mining
+
+Mining and geology add-on for [Open CAD Studio](https://github.com/HakanSeven12/OpenCADStudio)
+(out-of-process `cdylib`, plugin API 23). Rust rewrite of PST_Sondajes,
+PST_SolidMine and GeoMapper.
+
+| Module | Commands | What it does |
+|---|---|---|
+| Drillholes | `MIN_DH_PANEL` `MIN_DH_LOAD` `MIN_DH_DRAW` `MIN_DH_CLEAR` `MIN_DH_GEOCOLORS` | CSV/XLSX import with column mapping, validation R01–R07, minimum-curvature desurvey, 3D traces coloured by grade or geology, labels |
+| Workings | `MIN_UG_PANEL` `MIN_UG_AXIS` `MIN_UG_HBOUND` `MIN_UG_VBOUND` | Closed solids (mesh) from an axis + section, or from four boundary polylines |
+| Geology | `MIN_GM_PANEL` `MIN_GM_TRACE` | Structure/vein/contact trace from bearing + length, with annotations |
+
+UI in Spanish, English and Portuguese (`OPENMINING_LANG=es|en|pt`, else the
+system locale).
+
+## Install
+
+Open CAD Studio → **Plugin Manager → Add repository** → `antonio42ch/opencad-mining-plugin`,
+pick a release, **Install**, restart. Or copy the platform binary and
+`plugin.toml` from a release into the user plugins folder.
+
+## Develop
+
+```bash
+cargo test --workspace                       # all engines + plugin logic (mock CAD)
+cargo clippy --workspace --all-targets -- -D warnings
+cargo build -p opencad_mining --release      # target/release/libopencad_mining.{so,dll,dylib}
+cargo bench -p drillhole_engine              # 1 000 holes: validate ≈ 45 ms, desurvey+map ≈ 80 ms
+cargo run -p openmining_cli -- desurvey --collar collar.csv --survey survey.csv
+```
+
+Release: bump `version` in `Cargo.toml` and `plugin.toml`, add a
+`CHANGELOG.md` entry, tag `vX.Y.Z`. CI builds Linux/Windows/macOS assets.
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers, crates, data flow, design rules
+- [docs/PLUGIN.md](docs/PLUGIN.md) — commands, panels, layers, **XDATA schema**, settings storage
+- [docs/MIGRATION.md](docs/MIGRATION.md) — mapping from the legacy C# (AutoCAD) tools
+- [docs/TESTING.md](docs/TESTING.md) — test locally (WSL/WSLg or Windows) before releasing
+- [CHANGELOG.md](CHANGELOG.md)
+
+## License
+
+GPL-3.0-only (the host contract `ocs_plugin_api` is GPL-3.0-only).

@@ -1,0 +1,8 @@
+[package]
+name = "mining_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared, std-only math for Open Mining: vectors, azimuth/rumbo conversions."
+
+[dependencies]

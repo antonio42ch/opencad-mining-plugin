@@ -1,0 +1,2 @@
+# Test data must keep its exact bytes (CRLF, Latin-1, ;) — the importer tests depend on them.
+crates/drillhole_engine/tests/data/* -text

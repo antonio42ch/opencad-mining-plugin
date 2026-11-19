@@ -1,0 +1,61 @@
+# Testing before a release
+
+The plugin is found in `<config>/OpenCADStudio/plugins/opencad.mining/`
+(`plugin.toml` + one library). `OCS_PLUGINS_DIR` overrides the folder. The
+host must be a **release with the same plugin API** as `plugin.toml`
+(currently 23 = host v2026.46).
+
+## A. Linux host inside WSL (WSLg) — fastest loop
+
+```bash
+# once: download the host and extract it (no FUSE needed)
+mkdir -p ~/ocs && cd ~/ocs
+curl -LO https://github.com/HakanSeven12/OpenCADStudio/releases/download/v2026.46/OpenCADStudio-v2026.46-linux-x86_64.AppImage
+chmod +x OpenCADStudio-*.AppImage && ./OpenCADStudio-*.AppImage --appimage-extract
+
+# every change
+scripts/dev-install.sh                       # build + copy to ~/.config/OpenCADStudio/plugins
+~/ocs/squashfs-root/AppRun                   # opens in a Windows window through WSLg
+```
+
+## B. Windows host (what most users run)
+
+```bash
+sudo apt install -y mingw-w64                # once
+scripts/dev-install.sh --windows             # .dll -> %APPDATA%\OpenCADStudio\plugins
+```
+
+Close Open CAD Studio before installing (Windows locks the loaded `.dll`),
+then start it again. The release CI builds the official `.dll` with MSVC; if
+the MinGW build misbehaves, build on Windows itself with
+`cargo build -p opencad_mining --release` (Rust for Windows) and copy
+`target\release\opencad_mining.dll` + `plugin.toml` to the same folder.
+
+## C. Automated smoke test (headless)
+
+```bash
+python3 scripts/smoke_serve.py ~/ocs/squashfs-root/AppRun
+```
+
+Uses a temporary config and plugins folder, runs `MIN_GM_TRACE` and
+`MIN_UG_AXIS` over `--serve`, and checks the plugin layers are filled.
+
+## Manual checklist (GUI)
+
+1. Ribbon shows the **Minería** tab (Sondajes / Labores / Geología).
+2. Sondajes panel: pick `crates/drillhole_engine/tests/data/{collar,survey,assays}.csv`,
+   **Cargar y validar** → status line counts 3 collars, 0 messages.
+3. **Dibujar** → 3 traces, labels, coloured assays; **Dibujar** again → same
+   entity count (no duplicates). Ctrl+Z undoes the whole draw in one step.
+4. Properties of a trace show *Traza de sondaje (Polyline3D)*.
+5. Rename a column in `collar.csv` → load → the mapping dialog appears; load
+   again → it is not asked again.
+6. Save as DWG, close, reopen → the panel paths/options come back
+   ("configuración restaurada"); **Dibujar** works after **Cargar**.
+7. Labores: draw a `3DPOLY`, select it, **Por eje** → solid on `MIN_UG_SOLIDO`
+   with its volume on the command line.
+8. Geología: **Traza** → live red preview, click → line + texts.
+9. Plugin Manager lists *Open Mining* as enabled with no errors.
+
+Logs: the host writes plugin load errors (API/wire-schema mismatch, runner
+crashes) to the command line and to `automation/gui.log` in the config folder.

@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["crates/mining_core", "crates/drillhole_engine", "crates/solids_engine", "crates/geomap_engine", "crates/openmining_cli", "crates/opencad_mining"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+license = "GPL-3.0-only"

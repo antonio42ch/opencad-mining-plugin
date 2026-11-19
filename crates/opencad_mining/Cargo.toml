@@ -1,0 +1,20 @@
+[package]
+name = "opencad_mining"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Open Mining: mining & geology add-on for Open CAD Studio (drillholes, underground solids, geological mapping)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Host contract pinned to the commit of the latest host RELEASE (v2026.46, plugin API 23). Bump `rev` to follow a newer API,
+# then `cargo update -p ocs_plugin_api` and raise `api_version` in plugin.toml.
+ocs_plugin_api = { git = "https://github.com/HakanSeven12/OpenCADStudio", rev = "8b4d270", features = ["host"] }
+mining_core = { path = "../mining_core" }
+drillhole_engine = { path = "../drillhole_engine", features = ["xlsx"] }
+solids_engine = { path = "../solids_engine" }
+geomap_engine = { path = "../geomap_engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

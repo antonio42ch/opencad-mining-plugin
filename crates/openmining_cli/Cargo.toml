@@ -1,0 +1,14 @@
+[package]
+name = "openmining_cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Command-line front end of the Open Mining engines (batch processing and QA without the CAD)."
+
+[[bin]]
+name = "openmining"
+path = "src/main.rs"
+
+[dependencies]
+mining_core = { path = "../mining_core" }
+drillhole_engine = { path = "../drillhole_engine", features = ["xlsx"] }

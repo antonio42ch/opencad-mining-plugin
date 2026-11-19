@@ -1,0 +1,16 @@
+# Discovery file shipped beside the binary. Values mirror `MANIFEST` in
+# crates/opencad_mining/src/lib.rs (a test checks they stay in sync).
+[plugin]
+id = "opencad.mining"
+name = "Open Mining"
+version = "0.2.0"
+description = "Mining & geology: drillholes, underground workings and geological mapping"
+author = "Open Mining contributors"
+license = "GPL-3.0-only"
+repository = "antonio42ch/opencad-mining-plugin"
+
+[opencad]
+api_version = 23
+ribbon_order = 40
+command_prefixes = ["MIN_"]
+xdata_apps = ["OPENMINING"]

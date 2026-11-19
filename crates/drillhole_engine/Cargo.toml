@@ -1,0 +1,26 @@
+[package]
+name = "drillhole_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Headless drillhole engine for Open Mining: tabular import (CSV/XLSX), validation, minimum-curvature desurvey, interval mapping, grade colours."
+
+[features]
+default = ["parallel"]
+# Desurvey + interval mapping of many holes on all cores.
+parallel = ["dep:rayon"]
+# Reading the first worksheet of .xlsx/.xls/.ods files.
+xlsx = ["dep:calamine"]
+
+[dependencies]
+mining_core = { path = "../mining_core" }
+rayon = { version = "1.10", optional = true }
+calamine = { version = "0.36", optional = true }
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "pipeline"
+harness = false

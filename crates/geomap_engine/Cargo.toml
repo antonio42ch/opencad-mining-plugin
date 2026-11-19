@@ -1,0 +1,9 @@
+[package]
+name = "geomap_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Geological mapping for Open Mining: structure/vein/contact traces and their annotations. std + mining_core only."
+
+[dependencies]
+mining_core = { path = "../mining_core" }
