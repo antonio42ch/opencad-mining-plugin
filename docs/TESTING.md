@@ -56,6 +56,17 @@ Uses a temporary config and plugins folder, runs `MIN_GM_TRACE` and
    with its volume on the command line.
 8. Geología: **Traza** → live red preview, click → line + texts.
 9. Plugin Manager lists *Open Mining* as enabled with no errors.
+10. Ejes: start E/N/Z + azimuth, grade −12 %, **Agregar recta** 50 m, then
+    **Agregar curva** R 15 m, 90°, Derecha → one magenta polyline; the panel
+    start moved to its end. **Quitar último** removes the curve.
+11. Close and reopen the DWG, **Continuar polilínea** on the axis → message
+    "Eje … recuperado"; new elements extend the same polyline.
+12. Labores → **Por eje** on that axis, then Secciones → mode
+    *Perpendiculares a un eje*, interval 10 → select the solid, pick the axis →
+    red 3D sections on `MIN_SC_CORTE` and sheets to the right with PK titles
+    and areas; run again → no duplicates.
+13. Secciones *Horizontales* with Cota final ≤ Cota inicial → levels over the
+    whole solid automatically.
 
 Logs: the host writes plugin load errors (API/wire-schema mismatch, runner
 crashes) to the command line and to `automation/gui.log` in the config folder.

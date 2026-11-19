@@ -63,6 +63,21 @@ impl CadModule for MiningModule {
                     ],
                 },
                 RibbonGroup {
+                    title: t.grp_axes,
+                    tools: vec![
+                        large("MIN_AX_PANEL", t.tool_panel, icon!("axes")),
+                        small("MIN_AX_LINE", t.tool_line, icon!("straight")),
+                        small("MIN_AX_CURVE", t.tool_curve, icon!("curve")),
+                    ],
+                },
+                RibbonGroup {
+                    title: t.grp_sections,
+                    tools: vec![
+                        large("MIN_SC_PANEL", t.tool_panel, icon!("sections")),
+                        small("MIN_SC_RUN", t.tool_sections, icon!("sectionrun")),
+                    ],
+                },
+                RibbonGroup {
                     title: t.grp_geology,
                     tools: vec![
                         large("MIN_GM_PANEL", t.tool_panel, icon!("geomap")),

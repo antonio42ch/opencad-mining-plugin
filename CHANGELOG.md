@@ -3,7 +3,23 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
-## [0.2.0] — 2026-11-19
+## [0.3.0] — 2026-11-19
+
+### Added
+- Axis designer (`MIN_AX_*`, panel "Ejes"): start point and azimuth typed or
+  picked from the drawing (two points, or the end of any polyline);
+  straights and curves (radius + length or radius + central angle, right or
+  left) with grade in % or degrees; curve discretisation by segment length;
+  series mode ("Actualizar punto de inicio") extending one polyline; remove
+  last element; axes recoverable from their XDATA.
+- Section generator (`MIN_SC_*`, panel "Secciones"): cut meshes (Mesh,
+  PolyfaceMesh, 3DFACE) with planes perpendicular to an axis, vertical
+  through 2 points with parallels, horizontal levels (automatic range) or
+  3 points; 3D section polylines in place and 2D sheets on a grid with
+  coordinate grid, title, area and axis marker; replace previous run.
+- `solids_engine::{alignment, cut, sheet}` with tests.
+
+ — 2026-11-19
 
 ### Added
 - Workings module (`solids_engine`, `MIN_UG_*`): rectangular, trapezoidal,

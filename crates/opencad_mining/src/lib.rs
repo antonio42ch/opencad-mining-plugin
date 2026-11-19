@@ -8,6 +8,7 @@
 // `export_plugin!` (host macro) emits a C entry point taking a raw pointer.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+pub mod axes;
 pub mod cad;
 pub mod config;
 pub mod drillholes;
@@ -17,6 +18,7 @@ pub mod i18n;
 pub mod interactive;
 pub mod panels;
 pub mod ribbon;
+pub mod sections;
 pub mod session;
 pub mod solids;
 pub mod state;
@@ -30,7 +32,7 @@ use ocs_plugin_api::ribbon::CadModule;
 use cad::CadSink;
 use host_sink::HostSink;
 use i18n::{fmt, Lang};
-use interactive::{PickEntities, PickKind, PickTracePoint};
+use interactive::{PickAxisStart, PickEntities, PickKind, PickTracePoint, SectionPick};
 use state::Pending;
 
 /// Keep in sync with `plugin.toml`.
@@ -60,6 +62,9 @@ macro_rules! classes {
                 ("UG_SECTION", $s.cls_section),
                 ("GM_TRACE", $s.cls_geotrace),
                 ("GM_NOTE", $s.cls_geonote),
+                ("AX_AXIS", $s.cls_axis),
+                ("SC_CUT", $s.cls_cut),
+                ("SC_SHEET", $s.cls_sheet),
             ],
         };
     };
@@ -94,6 +99,8 @@ impl BuiltinPlugin for MiningPlugin {
             panels::drillholes(s, &c),
             panels::workings(s, &c),
             panels::geomap(s, &c),
+            panels::axes(s, &c),
+            panels::sections(s, &c),
         ] {
             let id = def.id.clone();
             if !host.register_panel_for_plugin(MANIFEST.id, def) {
@@ -127,6 +134,8 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_DH_PANEL" => Some(panels::DH),
             "MIN_UG_PANEL" => Some(panels::UG),
             "MIN_GM_PANEL" => Some(panels::GM),
+            "MIN_AX_PANEL" => Some(panels::AX),
+            "MIN_SC_PANEL" => Some(panels::SC),
             _ => None,
         };
         if let Some(p) = panel {
@@ -236,10 +245,216 @@ impl BuiltinPlugin for MiningPlugin {
                     sink.end();
                 }
             }
+            "MIN_AX_LINE" | "MIN_AX_CURVE" | "MIN_AX_UNDO" => {
+                let element = if name == "MIN_AX_LINE" {
+                    cfg.ax.straight()
+                } else {
+                    cfg.ax.curve()
+                };
+                let mut current = state::with_tab(tab, |t| t.axis.clone());
+                let mut sink = HostSink::new(host);
+                sink.begin(&name);
+                let end = if name == "MIN_AX_UNDO" {
+                    axes::undo_last(&mut sink, s, &mut current)
+                } else {
+                    axes::add_element(&mut sink, s, &cfg.ax, &mut current, element)
+                };
+                if let Some(end) = end.filter(|_| cfg.ax.update_start) {
+                    axes::set_start(&mut cfg.ax, end);
+                }
+                session::commit(&mut sink, s, tab, &cfg);
+                sink.end();
+                let status = current
+                    .as_ref()
+                    .map_or_else(|| s.m_axis_empty.to_string(), |a| axes::status(s, a));
+                state::with_tab(tab, |t| t.axis = current);
+                session::push_panel(host, &cfg, panels::AX, Some((panels::AX_STATUS, status)));
+            }
+            "MIN_AX_NEW" => {
+                state::with_tab(tab, |t| t.axis = None);
+                session::push_panel(
+                    host,
+                    &cfg,
+                    panels::AX,
+                    Some((panels::AX_STATUS, s.m_axis_empty.to_string())),
+                );
+            }
+            "MIN_AX_PICKSTART" => {
+                state::with_tab(tab, |t| t.config = cfg.clone());
+                host.start_interactive(Box::new(PickAxisStart::new([
+                    s.pick_start_point.to_string(),
+                    s.pick_direction.to_string(),
+                ])));
+            }
+            "MIN_AX_FROMPOLY" => {
+                state::with_tab(tab, |t| t.config = cfg.clone());
+                host.start_interactive(Box::new(PickEntities::new(
+                    PickKind::AxisPolyline,
+                    vec![s.pick_poly_end.to_string()],
+                )));
+            }
+            "MIN_AX_SETSTART" | "MIN_AX_SETFROMPOLY" => {
+                let (station, restored) = match state::take_pending() {
+                    Some(Pending::AxisStart(p, q)) => (
+                        Some(solids_engine::alignment::Station {
+                            point: p,
+                            azimuth: mining_core::azimuth_between([p[0], p[1]], [q[0], q[1]]),
+                        }),
+                        None,
+                    ),
+                    Some(Pending::AxisFromPolyline(h)) => {
+                        let ent = host
+                            .entities_batch(&[h])
+                            .ok()
+                            .and_then(|v| v.into_iter().next().flatten());
+                        match ent
+                            .as_ref()
+                            .and_then(|e| host_sink::tag_of(e).and_then(|t| axes::from_tag(&t)))
+                        {
+                            Some(a) => (a.design.build().ok().map(|(_, end)| end), Some(a)),
+                            None => (
+                                ent.as_ref()
+                                    .and_then(polyline_points)
+                                    .and_then(|p| axes::polyline_end(&p)),
+                                None,
+                            ),
+                        }
+                    }
+                    _ => (None, None),
+                };
+                let Some(st) = station else {
+                    host.push_error(s.m_not_polyline);
+                    return true;
+                };
+                if restored.is_some() {
+                    host.push_info(s.m_axis_restored);
+                }
+                axes::set_start(&mut cfg.ax, st);
+                host.push_info(&fmt(
+                    s.m_start_set,
+                    &[
+                        &format!("{:.3}", st.point[0]),
+                        &format!("{:.3}", st.point[1]),
+                        &format!("{:.3}", st.point[2]),
+                        &format!("{:.4}", st.azimuth),
+                    ],
+                ));
+                let status = restored
+                    .as_ref()
+                    .map_or_else(|| s.m_axis_empty.to_string(), |a| axes::status(s, a));
+                state::with_tab(tab, |t| t.axis = restored);
+                let mut sink = HostSink::new(host);
+                sink.begin(&name);
+                session::commit(&mut sink, s, tab, &cfg);
+                sink.end();
+                session::push_panel(host, &cfg, panels::AX, Some((panels::AX_STATUS, status)));
+            }
+            "MIN_SC_RUN" => {
+                state::with_tab(tab, |t| t.config = cfg.clone());
+                let pick = SectionPick::new(
+                    cfg.sc.mode,
+                    host.selection(),
+                    s.pick_solids.to_string(),
+                    s.pick_axis.to_string(),
+                    s.pick_plane_points.map(str::to_string),
+                );
+                if pick.is_complete() {
+                    state::set_pending(pick.into_pending());
+                    run_sections(host, s, tab, &cfg);
+                } else {
+                    host.start_interactive(Box::new(pick));
+                }
+            }
+            "MIN_SC_EXEC" => run_sections(host, s, tab, &cfg),
             _ => return false,
         }
         true
     }
+}
+
+/// Faces of the mesh-like entities (Mesh, PolyfaceMesh); all 3DFACEs are
+/// merged into one mesh so their section chains across faces.
+fn meshes_of(ents: &[Option<EntityType>]) -> Vec<solids_engine::cut::MeshData> {
+    use solids_engine::cut::MeshData;
+    let v3 = |p: &ocs_plugin_api::host::acadrust::types::Vector3| [p.x, p.y, p.z];
+    let mut out = Vec::new();
+    let mut faces3d = MeshData::default();
+    for e in ents.iter().flatten() {
+        match e {
+            EntityType::Mesh(m) => out.push(MeshData {
+                vertices: m.vertices.iter().map(v3).collect(),
+                faces: m.faces.iter().map(|f| f.vertices.clone()).collect(),
+            }),
+            EntityType::PolyfaceMesh(m) => out.push(MeshData {
+                vertices: m.vertices.iter().map(|v| v3(&v.location)).collect(),
+                faces: m
+                    .faces
+                    .iter()
+                    .map(|f| {
+                        [f.index1, f.index2, f.index3, f.index4]
+                            .iter()
+                            .filter(|&&i| i != 0)
+                            .map(|&i| i.unsigned_abs() as usize - 1)
+                            .collect()
+                    })
+                    .collect(),
+            }),
+            EntityType::Face3D(f) => {
+                let mut c = vec![
+                    v3(&f.first_corner),
+                    v3(&f.second_corner),
+                    v3(&f.third_corner),
+                    v3(&f.fourth_corner),
+                ];
+                if c[3] == c[2] {
+                    c.pop();
+                }
+                let base = faces3d.vertices.len();
+                faces3d.faces.push((base..base + c.len()).collect());
+                faces3d.vertices.extend(c);
+            }
+            _ => {}
+        }
+    }
+    if !faces3d.faces.is_empty() {
+        out.push(faces3d);
+    }
+    out
+}
+
+fn run_sections(host: &mut dyn HostApi, s: &i18n::Strings, tab: u64, cfg: &config::ProjectConfig) {
+    let Some(Pending::Sections { solids, axis, points }) = state::take_pending() else {
+        return;
+    };
+    let ents = host.entities_batch(&solids).unwrap_or_default();
+    let meshes = meshes_of(&ents);
+    let axis_pts = match axis {
+        Some(h) => match fetch_points(host, &[h]) {
+            Some(mut v) => Some(v.remove(0)),
+            None => {
+                host.push_error(s.m_not_polyline);
+                return;
+            }
+        },
+        None => None,
+    };
+    let mut sink = HostSink::new(host);
+    sink.begin("MIN_SC_RUN");
+    if sections::run(
+        &mut sink,
+        s,
+        &cfg.sc,
+        &meshes,
+        &sections::PlaneInput {
+            axis: axis_pts.as_deref(),
+            points: &points,
+        },
+    )
+    .is_some()
+    {
+        session::commit(&mut sink, s, tab, cfg);
+    }
+    sink.end();
 }
 
 fn polyline_points(e: &EntityType) -> Option<Vec<mining_core::Vec3>> {
@@ -273,7 +488,7 @@ fn run_solid(host: &mut dyn HostApi, s: &i18n::Strings, tab: u64, cfg: &config::
     let handles: Vec<Handle> = match &p {
         Pending::Axis { axis, profile } => std::iter::once(*axis).chain(*profile).collect(),
         Pending::Boundaries { handles, .. } => handles.to_vec(),
-        Pending::TracePoint(_) => return,
+        _ => return,
     };
     let Some(pts) = fetch_points(host, &handles) else {
         host.push_error(s.m_not_polyline);
@@ -292,7 +507,7 @@ fn run_solid(host: &mut dyn HostApi, s: &i18n::Strings, tab: u64, cfg: &config::
             lines: [&pts[0], &pts[1], &pts[2], &pts[3]],
             vertical: *vertical,
         },
-        Pending::TracePoint(_) => unreachable!(),
+        _ => unreachable!("filtered above"),
     };
     let mut sink = HostSink::new(host);
     sink.begin("MIN_UG_SOLID");
@@ -326,5 +541,56 @@ mod manifest_tests {
         assert_eq!(field("ribbon_order"), MANIFEST.ribbon_order.to_string());
         assert!(toml.contains(&format!("\"{}\"", MANIFEST.xdata_apps[0])));
         assert!(toml.contains(&format!("\"{}\"", MANIFEST.command_prefixes[0])));
+    }
+}
+
+#[cfg(test)]
+mod entity_tests {
+    use super::*;
+    use ocs_plugin_api::host::acadrust::entities::{Face3D, Mesh, MeshFace};
+    use ocs_plugin_api::host::acadrust::types::Vector3;
+    use solids_engine::cut::{cut, level_planes};
+
+    fn v(x: f64, y: f64, z: f64) -> Vector3 {
+        Vector3::new(x, y, z)
+    }
+
+    /// A unit cube as a host `Mesh` and as six `3DFACE`s gives the same
+    /// horizontal section (a closed 1 x 1 square).
+    #[test]
+    fn host_meshes_and_3dfaces_are_cut() {
+        let c = [
+            v(0., 0., 0.),
+            v(1., 0., 0.),
+            v(1., 1., 0.),
+            v(0., 1., 0.),
+            v(0., 0., 1.),
+            v(1., 0., 1.),
+            v(1., 1., 1.),
+            v(0., 1., 1.),
+        ];
+        let quads = [
+            [0, 3, 2, 1],
+            [4, 5, 6, 7],
+            [0, 1, 5, 4],
+            [1, 2, 6, 5],
+            [2, 3, 7, 6],
+            [3, 0, 4, 7],
+        ];
+        let mut mesh = Mesh::new();
+        mesh.vertices = c.to_vec();
+        mesh.faces = quads.iter().map(|q| MeshFace::new(q.to_vec())).collect();
+        let faces: Vec<Option<EntityType>> = quads
+            .iter()
+            .map(|q| Some(EntityType::Face3D(Face3D::new(c[q[0]], c[q[1]], c[q[2]], c[q[3]]))))
+            .collect();
+        let plane = level_planes(0.5, 0.5, 1.0).unwrap()[0].plane;
+        for ents in [vec![Some(EntityType::Mesh(mesh))], faces] {
+            let meshes = meshes_of(&ents);
+            assert_eq!(meshes.len(), 1);
+            let loops = cut(&meshes, &plane);
+            assert_eq!(loops.len(), 1);
+            assert!(loops[0].closed && (loops[0].area() - 1.0).abs() < 1e-12);
+        }
     }
 }

@@ -15,7 +15,44 @@ Plugin id `opencad.mining`, command prefix `MIN_`, XDATA application
 | `MIN_UG_AXIS` | Solid along a 3D polyline (uses the selection if one entity is selected) |
 | `MIN_UG_HBOUND` / `MIN_UG_VBOUND` | Solid from roof/floor/left/right or front/back/left/right |
 | `MIN_GM_TRACE` | Geological trace at a picked point (live preview) |
+| `MIN_AX_PANEL` | Show/hide the axis designer |
+| `MIN_AX_LINE` / `MIN_AX_CURVE` | Add a straight / curve with the panel values. With **Update start point** the element continues the current axis (same polyline) and the panel start moves to its end; otherwise each element is a new axis from the panel start |
+| `MIN_AX_UNDO` | Remove the last element of the current axis |
+| `MIN_AX_NEW` | Close the current axis; the next element starts a new one |
+| `MIN_AX_PICKSTART` | Pick the start point and a second point for the azimuth |
+| `MIN_AX_FROMPOLY` | Pick a polyline: its end point and end azimuth become the start. An Open Mining axis is recovered from its XDATA and continued |
+| `MIN_SC_PANEL` | Show/hide the section generator |
+| `MIN_SC_RUN` | Cut the selected (or picked) meshes with the configured planes |
+| `MIN_AX_SETSTART` / `MIN_AX_SETFROMPOLY` / `MIN_SC_EXEC` | Internal follow-ups of the interactive picks |
 | `MIN_UG_RUN` / `MIN_GM_RUN` | Internal: follow-ups of the interactive picks |
+
+## Axis designer
+
+- Lengths are **horizontal** (plan); Z changes by grade × horizontal length.
+  Grade in % or degrees, positive = up, per element.
+- Curves: radius + horizontal arc length, or radius + central angle; right =
+  clockwise. Drawn as chords no longer than the segment length (per element).
+- One `Polyline3D` per axis on `MIN_AX_EJE`; its XDATA stores the start and
+  every element, so `MIN_AX_FROMPOLY` can continue it after reopening.
+
+## Sections
+
+| Planes | Input | 2D frame (sheet axes) | Title |
+|---|---|---|---|
+| Perpendicular to an axis | axis polyline, interval, chainage range (horizontal chainage) | offset (+ right of advance) / elevation | `PK 0+010.00` |
+| Vertical through 2 points | 2 points, spacing, count (parallels to the right of p1→p2) | distance from p1 / elevation | `Sección i (desplazamiento d m)` |
+| Horizontal levels | elevation from/to/step (to ≤ from = automatic over the solids) | X / Y | `Nivel 4200.00` |
+| Through 3 points | 3 points | along p1→p2 / in-plane | `Sección por 3 puntos` |
+
+Solids: `Mesh` (Open Mining solids and any other), `PolyfaceMesh` and `3DFACE`
+(all selected 3DFACEs are treated as one surface). ACIS `3DSOLID`s are not
+cut. A plane lying exactly on a face (e.g. the gallery end at chainage 0) is
+cut a hair inside and projected back. Closed sections report their area.
+
+Sheets are drawn at z = 0 on a grid (sheets per row, gap), to the right of
+the solids or at a given X/Y, each with frame, coordinate grid (true
+offsets/elevations as labels), title, area and the axis marker. With
+**Replace previous sections** the previous run's `SC_*` entities are removed.
 
 ## Import
 
@@ -51,6 +88,10 @@ Plugin id `opencad.mining`, command prefix `MIN_`, XDATA application
 | `MIN_UG_SECCION` | sections (closed 3D polylines) | 4 |
 | `MIN_GM_TRAZA` | geological traces | 1 |
 | `MIN_GM_NOTA` | trace annotations | 7 |
+| `MIN_AX_EJE` | designed axes (3D polylines) | 6 |
+| `MIN_SC_CORTE` | 3D sections in place | 1 |
+| `MIN_SC_LAMINA` | sheet frames, titles, areas, sections, markers | 7 |
+| `MIN_SC_GRILLA` | sheet grids and grid labels | 8 |
 
 ## XDATA schema v1 (`OPENMINING`)
 
@@ -76,6 +117,13 @@ bump. A breaking change increments `schema`.
 | `UG_SECTION` | Sección de labor | `solid` (= `UG_SOLID.id`), `station` |
 | `GM_TRACE` | Traza geológica | `id`, `azimuth`, `length`, `rock`?, `thickness`?, `mineralization`?, `alteration`?, `structure`?, `grade`?, `dip`?, `sample`? |
 | `GM_NOTE` | Anotación geológica | `trace` (= `GM_TRACE.id`) |
+| `AX_AXIS` | Eje de labor | `id`, `e`, `n`, `z`, `az` (start), `length`, `elements`, `e1`…`eN` (see below) |
+| `SC_CUT` | Sección 3D | `set` (run id), `plane` (title), `area` |
+| `SC_SHEET` | Lámina de sección | `set`, `plane`, `role` (`frame`/`grid`/`grid_label`/`title`/`area`/`section`/`marker`) |
+
+Axis elements (`eN`), `;`-separated, grade as `p;<percent>` or `d;<degrees>`:
+`S;<length>;<grade>;<segment>` and
+`C;<radius>;L|A;<length or angle>;R|L;<grade>;<segment>`.
 
 Query example (automation API): `{"xdata_app":"OPENMINING","layer":"MIN_DH_*"}`.
 

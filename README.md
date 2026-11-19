@@ -8,6 +8,8 @@ PST_SolidMine and GeoMapper.
 |---|---|---|
 | Drillholes | `MIN_DH_PANEL` `MIN_DH_LOAD` `MIN_DH_DRAW` `MIN_DH_CLEAR` `MIN_DH_GEOCOLORS` | CSV/XLSX import with column mapping, validation R01–R07, minimum-curvature desurvey, 3D traces coloured by grade or geology, labels |
 | Workings | `MIN_UG_PANEL` `MIN_UG_AXIS` `MIN_UG_HBOUND` `MIN_UG_VBOUND` | Closed solids (mesh) from an axis + section, or from four boundary polylines |
+| Axes | `MIN_AX_PANEL` `MIN_AX_LINE` `MIN_AX_CURVE` `MIN_AX_UNDO` `MIN_AX_NEW` `MIN_AX_PICKSTART` `MIN_AX_FROMPOLY` | Working axes as chains of straights and curves (radius + length or angle, right/left) with grade in % or °, drawn in series from the previous end |
+| Sections | `MIN_SC_PANEL` `MIN_SC_RUN` | Cut solids (meshes) with planes perpendicular to an axis, vertical through 2 points (+ parallels), horizontal levels or 3 points; 3D polylines in place and 2D sheets with grid, title and area |
 | Geology | `MIN_GM_PANEL` `MIN_GM_TRACE` | Structure/vein/contact trace from bearing + length, with annotations |
 
 UI in Spanish, English and Portuguese (`OPENMINING_LANG=es|en|pt`, else the

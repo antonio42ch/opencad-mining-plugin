@@ -62,6 +62,15 @@ pub fn push_panels(host: &mut dyn HostApi, cfg: &ProjectConfig, assay_attrs: &[S
     }
 }
 
+/// Pushes one panel's values (and optionally a status label).
+pub fn push_panel(host: &mut dyn HostApi, cfg: &ProjectConfig, panel: &'static str, status: Option<(&str, String)>) {
+    let mut values = panels::values_for(cfg, &[], &[]).remove(panel).unwrap_or_default();
+    if let Some((id, text)) = status {
+        values.insert(id.to_string(), DialogValue::Text(text));
+    }
+    host.update_panel_for_plugin(MANIFEST.id, panel, values);
+}
+
 pub fn set_status(host: &mut dyn HostApi, text: String) {
     host.update_panel_for_plugin(
         MANIFEST.id,

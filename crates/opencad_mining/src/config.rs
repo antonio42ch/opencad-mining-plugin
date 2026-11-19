@@ -8,6 +8,7 @@ use drillhole_engine::import::{ColumnMap, Field};
 use drillhole_engine::pipeline::RangeScope;
 use ocs_plugin_api::dialog::DialogValue;
 use serde::{Deserialize, Serialize};
+use solids_engine::alignment::{CurveSpec, Element, Grade, Turn};
 use solids_engine::section::{HAlign, Profile, VAlign};
 
 pub const SETTINGS_VERSION: u32 = 1;
@@ -20,6 +21,8 @@ pub struct ProjectConfig {
     pub ug: WorkingsConfig,
     pub gm: GeoMapConfig,
     pub origin: OriginConfig,
+    pub ax: AxesConfig,
+    pub sc: SectionsConfig,
 }
 
 impl Default for ProjectConfig {
@@ -30,6 +33,129 @@ impl Default for ProjectConfig {
             ug: Default::default(),
             gm: Default::default(),
             origin: Default::default(),
+            ax: Default::default(),
+            sc: Default::default(),
+        }
+    }
+}
+
+/// Axis designer (panel "Ejes").
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AxesConfig {
+    pub e: f64,
+    pub n: f64,
+    pub z: f64,
+    pub bearing: String,
+    pub grade: f64,
+    /// 0 = %, 1 = degrees.
+    pub grade_unit: usize,
+    pub length: f64,
+    /// 0 = radius + length, 1 = radius + angle.
+    pub curve_method: usize,
+    pub radius: f64,
+    pub curve_length: f64,
+    pub angle: f64,
+    /// 0 = right (clockwise), 1 = left.
+    pub turn: usize,
+    pub segment: f64,
+    pub update_start: bool,
+}
+
+impl Default for AxesConfig {
+    fn default() -> Self {
+        AxesConfig {
+            e: 0.0,
+            n: 0.0,
+            z: 0.0,
+            bearing: "0".into(),
+            grade: 0.0,
+            grade_unit: 0,
+            length: 20.0,
+            curve_method: 0,
+            radius: 15.0,
+            curve_length: 10.0,
+            angle: 90.0,
+            turn: 0,
+            segment: 1.0,
+            update_start: true,
+        }
+    }
+}
+
+impl AxesConfig {
+    pub fn grade(&self) -> Grade {
+        if self.grade_unit == 1 {
+            Grade::Degrees(self.grade)
+        } else {
+            Grade::Percent(self.grade)
+        }
+    }
+    pub fn straight(&self) -> Element {
+        Element::Straight { length: self.length }
+    }
+    pub fn curve(&self) -> Element {
+        Element::Curve {
+            radius: self.radius,
+            spec: if self.curve_method == 1 {
+                CurveSpec::Angle(self.angle)
+            } else {
+                CurveSpec::Length(self.curve_length)
+            },
+            turn: if self.turn == 1 { Turn::Left } else { Turn::Right },
+        }
+    }
+}
+
+/// Cross-section generator (panel "Secciones").
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SectionsConfig {
+    /// 0 = perpendicular to an axis, 1 = vertical through 2 points,
+    /// 2 = horizontal levels, 3 = through 3 points.
+    pub mode: usize,
+    pub interval: f64,
+    pub ch_from: f64,
+    pub ch_to: f64,
+    pub spacing: f64,
+    pub count: f64,
+    pub z_from: f64,
+    pub z_to: f64,
+    pub z_step: f64,
+    pub draw_3d: bool,
+    pub draw_sheets: bool,
+    pub columns: f64,
+    pub gap: f64,
+    pub grid: f64,
+    pub text_height: f64,
+    pub auto_place: bool,
+    pub sheet_x: f64,
+    pub sheet_y: f64,
+    pub replace: bool,
+}
+
+impl Default for SectionsConfig {
+    fn default() -> Self {
+        SectionsConfig {
+            mode: 0,
+            interval: 10.0,
+            ch_from: 0.0,
+            ch_to: 0.0,
+            spacing: 5.0,
+            count: 1.0,
+            z_from: 0.0,
+            z_to: 0.0,
+            z_step: 5.0,
+            draw_3d: true,
+            draw_sheets: true,
+            columns: 5.0,
+            gap: 4.0,
+            grid: 2.0,
+            text_height: 0.4,
+            auto_place: true,
+            sheet_x: 0.0,
+            sheet_y: 0.0,
+            replace: true,
         }
     }
 }
@@ -341,6 +467,41 @@ impl ProjectConfig {
         set!(g.grade, text("gm_grade"));
         set!(g.dip, text("gm_dip"));
         set!(g.sample, text("gm_sample"));
+        let a = &mut self.ax;
+        set!(a.e, num("ax_e"));
+        set!(a.n, num("ax_n"));
+        set!(a.z, num("ax_z"));
+        set!(a.bearing, text("ax_bearing"));
+        set!(a.grade, num("ax_grade"));
+        set!(a.grade_unit, choice("ax_grade_unit"));
+        set!(a.length, num("ax_length"));
+        set!(a.curve_method, choice("ax_curve_method"));
+        set!(a.radius, num("ax_radius"));
+        set!(a.curve_length, num("ax_curve_length"));
+        set!(a.angle, num("ax_angle"));
+        set!(a.turn, choice("ax_turn"));
+        set!(a.segment, num("ax_segment"));
+        set!(a.update_start, flag("ax_update_start"));
+        let c = &mut self.sc;
+        set!(c.mode, choice("sc_mode"));
+        set!(c.interval, num("sc_interval"));
+        set!(c.ch_from, num("sc_from"));
+        set!(c.ch_to, num("sc_to"));
+        set!(c.spacing, num("sc_spacing"));
+        set!(c.count, num("sc_count"));
+        set!(c.z_from, num("sc_z_from"));
+        set!(c.z_to, num("sc_z_to"));
+        set!(c.z_step, num("sc_z_step"));
+        set!(c.draw_3d, flag("sc_draw_3d"));
+        set!(c.draw_sheets, flag("sc_draw_sheets"));
+        set!(c.columns, num("sc_columns"));
+        set!(c.gap, num("sc_gap"));
+        set!(c.grid, num("sc_grid"));
+        set!(c.text_height, num("sc_text_h"));
+        set!(c.auto_place, flag("sc_auto_place"));
+        set!(c.sheet_x, num("sc_sheet_x"));
+        set!(c.sheet_y, num("sc_sheet_y"));
+        set!(c.replace, flag("sc_replace"));
     }
 }
 

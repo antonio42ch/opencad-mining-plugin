@@ -10,6 +10,7 @@ use mining_core::Vec3;
 use ocs_plugin_api::dialog::DialogValue;
 use ocs_plugin_api::host::Handle;
 
+use crate::axes::AxisState;
 use crate::config::ProjectConfig;
 
 #[derive(Default)]
@@ -18,14 +19,30 @@ pub struct TabState {
     pub data: Option<DataSet>,
     /// Settings were looked up in the drawing already.
     pub settings_checked: bool,
+    /// Axis being designed (elements are appended to it).
+    pub axis: Option<AxisState>,
 }
 
 /// What an interactive pick hands over to the follow-up command.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pending {
-    Axis { axis: Handle, profile: Option<Handle> },
-    Boundaries { vertical: bool, handles: [Handle; 4] },
+    Axis {
+        axis: Handle,
+        profile: Option<Handle>,
+    },
+    Boundaries {
+        vertical: bool,
+        handles: [Handle; 4],
+    },
     TracePoint(Vec3),
+    /// Start point + a point giving the direction.
+    AxisStart(Vec3, Vec3),
+    AxisFromPolyline(Handle),
+    Sections {
+        solids: Vec<Handle>,
+        axis: Option<Handle>,
+        points: Vec<Vec3>,
+    },
 }
 
 static TABS: Mutex<Option<HashMap<u64, TabState>>> = Mutex::new(None);

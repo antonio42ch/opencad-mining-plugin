@@ -11,8 +11,11 @@ use crate::i18n::Strings;
 pub const DH: &str = "min_drillholes";
 pub const UG: &str = "min_workings";
 pub const GM: &str = "min_geomap";
-pub const ALL: [&str; 3] = [DH, UG, GM];
+pub const AX: &str = "min_axes";
+pub const SC: &str = "min_sections";
+pub const ALL: [&str; 5] = [DH, UG, GM, AX, SC];
 pub const DH_STATUS: &str = "dh_status";
+pub const AX_STATUS: &str = "ax_status";
 
 const FILE_EXT: &[&str] = &["csv", "txt", "tsv", "xlsx", "xls", "ods"];
 
@@ -245,6 +248,125 @@ pub fn geomap(s: &Strings, c: &ProjectConfig) -> PanelDef {
     )
 }
 
+pub fn axes(s: &Strings, c: &ProjectConfig) -> PanelDef {
+    let a = &c.ax;
+    panel(
+        AX,
+        s.p_axes,
+        "MIN_AX_PANEL",
+        vec![
+            fields(
+                "ax_start",
+                s.sec_start,
+                vec![
+                    num("ax_e", s.ax_e, a.e, None, 1.0),
+                    num("ax_n", s.ax_n, a.n, None, 1.0),
+                    num("ax_z", s.ax_z, a.z, None, 1.0),
+                    text("ax_bearing", s.bearing, &a.bearing),
+                ],
+            ),
+            DialogControl::Row {
+                controls: vec![
+                    button("ax_btn_pick", s.btn_pick_start, "MIN_AX_PICKSTART"),
+                    button("ax_btn_from", s.btn_from_poly, "MIN_AX_FROMPOLY"),
+                ],
+                align_h: None,
+                align_v: None,
+            },
+            fields(
+                "ax_grade_f",
+                s.sec_grade,
+                vec![
+                    num("ax_grade", s.ax_grade, a.grade, None, 0.5),
+                    choice("ax_grade_unit", "", &s.grade_units, a.grade_unit),
+                ],
+            ),
+            fields(
+                "ax_straight",
+                s.sec_straight,
+                vec![
+                    num("ax_length", s.ax_length, a.length, Some(0.001), 1.0),
+                    button("ax_btn_line", s.btn_add_line, "MIN_AX_LINE"),
+                ],
+            ),
+            fields(
+                "ax_curve",
+                s.sec_curve,
+                vec![
+                    choice("ax_curve_method", s.curve_method, &s.curve_methods, a.curve_method),
+                    num("ax_radius", s.radius, a.radius, Some(0.001), 1.0),
+                    num("ax_curve_length", s.curve_length, a.curve_length, Some(0.001), 1.0),
+                    num("ax_angle", s.central_angle, a.angle, Some(0.001), 5.0),
+                    choice("ax_turn", s.turn, &s.turns, a.turn),
+                    num("ax_segment", s.segment, a.segment, Some(0.001), 0.5),
+                    button("ax_btn_curve", s.btn_add_curve, "MIN_AX_CURVE"),
+                ],
+            ),
+            check("ax_update_start", s.update_start, a.update_start),
+            DialogControl::Row {
+                controls: vec![
+                    button("ax_btn_undo", s.btn_undo_element, "MIN_AX_UNDO"),
+                    button("ax_btn_new", s.btn_new_axis, "MIN_AX_NEW"),
+                ],
+                align_h: None,
+                align_v: None,
+            },
+            DialogControl::Label {
+                id: AX_STATUS.into(),
+                text: String::new(),
+                align_h: None,
+            },
+        ],
+    )
+}
+
+pub fn sections(s: &Strings, c: &ProjectConfig) -> PanelDef {
+    let x = &c.sc;
+    panel(
+        SC,
+        s.p_sections,
+        "MIN_SC_PANEL",
+        vec![
+            fields(
+                "sc_planes",
+                s.sec_planes,
+                vec![
+                    choice("sc_mode", s.sc_mode, &s.sc_modes, x.mode),
+                    num("sc_interval", s.sc_interval, x.interval, Some(0.001), 1.0),
+                    num("sc_from", s.sc_from, x.ch_from, Some(0.0), 10.0),
+                    num("sc_to", s.sc_to, x.ch_to, Some(0.0), 10.0),
+                    num("sc_spacing", s.sc_spacing, x.spacing, Some(0.001), 1.0),
+                    num("sc_count", s.sc_count, x.count, Some(1.0), 1.0),
+                    num("sc_z_from", s.sc_z_from, x.z_from, None, 5.0),
+                    num("sc_z_to", s.sc_z_to, x.z_to, None, 5.0),
+                    num("sc_z_step", s.sc_z_step, x.z_step, Some(0.001), 1.0),
+                ],
+            ),
+            fields(
+                "sc_output",
+                s.sec_output,
+                vec![
+                    check("sc_draw_3d", s.sc_draw_3d, x.draw_3d),
+                    check("sc_draw_sheets", s.sc_draw_sheets, x.draw_sheets),
+                    num("sc_columns", s.sc_columns, x.columns, Some(1.0), 1.0),
+                    num("sc_gap", s.sc_gap, x.gap, Some(0.0), 1.0),
+                    num("sc_grid", s.sc_grid, x.grid, Some(0.01), 1.0),
+                    num("sc_text_h", s.sc_text_h, x.text_height, Some(0.01), 0.1),
+                    check("sc_auto_place", s.sc_auto_place, x.auto_place),
+                    num("sc_sheet_x", s.sc_sheet_x, x.sheet_x, None, 10.0),
+                    num("sc_sheet_y", s.sc_sheet_y, x.sheet_y, None, 10.0),
+                    check("sc_replace", s.sc_replace, x.replace),
+                ],
+            ),
+            DialogControl::InfoText {
+                text: s.sc_hint.into(),
+                align_h: None,
+            },
+            button("sc_btn_run", s.btn_sections, "MIN_SC_RUN"),
+        ],
+    )
+}
+
 /// Values to push into the panels so they show `c` (after restoring settings
 /// from a drawing, or after a load fills the attribute lists).
 pub fn values_for(
@@ -337,7 +459,51 @@ pub fn values_for(
     .into_iter()
     .map(|(k, v)| (k.to_string(), v))
     .collect();
-    HashMap::from([(DH, dh), (UG, ug), (GM, gm)])
+    let (a, x) = (&c.ax, &c.sc);
+    let ax = [
+        ("ax_e", n(a.e)),
+        ("ax_n", n(a.n)),
+        ("ax_z", n(a.z)),
+        ("ax_bearing", t(&a.bearing)),
+        ("ax_grade", n(a.grade)),
+        ("ax_grade_unit", ch(a.grade_unit, &["", ""])),
+        ("ax_length", n(a.length)),
+        ("ax_curve_method", ch(a.curve_method, &["", ""])),
+        ("ax_radius", n(a.radius)),
+        ("ax_curve_length", n(a.curve_length)),
+        ("ax_angle", n(a.angle)),
+        ("ax_turn", ch(a.turn, &["", ""])),
+        ("ax_segment", n(a.segment)),
+        ("ax_update_start", b(a.update_start)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+    let sc = [
+        ("sc_mode", ch(x.mode, &["", "", "", ""])),
+        ("sc_interval", n(x.interval)),
+        ("sc_from", n(x.ch_from)),
+        ("sc_to", n(x.ch_to)),
+        ("sc_spacing", n(x.spacing)),
+        ("sc_count", n(x.count)),
+        ("sc_z_from", n(x.z_from)),
+        ("sc_z_to", n(x.z_to)),
+        ("sc_z_step", n(x.z_step)),
+        ("sc_draw_3d", b(x.draw_3d)),
+        ("sc_draw_sheets", b(x.draw_sheets)),
+        ("sc_columns", n(x.columns)),
+        ("sc_gap", n(x.gap)),
+        ("sc_grid", n(x.grid)),
+        ("sc_text_h", n(x.text_height)),
+        ("sc_auto_place", b(x.auto_place)),
+        ("sc_sheet_x", n(x.sheet_x)),
+        ("sc_sheet_y", n(x.sheet_y)),
+        ("sc_replace", b(x.replace)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect();
+    HashMap::from([(DH, dh), (UG, ug), (GM, gm), (AX, ax), (SC, sc)])
 }
 
 #[cfg(test)]
@@ -362,7 +528,13 @@ mod tests {
         }
         let s = for_lang(Lang::Es);
         let c = ProjectConfig::default();
-        let panels = [drillholes(s, &c), workings(s, &c), geomap(s, &c)];
+        let panels = [
+            drillholes(s, &c),
+            workings(s, &c),
+            geomap(s, &c),
+            axes(s, &c),
+            sections(s, &c),
+        ];
         let values = values_for(&c, &["cu".into()], &["rock".into()]);
         for p in &panels {
             let mut declared = Vec::new();
@@ -381,6 +553,10 @@ mod tests {
         c.ug.width = 5.5;
         c.gm.bearing = "S30W".into();
         c.dh.custom_ranges = vec![(0.0, 1.0, "Verde".into())];
+        c.ax.radius = 22.5;
+        c.ax.turn = 1;
+        c.sc.mode = 2;
+        c.sc.columns = 3.0;
         let mut flat = HashMap::new();
         for (_, m) in values_for(&c, &[], &[]) {
             flat.extend(m);
@@ -391,5 +567,7 @@ mod tests {
         assert_eq!(back.ug.width, 5.5);
         assert_eq!(back.gm.bearing, "S30W");
         assert_eq!(back.dh.custom_ranges, c.dh.custom_ranges);
+        assert_eq!((back.ax.radius, back.ax.turn), (22.5, 1));
+        assert_eq!((back.sc.mode, back.sc.columns), (2, 3.0));
     }
 }

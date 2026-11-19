@@ -20,10 +20,13 @@ pub enum Class {
     Section,
     GeoTrace,
     GeoNote,
+    Axis,
+    Cut,
+    Sheet,
 }
 
 impl Class {
-    pub const ALL: [Class; 9] = [
+    pub const ALL: [Class; 12] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -33,6 +36,9 @@ impl Class {
         Class::Section,
         Class::GeoTrace,
         Class::GeoNote,
+        Class::Axis,
+        Class::Cut,
+        Class::Sheet,
     ];
 
     pub fn key(self) -> &'static str {
@@ -46,6 +52,9 @@ impl Class {
             Self::Section => "UG_SECTION",
             Self::GeoTrace => "GM_TRACE",
             Self::GeoNote => "GM_NOTE",
+            Self::Axis => "AX_AXIS",
+            Self::Cut => "SC_CUT",
+            Self::Sheet => "SC_SHEET",
         }
     }
 
