@@ -1,0 +1,10 @@
+[package]
+name = "geotech_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Geotechnics for Open Mining: RMR89, Q-system, GSI, Hoek-Brown 2002, rock mass modulus, geotechnical data import. std + mining_core + drillhole_engine."
+
+[dependencies]
+mining_core = { path = "../mining_core" }
+drillhole_engine = { path = "../drillhole_engine", default-features = false }

@@ -106,6 +106,7 @@ pub fn panel_value(host: &mut dyn HostApi, panel: &str, id: &str) -> Option<Dial
 
 pub fn push_panels(host: &mut dyn HostApi, cfg: &ProjectConfig, assay_attrs: &[String], geo_attrs: &[String]) {
     push_rs(host, cfg);
+    crate::gtcommands::push_all(host, cfg);
     for (panel, values) in panels::values_for(cfg, assay_attrs, geo_attrs) {
         host.update_panel_for_plugin(MANIFEST.id, panel, values);
     }

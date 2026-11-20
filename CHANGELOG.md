@@ -3,6 +3,26 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — unreleased
+
+### Added
+- **Geotechnics, phase 1** (new ribbon group and three panels) — see `docs/GEOTECH.md`:
+  - Tables of drillhole logging, face/cell mapping (coordinates or chainage along an axis),
+    laboratory tests and oriented discontinuities; column names recognised in es/en/pt, a
+    column chooser when one is missing, remembered with the project.
+  - **RMR89** (official tables), **Q** and **Q'**, **GSI** (typed, from RMR89' or from Q'),
+    RMR ↔ Q correlations (opt-in), RQD from fractures/m (Priest & Hudson), UCS from the
+    laboratory by lithology. Missing parameters are reported, never invented.
+  - **Hoek-Brown 2002** calculator: mb, s, a, rock mass strength, Mohr-Coulomb fit for tunnels
+    or slopes, rock mass modulus (Hoek & Diederichs 2006), envelope chart; GSI and σci / mi
+    filled from the classified data and the laboratory.
+  - Records drawn on `MIN_GT_SONDAJE` / `MIN_GT_MAPEO` coloured by RMR class, Q class or GSI,
+    with XDATA `GT_REC`.
+  - **Geotechnical block model**: RMR, GSI and log Q interpolated (IDW / nearest) into the
+    resource model (or a new one), rock mass class column, views coloured by them.
+  - `MIN_GT_LOAD [logging [mapping [lab [joints]]]]` takes paths as arguments.
+- New crate `geotech_engine`. The end-to-end host test also runs the geotechnical module.
+
 ## [0.5.0] — 2026-11-20
 
 ### Added

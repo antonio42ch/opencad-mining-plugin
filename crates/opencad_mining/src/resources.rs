@@ -1788,8 +1788,14 @@ pub fn validate(
 
 const DOMAIN_COLORS: [u8; 10] = [3, 1, 5, 2, 6, 4, 30, 62, 141, 210];
 
+/// First view attribute of the geotechnical columns (RMR, GSI, log Q, class).
+pub const GT_VIEW_ATTR: usize = 11;
+
 /// Column shown for the view attribute index (`None` = the domain itself).
 pub fn attr_column(var: &str, i: usize) -> Option<String> {
+    if let Some(c) = i.checked_sub(GT_VIEW_ATTR).and_then(|k| crate::geotech::COLUMNS.get(k)) {
+        return Some(c.to_string());
+    }
     let suffix = [
         "ok", "ok_var", "ok_ke", "", "pass", "n", "dist", "nn", "idw", "sk", "tonnage",
     ]
@@ -1873,7 +1879,7 @@ pub fn view(
         None => (0.0, 1.0),
     };
     let custom = cfg.dh.custom_ranges();
-    let scheme = if is_grade {
+    let scheme = if is_grade && b.view_attr < GT_VIEW_ATTR {
         cfg.dh.scheme()
     } else {
         ColorScheme::BlueToRed
@@ -1884,6 +1890,14 @@ pub fn view(
             Some(v) => {
                 if b.view_attr == 4 {
                     return [3, 2, 1, 6][(v[i].round() as usize).clamp(1, 4) - 1];
+                }
+                // Geotechnics: the class has its own colours; RMR, GSI and log Q
+                // are reversed so poor rock is red.
+                if b.view_attr == GT_VIEW_ATTR + 3 {
+                    return crate::geotech::class_color(v[i].round().clamp(1.0, 5.0) as u8);
+                }
+                if b.view_attr >= GT_VIEW_ATTR {
+                    return grade_color(ColorScheme::BlueToRed, hi + lo - v[i] as f64, lo, hi, &[]);
                 }
                 if scheme == ColorScheme::Custom && custom.is_empty() {
                     GRAY
@@ -1974,7 +1988,8 @@ pub fn view(
         _ => {
             let blocks: Vec<usize> = (0..model.len()).filter(|&i| accept(i)).collect();
             let total = blocks.len();
-            let chosen = pick_cubes(blocks, values, limit);
+            // Geotechnical attributes keep an even sample (no "highest first").
+            let chosen = pick_cubes(blocks, values.filter(|_| b.view_attr < GT_VIEW_ATTR), limit);
             limited = chosen.len() < total;
             cubes = Some((chosen.len(), total));
             let mut by_color: BTreeMap<u8, Vec<usize>> = BTreeMap::new();

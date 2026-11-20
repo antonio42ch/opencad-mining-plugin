@@ -14,6 +14,11 @@ pub mod charts;
 pub mod config;
 pub mod drillholes;
 pub mod geomap;
+pub mod geotech;
+pub mod gtcommands;
+pub mod gtconfig;
+pub mod gti18n;
+pub mod gtpanels;
 pub mod host_sink;
 pub mod i18n;
 pub mod interactive;
@@ -54,7 +59,7 @@ pub static MANIFEST: PluginManifest = PluginManifest {
 };
 
 macro_rules! classes {
-    ($name:ident, $s:expr, $r:expr) => {
+    ($name:ident, $s:expr, $r:expr, $g:expr) => {
         static $name: EntityClasses = EntityClasses {
             app_id: xdata::APP,
             class_prefix: xdata::CLASS_PREFIX,
@@ -74,13 +79,14 @@ macro_rules! classes {
                 ("AX_AXIS", $s.cls_axis),
                 ("SC_CUT", $s.cls_cut),
                 ("SC_SHEET", $s.cls_sheet),
+                ("GT_REC", $g.cls_rec),
             ],
         };
     };
 }
-classes!(CLASSES_ES, i18n::ES, rsi18n::ES);
-classes!(CLASSES_EN, i18n::EN, rsi18n::EN);
-classes!(CLASSES_PT, i18n::PT, rsi18n::PT);
+classes!(CLASSES_ES, i18n::ES, rsi18n::ES, gti18n::ES);
+classes!(CLASSES_EN, i18n::EN, rsi18n::EN, gti18n::EN);
+classes!(CLASSES_PT, i18n::PT, rsi18n::PT, gti18n::PT);
 
 pub struct MiningPlugin;
 
@@ -113,6 +119,9 @@ impl BuiltinPlugin for MiningPlugin {
             rspanels::comp(rsi18n::r(), &c, ""),
             rspanels::vario(rsi18n::r(), &c, ""),
             rspanels::blocks(rsi18n::r(), &c, ""),
+            gtpanels::data(gti18n::g(), &c),
+            gtpanels::hb(gti18n::g(), &c, ""),
+            gtpanels::model(gti18n::g(), &c),
         ] {
             let id = def.id.clone();
             if !host.register_panel_for_plugin(MANIFEST.id, def) {
@@ -151,6 +160,9 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_RS_COMP_PANEL" => Some(rspanels::COMP),
             "MIN_RS_VARIO_PANEL" => Some(rspanels::VARIO),
             "MIN_RS_BM_PANEL" => Some(rspanels::BM),
+            "MIN_GT_DATA_PANEL" => Some(gtpanels::DATA),
+            "MIN_GT_HB_PANEL" => Some(gtpanels::HB),
+            "MIN_GT_MODEL_PANEL" => Some(gtpanels::MODEL),
             _ => None,
         };
         if let Some(p) = panel {
@@ -426,6 +438,7 @@ impl BuiltinPlugin for MiningPlugin {
                 }
             }
             "MIN_SC_EXEC" => run_sections(host, s, tab, &cfg),
+            other if other.starts_with("MIN_GT_") => return gtcommands::dispatch(host, cmd, other, tab, &mut cfg),
             other => return rscommands::dispatch(host, other, tab, &mut cfg),
         }
         true

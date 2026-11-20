@@ -275,6 +275,8 @@ pub enum SelectionKind {
     DomainSolids,
     /// Mapped traces to project along their dip.
     Projection,
+    /// Axes of a geotechnical mapping by chainage.
+    GtAxes,
 }
 
 /// Gathers a selection (pick or window) and hands it to a follow-up command.
@@ -309,6 +311,7 @@ impl InteractiveCommand for PickSelection {
         let (pending, next) = match self.kind {
             SelectionKind::DomainSolids => (Pending::DomainSolids(handles), "MIN_RS_SETSOLID_EXEC"),
             SelectionKind::Projection => (Pending::Projection(handles), "MIN_GM_PROJECT_EXEC"),
+            SelectionKind::GtAxes => (Pending::GtAxes(handles), "MIN_GT_CLASSIFY_EXEC"),
         };
         set_pending(pending);
         CommandStep::Dispatch(next.into())

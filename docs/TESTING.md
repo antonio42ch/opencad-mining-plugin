@@ -38,10 +38,12 @@ python3 scripts/smoke_serve.py ~/ocs/squashfs-root/AppRun
 ```
 
 Uses a temporary config and plugins folder and drives every module over
-`--serve`: plugin loaded and its 8 panels registered, geology trace from
+`--serve`: plugin loaded and its 11 panels registered, geology trace from
 coordinates and projection along the dip, axis solid and level sections,
 drillholes from the reference CSVs (typed into the panel), composites, a saved
-variogram model, block model estimation and a block view. On failure it prints
+variogram model, block model estimation and a block view, then geotechnics
+(sample logging + laboratory tables classified on the loaded holes, Hoek-Brown,
+geotechnical block model columns and a view coloured by RMR). On failure it prints
 every request/reply and the host's command line. CI runs it on each push
 against the host release pinned in `.github/workflows/ci.yml` (`OCS_VERSION`).
 
@@ -109,3 +111,21 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     Check the side (right/left of the drawing direction), then *Diferencia de altura* with a positive and a
     negative value (the line moves against / with the dip). Reverse the polyline and the side flips.
 24. Draw a trace with a dip, leave the dip field empty, project it → uses the stored dip.
+
+## Geotechnics (v0.6)
+
+25. Geotecnia → Datos: choose `crates/geotech_engine/tests/data/logging.csv` as logging and
+    `lab.csv` as laboratory (after loading the reference drillholes), **Cargar** → two lines with
+    the records and recognised columns. **Clasificar y dibujar** → 5 coloured intervals on
+    `MIN_GT_SONDAJE` along VERT and INCL; the report gives RMR / Q / GSI counts and the classes
+    (VERT 0–20 m is RMR 84, class I, blue; VERT 40–60 m is RMR 36, class IV, orange).
+26. Delete the UCS of a Brecha row in a copy of the file and reload → that record is grey and the
+    report counts it under *UCS* (nothing is filled in silently).
+27. Mapping by chainage: a table with `PK;RMR;Q` rows, draw an axis, **Clasificar** → asks for the
+    axis; points with labels appear at those horizontal chainages on `MIN_GT_MAPEO`.
+28. Hoek-Brown: GSI 50, mi 10, D 0, σci 100 → mb 1.677, s 0.00387, a 0.506 and a chart with the
+    curve and the dashed Mohr-Coulomb line. Type `Andesita` as lithology, **Usar datos
+    clasificados** → σci 140, mi 25 and the median GSI.
+29. Modelo: **Estimar geotecnia** (with or without a resource model) → `gt_rmr`, `gt_gsi`, `gt_logq`,
+    `gt_class` reported; **Ver modelo** with *Clase de macizo* → blocks in the class colours.
+    The resource tonnage report is unchanged afterwards.

@@ -13,7 +13,7 @@ pub const UG: &str = "min_workings";
 pub const GM: &str = "min_geomap";
 pub const AX: &str = "min_axes";
 pub const SC: &str = "min_sections";
-pub const ALL: [&str; 8] = [
+pub const ALL: [&str; 11] = [
     DH,
     UG,
     GM,
@@ -22,6 +22,9 @@ pub const ALL: [&str; 8] = [
     crate::rspanels::COMP,
     crate::rspanels::VARIO,
     crate::rspanels::BM,
+    crate::gtpanels::DATA,
+    crate::gtpanels::HB,
+    crate::gtpanels::MODEL,
 ];
 pub const DH_STATUS: &str = "dh_status";
 pub const AX_STATUS: &str = "ax_status";

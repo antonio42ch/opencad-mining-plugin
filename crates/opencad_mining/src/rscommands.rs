@@ -143,6 +143,23 @@ fn need_composites(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, r: &Rs
     }
 }
 
+/// Block model of the tab or of its `.ombm` file, without complaining when
+/// there is none (the geotechnical module then creates its own).
+pub(crate) fn current_model(
+    host: &mut dyn HostApi,
+    tab: u64,
+    cfg: &ProjectConfig,
+) -> Option<blockmodel_engine::BlockModel> {
+    if let Some(m) = state::with_tab(tab, |t| t.rs.model.clone()) {
+        return Some(m);
+    }
+    let path = rs::model_file(doc_path(host).as_deref(), &cfg.rs.bm.folder, ".ombm")?;
+    let m = blockmodel_engine::file::load(&path).ok()?;
+    host.push_info(&fmt(r().m_reload_model, &[&path.display()]));
+    state::with_tab(tab, |t| t.rs.model = Some(m.clone()));
+    Some(m)
+}
+
 /// Block model of the tab, recovered from `<drawing>.ombm` after reopening.
 fn need_model(
     host: &mut dyn HostApi,
@@ -563,7 +580,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
     true
 }
 
-fn save_model(
+pub(crate) fn save_model(
     host: &dyn HostApi,
     cfg: &ProjectConfig,
     model: &blockmodel_engine::BlockModel,
