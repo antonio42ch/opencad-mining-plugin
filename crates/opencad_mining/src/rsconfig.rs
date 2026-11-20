@@ -23,8 +23,12 @@ pub struct DomainCfg {
     pub density: f64,
     /// Top-cut of the grade (0 = none).
     pub cap: f64,
-    /// Contact-surface side: 0 none, 1 above, 2 below.
+    /// Legacy (v0.4): side of the single contact surface, 0 none, 1 above,
+    /// 2 below. Read for old drawings; new settings use `surface`.
+    #[serde(skip_serializing)]
     pub side: usize,
+    /// Surface conditions as typed: `Encima C1`, `Debajo C1; Encima C2`…
+    pub surface: String,
 }
 
 impl Default for DomainCfg {
@@ -35,11 +39,48 @@ impl Default for DomainCfg {
             density: 2.7,
             cap: 0.0,
             side: 0,
+            surface: String::new(),
         }
     }
 }
 
+/// One contact surface: its name and the geology above / below it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct ContactRow {
+    pub name: String,
+    pub above: String,
+    pub below: String,
+}
+
+/// Words accepted for "above" / "below" (es, en, pt).
+fn side_word(w: &str) -> Option<bool> {
+    match w.trim().to_lowercase().as_str() {
+        "encima" | "above" | "acima" | "sobre" => Some(true),
+        "debajo" | "below" | "abaixo" | "bajo" => Some(false),
+        _ => None,
+    }
+}
+
 impl DomainCfg {
+    /// Surface conditions `(surface name, above?)`; an empty name means the
+    /// first contact surface. Unknown words are ignored.
+    pub fn conditions(&self) -> Vec<(String, bool)> {
+        let parsed: Vec<(String, bool)> = self
+            .surface
+            .split([';', ','])
+            .filter_map(|part| {
+                let mut words = part.split_whitespace();
+                let above = side_word(words.next()?)?;
+                Some((words.collect::<Vec<_>>().join(" "), above))
+            })
+            .collect();
+        if parsed.is_empty() && self.surface.trim().is_empty() && self.side != 0 {
+            return vec![(String::new(), self.side == 1)];
+        }
+        parsed
+    }
+
     pub fn value_list(&self) -> Vec<String> {
         self.values
             .split(';')
@@ -346,6 +387,14 @@ impl BlockCfg {
     }
 }
 
+/// Attribute and domain list the cached composites were made with.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct CompositeStamp {
+    pub variable: String,
+    pub domains: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ResourcesConfig {
@@ -363,6 +412,9 @@ pub struct ResourcesConfig {
     pub contact: ContactCfg,
     pub vario: VarioCfg,
     pub bm: BlockCfg,
+    pub composited: CompositeStamp,
+    /// Contact surfaces (name, geology above, geology below).
+    pub contacts: Vec<ContactRow>,
 }
 
 impl Default for ResourcesConfig {
@@ -381,6 +433,8 @@ impl Default for ResourcesConfig {
             contact: ContactCfg::default(),
             vario: VarioCfg::default(),
             bm: BlockCfg::default(),
+            composited: CompositeStamp::default(),
+            contacts: Vec::new(),
         }
     }
 }
@@ -413,6 +467,23 @@ impl ResourcesConfig {
         (0..n)
             .map(|i| self.dc_min + (self.dc_max - self.dc_min) * i as f64 / (n - 1) as f64)
             .collect()
+    }
+
+    /// Contact surfaces in use: the table, or the single v0.4 contact.
+    pub fn contact_rows(&self) -> Vec<ContactRow> {
+        if !self.contacts.is_empty() {
+            return self.contacts.clone();
+        }
+        let c = &self.contact;
+        if c.above.trim().is_empty() && c.below.trim().is_empty() {
+            Vec::new()
+        } else {
+            vec![ContactRow {
+                name: "C1".into(),
+                above: c.above.clone(),
+                below: c.below.clone(),
+            }]
+        }
     }
 
     pub fn domain_names(&self) -> Vec<String> {
@@ -477,17 +548,28 @@ impl ResourcesConfig {
                     values: r.get(1).cloned().unwrap_or_default(),
                     density: num_of(r, 2, 2.7),
                     cap: num_of(r, 3, 0.0),
-                    side: match r.get(4).map(|s| s.trim().to_lowercase()).as_deref() {
-                        Some("encima") | Some("above") | Some("acima") => 1,
-                        Some("debajo") | Some("below") | Some("abaixo") => 2,
-                        _ => 0,
-                    },
+                    side: 0,
+                    surface: r.get(4).map(|s| s.trim().to_string()).unwrap_or_default(),
+                })
+                .collect();
+        }
+        if let Some(rows) = table("rs_contacts") {
+            self.contacts = rows
+                .iter()
+                .filter(|r| r.iter().any(|c| !c.trim().is_empty()))
+                .enumerate()
+                .map(|(i, r)| ContactRow {
+                    name: r
+                        .first()
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| format!("C{}", i + 1)),
+                    above: r.get(1).map(|s| s.trim().to_string()).unwrap_or_default(),
+                    below: r.get(2).map(|s| s.trim().to_string()).unwrap_or_default(),
                 })
                 .collect();
         }
         let c = &mut self.contact;
-        set!(c.above, text("rs_ct_above"));
-        set!(c.below, text("rs_ct_below"));
         set!(c.step, num("rs_ct_step").filter(|x| *x > 0.0));
         set!(c.kind, choice("rs_ct_kind"));
         set!(c.nugget, num("rs_ct_nugget"));
@@ -595,6 +677,40 @@ mod tests {
     }
 
     #[test]
+    fn surface_conditions_parse_and_legacy_settings_still_work() {
+        let d = |s: &str| DomainCfg {
+            surface: s.into(),
+            ..Default::default()
+        };
+        assert_eq!(d("Encima C1").conditions(), vec![("C1".to_string(), true)]);
+        assert_eq!(
+            d("debajo C1; Encima C2").conditions(),
+            vec![("C1".to_string(), false), ("C2".to_string(), true)]
+        );
+        assert_eq!(d("Below").conditions(), vec![(String::new(), false)]);
+        assert_eq!(d("Acima Contato 2").conditions(), vec![("Contato 2".to_string(), true)]);
+        assert!(d("").conditions().is_empty() && d("algo").conditions().is_empty());
+        // v0.4 drawings stored a numeric side for the single surface.
+        let legacy: DomainCfg = serde_json::from_str(r#"{"name":"Ox","side":1}"#).unwrap();
+        assert_eq!(legacy.conditions(), vec![(String::new(), true)]);
+        assert!(
+            !serde_json::to_string(&legacy).unwrap().contains("side"),
+            "new files do not write the legacy field"
+        );
+        let mut rc = ResourcesConfig::default();
+        assert!(rc.contact_rows().is_empty());
+        rc.contact.above = "OXIDO".into();
+        rc.contact.below = "SULFURO".into();
+        assert_eq!(rc.contact_rows()[0].name, "C1");
+        rc.contacts = vec![ContactRow {
+            name: "A".into(),
+            above: "X".into(),
+            below: "Y".into(),
+        }];
+        assert_eq!(rc.contact_rows()[0].name, "A");
+    }
+
+    #[test]
     fn passes_follow_the_configuration() {
         let b = BlockCfg {
             pass2: 2.0,
@@ -661,10 +777,11 @@ mod tests {
         assert_eq!(c.domains.len(), 2);
         assert_eq!(c.domains[0].value_list(), vec!["OXIDO", "OX"]);
         assert_eq!(
-            (c.domains[0].density, c.domains[0].cap, c.domains[0].side),
+            (c.domains[0].density, c.domains[0].cap, c.domains[0].conditions().len()),
             (2.4, 30.0, 1)
         );
-        assert_eq!((c.domains[1].density, c.domains[1].side), (2.7, 0));
+        assert_eq!((c.domains[1].density, c.domains[1].conditions().len()), (2.7, 0));
+        assert_eq!(c.domains[0].conditions(), vec![(String::new(), true)]);
         assert_eq!(c.vario.work.structures[1].sill, 4.5);
         assert_eq!(c.bm.size, [10.0, 10.0, 12.0], "non-positive size is ignored");
         let back: ResourcesConfig = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();

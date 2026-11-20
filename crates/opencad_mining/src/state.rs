@@ -22,6 +22,7 @@ pub struct TabState {
     /// Axis being designed (elements are appended to it).
     pub axis: Option<AxisState>,
     pub rs: crate::resources::RsState,
+    pub gt: crate::geotech::GtState,
 }
 
 /// What an interactive pick hands over to the follow-up command.
@@ -46,6 +47,10 @@ pub enum Pending {
     },
     /// Solids to assign to the estimation domain chosen in the panel.
     DomainSolids(Vec<Handle>),
+    /// Mapped traces to project along their dip.
+    Projection(Vec<Handle>),
+    /// Axis polylines of a geotechnical mapping by chainage.
+    GtAxes(Vec<Handle>),
     /// Inputs of a block-model section view.
     BmView {
         axis: Option<Handle>,

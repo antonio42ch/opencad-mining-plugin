@@ -1,11 +1,16 @@
-//! Geological mapping in plan: a trace (structure, vein, contact) from a
-//! point, an azimuth and a length, plus its annotation layout.
+//! Geological mapping: a trace (structure, vein, contact) from a point, an
+//! azimuth and a length, and the projection of a mapped trace to another
+//! height along its dip.
 //!
 //! Dip convention here is the geological one: **dip magnitude 0..90, positive
 //! downwards**, with a separate dip direction. (Drillholes use signed dip,
 //! -90 = down; [`dip_to_signed`] converts between both.)
 
+pub mod project;
+
 use mining_core::{azimuth_to_cad_angle, normalize360, Vec3};
+
+pub use project::{project_polyline, DipDirection, Height, ProjectError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Anchor {
@@ -15,6 +20,7 @@ pub enum Anchor {
     End,
 }
 
+/// Metadata stored with a trace (XDATA); it never produces drawn text.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Observation {
     pub rock_type: String,
@@ -25,6 +31,8 @@ pub struct Observation {
     pub grade: String,
     /// Dip magnitude 0..90 (positive down).
     pub dip: Option<f64>,
+    /// Dip direction (azimuth) when it is known.
+    pub dip_direction: Option<f64>,
     pub sample_code: String,
 }
 
@@ -41,6 +49,8 @@ pub struct Trace {
 pub enum MapError {
     InvalidLength(f64),
     InvalidDip(f64),
+    /// A coordinate is not a finite number.
+    InvalidPoint,
 }
 
 impl std::fmt::Display for MapError {
@@ -48,6 +58,7 @@ impl std::fmt::Display for MapError {
         match self {
             Self::InvalidLength(l) => write!(f, "trace length must be > 0 (got {l})"),
             Self::InvalidDip(d) => write!(f, "dip must be within 0..90 (got {d})"),
+            Self::InvalidPoint => write!(f, "the coordinates must be finite numbers"),
         }
     }
 }
@@ -77,6 +88,9 @@ pub fn dip_to_signed(dip: f64) -> f64 {
 
 impl Trace {
     pub fn validate(&self) -> Result<(), MapError> {
+        if self.point.iter().any(|c| !c.is_finite()) {
+            return Err(MapError::InvalidPoint);
+        }
         if !(self.length > 0.0 && self.length.is_finite()) {
             return Err(MapError::InvalidLength(self.length));
         }
@@ -98,48 +112,6 @@ impl Trace {
             Anchor::Center => (point_along(p, back, l / 2.0), point_along(p, self.azimuth, l / 2.0)),
         }
     }
-
-    /// Annotation lines (only non-empty fields), using the caller's labels.
-    pub fn annotation_lines(&self, labels: &AnnotationLabels) -> Vec<String> {
-        let o = &self.observation;
-        let mut v = Vec::new();
-        let mut push = |prefix: &str, val: &str| {
-            if !val.trim().is_empty() {
-                v.push(format!("{prefix}{val}"));
-            }
-        };
-        push("", &o.rock_type);
-        push(
-            labels.thickness,
-            &o.thickness.map(|t| format!("{t}")).unwrap_or_default(),
-        );
-        push(labels.mineralization, &o.mineralization);
-        push(labels.alteration, &o.alteration);
-        push("", &o.structure);
-        push(labels.grade, &o.grade);
-        push(labels.dip, &o.dip.map(|d| format!("{d:.0}")).unwrap_or_default());
-        push(labels.sample, &o.sample_code);
-        v
-    }
-}
-
-/// Prefixes for annotation lines (localised by the UI layer).
-pub struct AnnotationLabels {
-    pub thickness: &'static str,
-    pub mineralization: &'static str,
-    pub alteration: &'static str,
-    pub grade: &'static str,
-    pub dip: &'static str,
-    pub sample: &'static str,
-}
-
-/// Text height and insertion points for `count` lines next to `p`.
-pub fn annotation_layout(p: Vec3, length: f64, count: usize) -> (f64, Vec<Vec3>) {
-    let h = if length > 0.0 { length * 0.15 } else { 0.5 };
-    let pts = (0..count)
-        .map(|i| [p[0] + h * 0.5, p[1] - h * 0.5 - i as f64 * h * 1.5, p[2]])
-        .collect();
-    (h, pts)
 }
 
 #[cfg(test)]
@@ -150,21 +122,22 @@ mod tests {
         (0..3).all(|i| (a[i] - b[i]).abs() < 1e-9)
     }
 
-    #[test]
-    fn anchors() {
-        let mut t = Trace {
+    fn trace(anchor: Anchor) -> Trace {
+        Trace {
             point: [0.0, 0.0, 5.0],
             azimuth: 90.0,
             length: 10.0,
-            anchor: Anchor::Center,
+            anchor,
             observation: Observation::default(),
-        };
-        let (s, e) = t.endpoints();
+        }
+    }
+
+    #[test]
+    fn anchors() {
+        let (s, e) = trace(Anchor::Center).endpoints();
         assert!(close(s, [-5.0, 0.0, 5.0]) && close(e, [5.0, 0.0, 5.0]));
-        t.anchor = Anchor::Start;
-        assert!(close(t.endpoints().1, [10.0, 0.0, 5.0]));
-        t.anchor = Anchor::End;
-        assert!(close(t.endpoints().0, [-10.0, 0.0, 5.0]));
+        assert!(close(trace(Anchor::Start).endpoints().1, [10.0, 0.0, 5.0]));
+        assert!(close(trace(Anchor::End).endpoints().0, [-10.0, 0.0, 5.0]));
     }
 
     #[test]
@@ -174,29 +147,16 @@ mod tests {
     }
 
     #[test]
-    fn validation_and_annotation() {
-        let mut t = Trace {
-            point: [0.0; 3],
-            azimuth: 0.0,
-            length: 0.0,
-            anchor: Anchor::Center,
-            observation: Observation::default(),
-        };
+    fn validation() {
+        let mut t = trace(Anchor::Center);
+        t.length = 0.0;
         assert!(t.validate().is_err());
         t.length = 2.0;
-        t.observation.rock_type = "Andesita".into();
-        t.observation.thickness = Some(1.2);
+        t.observation.dip = Some(95.0);
+        assert!(matches!(t.validate(), Err(MapError::InvalidDip(_))));
         t.observation.dip = Some(65.0);
-        let l = AnnotationLabels {
-            thickness: "Pot: ",
-            mineralization: "Min: ",
-            alteration: "Alt: ",
-            grade: "Ley: ",
-            dip: "Bz: ",
-            sample: "Mx: ",
-        };
-        assert_eq!(t.annotation_lines(&l), vec!["Andesita", "Pot: 1.2", "Bz: 65"]);
-        let (h, pts) = annotation_layout([0.0; 3], 2.0, 3);
-        assert!((h - 0.3).abs() < 1e-12 && pts.len() == 3);
+        assert!(t.validate().is_ok());
+        t.point[1] = f64::NAN;
+        assert_eq!(t.validate(), Err(MapError::InvalidPoint));
     }
 }

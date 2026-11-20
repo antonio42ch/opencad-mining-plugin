@@ -136,14 +136,20 @@ pub fn comp(r: &RsStrings, c: &ProjectConfig, svg: &str) -> PanelDef {
             fields(
                 "rs_f_dom",
                 r.sec_domains,
-                vec![DialogControl::Table {
-                    id: "rs_domains".into(),
-                    label: None,
-                    headers: r.domain_headers.iter().map(|s| s.to_string()).collect(),
-                    rows: Vec::new(),
-                    allow_add: true,
-                    allow_delete: true,
-                }],
+                vec![
+                    DialogControl::Table {
+                        id: "rs_domains".into(),
+                        label: None,
+                        headers: r.domain_headers.iter().map(|s| s.to_string()).collect(),
+                        rows: Vec::new(),
+                        allow_add: true,
+                        allow_delete: true,
+                    },
+                    DialogControl::InfoText {
+                        text: r.surface_hint.into(),
+                        align_h: None,
+                    },
+                ],
             ),
             fields(
                 "rs_f_dc",
@@ -171,8 +177,14 @@ pub fn comp(r: &RsStrings, c: &ProjectConfig, svg: &str) -> PanelDef {
                 "rs_f_ct",
                 r.sec_contact,
                 vec![
-                    text("rs_ct_above", r.ct_above, &x.contact.above),
-                    text("rs_ct_below", r.ct_below, &x.contact.below),
+                    DialogControl::Table {
+                        id: "rs_contacts".into(),
+                        label: None,
+                        headers: r.contact_headers.iter().map(|s| s.to_string()).collect(),
+                        rows: Vec::new(),
+                        allow_add: true,
+                        allow_delete: true,
+                    },
                     num("rs_ct_step", r.ct_step, x.contact.step, Some(0.1), 5.0),
                     choice("rs_ct_kind", r.ct_kind, &r.ct_kinds, x.contact.kind),
                     num("rs_ct_nugget", r.ct_nugget, x.contact.nugget, Some(0.0), 1.0),
@@ -384,8 +396,6 @@ pub fn values_for(c: &ProjectConfig, r: &RsStrings) -> HashMap<&'static str, Has
         ("rs_dc_max", n(x.dc_max)),
         ("rs_dc_steps", n(x.dc_steps)),
         ("rs_dc_z", n(x.dc_zratio)),
-        ("rs_ct_above", t(&x.contact.above)),
-        ("rs_ct_below", t(&x.contact.below)),
         ("rs_ct_step", n(x.contact.step)),
         ("rs_ct_kind", ch(x.contact.kind)),
         ("rs_ct_nugget", n(x.contact.nugget)),
@@ -395,7 +405,14 @@ pub fn values_for(c: &ProjectConfig, r: &RsStrings) -> HashMap<&'static str, Has
         ("rs_ct_min", n(x.contact.min_samples)),
         ("rs_ct_max", n(x.contact.max_samples)),
     ]);
-    let side = |s: usize| ["", r.word_above, r.word_below][s.min(2)].to_string();
+    // The surface column shows what was typed; v0.4 settings show their side word.
+    let surface = |d: &crate::rsconfig::DomainCfg| {
+        if !d.surface.trim().is_empty() {
+            d.surface.clone()
+        } else {
+            ["", r.word_above, r.word_below][d.side.min(2)].to_string()
+        }
+    };
     comp.insert(
         "rs_domains".into(),
         DialogValue::Table(
@@ -407,9 +424,18 @@ pub fn values_for(c: &ProjectConfig, r: &RsStrings) -> HashMap<&'static str, Has
                         d.values.clone(),
                         d.density.to_string(),
                         d.cap.to_string(),
-                        side(d.side),
+                        surface(d),
                     ]
                 })
+                .collect(),
+        ),
+    );
+    comp.insert(
+        "rs_contacts".into(),
+        DialogValue::Table(
+            x.contact_rows()
+                .into_iter()
+                .map(|c| vec![c.name, c.above, c.below])
                 .collect(),
         ),
     );
@@ -549,14 +575,16 @@ mod tests {
                 values: "OXIDO".into(),
                 density: 2.4,
                 cap: 30.0,
-                side: 1,
+                side: 0,
+                surface: "Encima C1".into(),
             },
             crate::rsconfig::DomainCfg {
                 name: "Sulfuros".into(),
                 values: "SULFURO".into(),
                 density: 2.8,
                 cap: 0.0,
-                side: 2,
+                side: 0,
+                surface: "Debajo C1".into(),
             },
         ];
         c.rs.vario.work.structures[1].ranges[2] = 33.0;

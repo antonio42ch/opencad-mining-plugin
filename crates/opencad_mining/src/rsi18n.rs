@@ -116,7 +116,7 @@ pub struct RsStrings {
     pub w_mode: &'static str,
     pub w_modes: [&'static str; 4],
     pub w_attr: &'static str,
-    pub w_attrs: [&'static str; 11],
+    pub w_attrs: [&'static str; 15],
     pub w_cutoff: &'static str,
     pub w_zfrom: &'static str,
     pub w_zto: &'static str,
@@ -197,6 +197,13 @@ pub struct RsStrings {
     pub word_below: &'static str,
     pub m_domains_changed: &'static str,
     pub m_no_pairs: &'static str,
+    pub m_view_cubes_limited: &'static str,
+    pub m_reload_comp: &'static str,
+    pub m_reload_model: &'static str,
+    pub m_comp_stale: &'static str,
+    pub contact_headers: [&'static str; 3],
+    pub surface_hint: &'static str,
+    pub m_unknown_surface: &'static str,
 }
 
 pub fn r() -> &'static RsStrings {
@@ -347,6 +354,10 @@ pub static ES: RsStrings = RsStrings {
         "IDW",
         "Krigeado simple",
         "Tonelaje",
+        "RMR (geotecnia)",
+        "GSI (geotecnia)",
+        "log Q (geotecnia)",
+        "Clase de macizo (geotecnia)",
     ],
     w_cutoff: "Ley de corte",
     w_zfrom: "Cota inicial",
@@ -433,6 +444,13 @@ pub static ES: RsStrings = RsStrings {
     word_below: "Debajo",
     m_domains_changed: "La tabla de dominios cambió desde que se compositó (antes: {0}). Vuelva a ejecutar Compositar.",
     m_no_pairs: "No hay pares para el variograma de «{0}» con el paso y las tolerancias actuales.",
+    m_view_cubes_limited: "Se dibujaron los {0} bloques de mayor valor de {1}; suba la ley de corte o el máximo para ver el resto.",
+    m_reload_comp: "Compósitos recuperados de {0}: {1} compósitos.",
+    m_reload_model: "Modelo de bloques recuperado de {0}.",
+    m_comp_stale: "Los compósitos guardados se hicieron con otro atributo de ley o con otros dominios: ejecute Compositar.",
+    contact_headers: ["Superficie", "Geología encima", "Geología debajo"],
+    surface_hint: "Columna Superficie: «Encima C1», «Debajo C1», o dos condiciones separadas por ; para quedar entre dos contactos («Debajo C1; Encima C2»). Sin nombre se usa la primera superficie.",
+    m_unknown_surface: "La superficie «{0}» del dominio «{1}» no está en la tabla de contactos.",
 };
 
 pub static EN: RsStrings = RsStrings {
@@ -565,6 +583,10 @@ pub static EN: RsStrings = RsStrings {
         "IDW",
         "Simple kriging",
         "Tonnage",
+        "RMR (geotechnics)",
+        "GSI (geotechnics)",
+        "log Q (geotechnics)",
+        "Rock mass class (geotechnics)",
     ],
     w_cutoff: "Cut-off grade",
     w_zfrom: "Start elevation",
@@ -650,6 +672,13 @@ pub static EN: RsStrings = RsStrings {
     word_below: "Below",
     m_domains_changed: "The domain table changed since compositing (was: {0}). Run Composite again.",
     m_no_pairs: "No pairs for the variogram of «{0}» with the current lag and tolerances.",
+    m_view_cubes_limited: "Drew the {0} highest-value blocks of {1}; raise the cut-off or the maximum to see the rest.",
+    m_reload_comp: "Composites recovered from {0}: {1} composites.",
+    m_reload_model: "Block model recovered from {0}.",
+    m_comp_stale: "The saved composites were made with another grade attribute or other domains: run Composite.",
+    contact_headers: ["Surface", "Geology above", "Geology below"],
+    surface_hint: "Surface column: «Above C1», «Below C1», or two conditions separated by ; to lie between two contacts («Below C1; Above C2»). Without a name the first surface is used.",
+    m_unknown_surface: "Surface «{0}» of domain «{1}» is not in the contacts table.",
 };
 
 pub static PT: RsStrings = RsStrings {
@@ -788,6 +817,10 @@ pub static PT: RsStrings = RsStrings {
         "IDW",
         "Krigagem simples",
         "Tonelagem",
+        "RMR (geotecnia)",
+        "GSI (geotecnia)",
+        "log Q (geotecnia)",
+        "Classe do maciço (geotecnia)",
     ],
     w_cutoff: "Teor de corte",
     w_zfrom: "Cota inicial",
@@ -874,6 +907,13 @@ pub static PT: RsStrings = RsStrings {
     word_below: "Abaixo",
     m_domains_changed: "A tabela de domínios mudou desde a compositagem (antes: {0}). Execute Compositar novamente.",
     m_no_pairs: "Não há pares para o variograma de «{0}» com o passo e as tolerâncias atuais.",
+    m_view_cubes_limited: "Foram desenhados os {0} blocos de maior valor de {1}; aumente o teor de corte ou o máximo para ver o resto.",
+    m_reload_comp: "Compósitos recuperados de {0}: {1} compósitos.",
+    m_reload_model: "Modelo de blocos recuperado de {0}.",
+    m_comp_stale: "Os compósitos salvos foram feitos com outro atributo de teor ou outros domínios: execute Compositar.",
+    contact_headers: ["Superfície", "Geologia acima", "Geologia abaixo"],
+    surface_hint: "Coluna Superfície: «Acima C1», «Abaixo C1», ou duas condições separadas por ; para ficar entre dois contatos («Abaixo C1; Acima C2»). Sem nome usa-se a primeira superfície.",
+    m_unknown_surface: "A superfície «{0}» do domínio «{1}» não está na tabela de contatos.",
 };
 
 #[cfg(test)]

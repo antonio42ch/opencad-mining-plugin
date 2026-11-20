@@ -104,6 +104,18 @@ those are excluded before the neighbourhood limits, so the search keeps its full
 the row axis; 0 = east/north aligned). Automatic extent covers the composites
 (+ margin), snapped to multiples of the block size.
 
+**Contact surfaces.** The *contacts* table lists named surfaces (C1, C2…) with the
+geology above and below each one; every surface is kriged from the first such contact in
+each hole (shared kriging parameters). A domain's *Superficie* column holds conditions:
+`Encima C1`, `Debajo C1`, or both separated by `;` to lie between two contacts
+(`Debajo C1; Encima C2`). A condition without a name uses the first surface, so v0.4
+settings (one contact, *Encima*/*Debajo*) keep working.
+
+**Recovering work after reopening a drawing.** Composites are written to
+`<drawing>_composites.csv` and the model to `<drawing>.ombm`. When a command needs them and
+the session has none, they are read back — composites only if they were made with the
+current grade attribute and domain table (otherwise *Compositar* is requested).
+
 **Domains of blocks.** Per domain: its solids (union) and/or the side of the
 contact surface (intersection). A block takes the first domain (in table order)
 that contains most of its discretisation nodes (every node is tested unless the block
@@ -150,8 +162,9 @@ Layers: `MIN_RS_COMP_<VAR>`, `MIN_RS_CONTACTO`, `MIN_RS_VISTA`.
 
 - Domain solids must be meshes; ACIS `3DSOLID` are not read. Faces are tested as
   triangle fans (exact for convex/planar faces such as the plugin's solids).
-- One contact surface serves all domains that use one.
-- Views are limited to *Máximo de polígonos* (default 20 000) for drawing speed.
+- Views are limited to *Máximo de polígonos* (default 20 000) for drawing speed. Over the
+  limit, the cubes view keeps the highest-value blocks (an even sample of the model when
+  colouring by domain) and says how many were drawn.
 - **Not yet:** resource categorisation (kriging-variance cut-offs, emulated grids,
   Measured/Indicated/Inferred), simulation, reserves. The data they need
   (`_ok_var`, `_pass`, `_n`, `_dist`) is already in the model.

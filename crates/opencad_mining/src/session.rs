@@ -32,10 +32,16 @@ pub fn config(host: &mut dyn HostApi, s: &Strings) -> ProjectConfig {
     let mut cfg = state::with_tab(tab, |t| t.config.clone());
     cfg.apply(&state::tracked_values());
     for p in panels::ALL {
-        if let Ok(snap) = host.panel_snapshot_for_plugin(MANIFEST.id, p) {
-            if snap.errors.is_empty() {
-                cfg.apply(&flatten(&snap.values));
-            }
+        // `panel_snapshot` (not `panel_snapshot_for_plugin`): out of process the
+        // IPC client implements only this one and the host authenticates the
+        // caller from the connection; the `_for_plugin` variant falls back to
+        // the contract default, which always fails.
+        // A snapshot lists only readable controls in `values`; `errors` names
+        // the unreadable ones (a field never edited, an empty dropdown...).
+        // Use every value that is there: discarding the whole panel for one
+        // unreadable control silently fell back to stale settings.
+        if let Ok(snap) = host.panel_snapshot(p) {
+            cfg.apply(&flatten(&snap.values));
         }
     }
     cfg
@@ -90,7 +96,7 @@ pub fn set_label(host: &mut dyn HostApi, panel: &'static str, id: &str, text: St
 
 /// Current value of a control that is not part of the saved settings.
 pub fn panel_value(host: &mut dyn HostApi, panel: &str, id: &str) -> Option<DialogValue> {
-    if let Ok(snap) = host.panel_snapshot_for_plugin(MANIFEST.id, panel) {
+    if let Ok(snap) = host.panel_snapshot(panel) {
         if let Some(v) = flatten(&snap.values).remove(id) {
             return Some(v);
         }
@@ -100,6 +106,7 @@ pub fn panel_value(host: &mut dyn HostApi, panel: &str, id: &str) -> Option<Dial
 
 pub fn push_panels(host: &mut dyn HostApi, cfg: &ProjectConfig, assay_attrs: &[String], geo_attrs: &[String]) {
     push_rs(host, cfg);
+    crate::gtcommands::push_all(host, cfg);
     for (panel, values) in panels::values_for(cfg, assay_attrs, geo_attrs) {
         host.update_panel_for_plugin(MANIFEST.id, panel, values);
     }

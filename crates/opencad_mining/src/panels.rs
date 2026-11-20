@@ -13,7 +13,7 @@ pub const UG: &str = "min_workings";
 pub const GM: &str = "min_geomap";
 pub const AX: &str = "min_axes";
 pub const SC: &str = "min_sections";
-pub const ALL: [&str; 8] = [
+pub const ALL: [&str; 11] = [
     DH,
     UG,
     GM,
@@ -22,6 +22,9 @@ pub const ALL: [&str; 8] = [
     crate::rspanels::COMP,
     crate::rspanels::VARIO,
     crate::rspanels::BM,
+    crate::gtpanels::DATA,
+    crate::gtpanels::HB,
+    crate::gtpanels::MODEL,
 ];
 pub const DH_STATUS: &str = "dh_status";
 pub const AX_STATUS: &str = "ax_status";
@@ -77,6 +80,13 @@ fn button(id: &str, label: &str, command: &str) -> DialogControl {
         action: Some(command.into()),
         align_h: None,
         width: None,
+    }
+}
+fn row(controls: Vec<DialogControl>) -> DialogControl {
+    DialogControl::Row {
+        controls,
+        align_h: None,
+        align_v: None,
     }
 }
 fn fields(id: &str, title: &str, controls: Vec<DialogControl>) -> DialogControl {
@@ -232,27 +242,50 @@ pub fn geomap(s: &Strings, c: &ProjectConfig) -> PanelDef {
                 "gm_trace",
                 s.sec_trace,
                 vec![
+                    num("gm_e", s.ax_e, g.e, None, 1.0),
+                    num("gm_n", s.ax_n, g.n, None, 1.0),
+                    num("gm_z", s.ax_z, g.z, None, 1.0),
                     text("gm_bearing", s.bearing, &g.bearing),
                     num("gm_length", s.length, g.length, Some(0.01), 0.5),
                     choice("gm_anchor", s.anchor, &s.anchors, g.anchor),
-                    check("gm_annotate", s.annotate, g.annotate),
+                    row(vec![
+                        button("gm_btn_draw", s.btn_trace_draw, "MIN_GM_TRACE"),
+                        button("gm_btn_pick", s.btn_trace_pick, "MIN_GM_TRACE_PICK"),
+                    ]),
                 ],
             ),
             fields(
-                "gm_obs",
-                s.sec_observation,
+                "gm_dipf",
+                s.sec_dip,
                 vec![
+                    text("gm_dip", s.dip, &g.dip),
+                    choice("gm_dipdir", s.dip_dir, &s.dip_dirs, g.dip_dir),
+                    text("gm_dipaz", s.dip_az, &g.dip_az),
+                ],
+            ),
+            fields(
+                "gm_proj",
+                s.sec_projection,
+                vec![
+                    choice("gm_pmode", s.proj_mode, &s.proj_modes, g.proj_mode),
+                    num("gm_pvalue", s.proj_value, g.proj_value, None, 1.0),
+                    button("gm_btn_project", s.btn_project, "MIN_GM_PROJECT"),
+                ],
+            ),
+            DialogControl::Fields {
+                id: "gm_obs".into(),
+                title: Some(s.sec_observation.into()),
+                controls: vec![
                     text("gm_rock", s.rock_type, &g.rock_type),
                     text("gm_thickness", s.thickness, &g.thickness),
                     text("gm_min", s.mineralization, &g.mineralization),
                     text("gm_alt", s.alteration, &g.alteration),
                     text("gm_struct", s.structure, &g.structure),
                     text("gm_grade", s.grade, &g.grade),
-                    text("gm_dip", s.dip, &g.dip),
                     text("gm_sample", s.sample, &g.sample),
                 ],
-            ),
-            button("gm_btn_trace", s.tool_trace, "MIN_GM_TRACE"),
+                collapsed: true,
+            },
         ],
     )
 }
@@ -455,7 +488,13 @@ pub fn values_for(
         ("gm_bearing", t(&g.bearing)),
         ("gm_length", n(g.length)),
         ("gm_anchor", ch(g.anchor, &["", "", ""])),
-        ("gm_annotate", b(g.annotate)),
+        ("gm_e", n(g.e)),
+        ("gm_n", n(g.n)),
+        ("gm_z", n(g.z)),
+        ("gm_dipdir", ch(g.dip_dir, &["", "", ""])),
+        ("gm_dipaz", t(&g.dip_az)),
+        ("gm_pmode", ch(g.proj_mode, &["", ""])),
+        ("gm_pvalue", n(g.proj_value)),
         ("gm_rock", t(&g.rock_type)),
         ("gm_thickness", t(&g.thickness)),
         ("gm_min", t(&g.mineralization)),
@@ -561,6 +600,9 @@ mod tests {
         c.dh.collar = "c.csv".into();
         c.ug.width = 5.5;
         c.gm.bearing = "S30W".into();
+        (c.gm.e, c.gm.n, c.gm.z) = (500_123.5, 8_500_456.25, 4_012.0);
+        (c.gm.dip, c.gm.dip_dir, c.gm.dip_az) = ("65".into(), 2, "N30E".into());
+        (c.gm.proj_mode, c.gm.proj_value) = (1, -12.5);
         c.dh.custom_ranges = vec![(0.0, 1.0, "Verde".into())];
         c.ax.radius = 22.5;
         c.ax.turn = 1;
@@ -575,6 +617,12 @@ mod tests {
         assert_eq!(back.dh.collar, "c.csv");
         assert_eq!(back.ug.width, 5.5);
         assert_eq!(back.gm.bearing, "S30W");
+        assert_eq!((back.gm.e, back.gm.n, back.gm.z), (500_123.5, 8_500_456.25, 4_012.0));
+        assert_eq!(
+            (back.gm.dip.as_str(), back.gm.dip_dir, back.gm.dip_az.as_str()),
+            ("65", 2, "N30E")
+        );
+        assert_eq!((back.gm.proj_mode, back.gm.proj_value), (1, -12.5));
         assert_eq!(back.dh.custom_ranges, c.dh.custom_ranges);
         assert_eq!((back.ax.radius, back.ax.turn), (22.5, 1));
         assert_eq!((back.sc.mode, back.sc.columns), (2, 3.0));

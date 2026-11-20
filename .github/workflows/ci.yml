@@ -34,3 +34,26 @@ jobs:
       - run: cargo build -p opencad_mining --release --locked
       # Benchmarks must keep compiling; they are run manually.
       - run: cargo bench -p drillhole_engine -p blockmodel_engine --no-run --locked
+
+  # End-to-end test against the official Open CAD Studio release: the plugin is
+  # loaded by the real host and every module is driven over `--serve`.
+  host-smoke:
+    runs-on: ubuntu-latest
+    env:
+      # Host release whose plugin API matches plugin.toml (api_version 23).
+      OCS_VERSION: v2026.46
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Download Open CAD Studio
+        run: |
+          curl -fsSL -o ocs.AppImage \
+            "https://github.com/HakanSeven12/OpenCADStudio/releases/download/${OCS_VERSION}/OpenCADStudio-${OCS_VERSION}-linux-x86_64.AppImage"
+          chmod +x ocs.AppImage
+          ./ocs.AppImage --appimage-extract > /dev/null
+          ls squashfs-root
+      - name: Runtime libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1 libegl1 libxkbcommon0 libwayland-client0
+      - name: Smoke test
+        run: xvfb-run -a timeout 900 python3 scripts/smoke_serve.py "$PWD/squashfs-root/AppRun" --install
