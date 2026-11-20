@@ -32,10 +32,12 @@ pub fn config(host: &mut dyn HostApi, s: &Strings) -> ProjectConfig {
     let mut cfg = state::with_tab(tab, |t| t.config.clone());
     cfg.apply(&state::tracked_values());
     for p in panels::ALL {
+        // A snapshot lists only readable controls in `values`; `errors` names
+        // the unreadable ones (a field never edited, an empty dropdown...).
+        // Use every value that is there: discarding the whole panel for one
+        // unreadable control silently fell back to stale settings.
         if let Ok(snap) = host.panel_snapshot_for_plugin(MANIFEST.id, p) {
-            if snap.errors.is_empty() {
-                cfg.apply(&flatten(&snap.values));
-            }
+            cfg.apply(&flatten(&snap.values));
         }
     }
     cfg
