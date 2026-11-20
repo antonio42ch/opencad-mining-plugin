@@ -11,7 +11,7 @@ PST_SolidMine and GeoMapper.
 | Axes | `MIN_AX_PANEL` `MIN_AX_LINE` `MIN_AX_CURVE` `MIN_AX_UNDO` `MIN_AX_NEW` `MIN_AX_PICKSTART` `MIN_AX_FROMPOLY` | Working axes as chains of straights and curves (radius + length or angle, right/left) with grade in % or °, drawn in series from the previous end |
 | Sections | `MIN_SC_PANEL` `MIN_SC_RUN` | Cut solids (meshes) with planes perpendicular to an axis, vertical through 2 points (+ parallels), horizontal levels or 3 points; 3D polylines in place and 2D sheets with grid, title and area |
 | Resources | `MIN_RS_COMP_PANEL` `MIN_RS_VARIO_PANEL` `MIN_RS_BM_PANEL` `MIN_RS_COMPOSITE` `MIN_RS_ESTIMATE` `MIN_RS_BMVIEW` … | Composites, domains (attribute, solids, contact surface), declustering, variography with auto-fit, ordinary/simple kriging, IDW and nearest neighbour on a rotated block model, validation (swath, grade-tonnage, cross-validation) and views — see [docs/RESOURCES.md](docs/RESOURCES.md) |
-| Geology | `MIN_GM_PANEL` `MIN_GM_TRACE` | Structure/vein/contact trace from bearing + length, with annotations |
+| Geology | `MIN_GM_PANEL` `MIN_GM_TRACE` `MIN_GM_TRACE_PICK` `MIN_GM_PROJECT` | Structure/vein/contact traces from coordinates + bearing/azimuth + length, and projection of mapped traces to another height along their dip |
 
 UI in Spanish, English and Portuguese (`OPENMINING_LANG=es|en|pt`, else the
 system locale).

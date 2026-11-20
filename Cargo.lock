@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "blockmodel_engine"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "criterion",
  "geostat_engine",
@@ -444,7 +444,7 @@ checksum = "c2db04e74f0a9a93103b50e90b96024c9b2bdca8bce6a632ec71b88736d3d359"
 
 [[package]]
 name = "drillhole_engine"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "calamine",
  "criterion",
@@ -574,14 +574,14 @@ dependencies = [
 
 [[package]]
 name = "geomap_engine"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mining_core",
 ]
 
 [[package]]
 name = "geostat_engine"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "drillhole_engine",
  "mining_core",
@@ -867,7 +867,7 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mining_core"
-version = "0.4.0"
+version = "0.5.0"
 
 [[package]]
 name = "miniz_oxide"
@@ -949,7 +949,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "opencad_mining"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "blockmodel_engine",
  "drillhole_engine",
@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "openmining_cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "drillhole_engine",
  "mining_core",
@@ -1407,7 +1407,7 @@ checksum = "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
 
 [[package]]
 name = "solids_engine"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mining_core",
 ]

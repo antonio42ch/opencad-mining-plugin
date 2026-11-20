@@ -42,7 +42,8 @@ pub struct RsState {
     pub composites: Vec<Composite3d>,
     pub weights: Vec<f64>,
     pub exp: Vec<(String, ExpVariogram)>,
-    pub surface: Option<GridSurface>,
+    /// Contact surfaces by name.
+    pub surfaces: Vec<(String, GridSurface)>,
     pub model: Option<BlockModel>,
     /// Variable name used for the block model columns.
     pub variable: String,
@@ -72,7 +73,7 @@ impl RsState {
             weights,
             domain_names,
             variable,
-            surface: self.surface.take(),
+            surfaces: std::mem::take(&mut self.surfaces),
             ..Default::default()
         };
     }
@@ -283,14 +284,16 @@ pub fn histogram_chart(
     })
 }
 
+/// Composites as CSV (also the session cache: see [`parse_composites_csv`]).
 pub fn composites_csv(comps: &[Composite3d], domains: &[DomainCfg]) -> String {
-    let mut s = String::from("hole,from,to,x,y,z,value,domain\n");
+    let mut s = String::from("hole,from,to,x,y,z,value,domain,x_from,y_from,z_from,x_to,y_to,z_to\n");
     for c in comps {
         let dn = domains
             .get((c.domain as usize).wrapping_sub(1))
             .map_or("", |d| d.name.as_str());
+        let (f, t) = (c.from_xyz, c.to_xyz);
         s.push_str(&format!(
-            "{},{},{},{:.3},{:.3},{:.3},{},{}\n",
+            "{},{},{},{:.4},{:.4},{:.4},{},{},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
             c.hole.replace(',', " "),
             c.from,
             c.to,
@@ -298,10 +301,108 @@ pub fn composites_csv(comps: &[Composite3d], domains: &[DomainCfg]) -> String {
             c.xyz[1],
             c.xyz[2],
             c.value,
-            dn.replace(',', " ")
+            dn.replace(',', " "),
+            f[0],
+            f[1],
+            f[2],
+            t[0],
+            t[1],
+            t[2]
         ));
     }
     s
+}
+
+/// Reads back [`composites_csv`]. Domain names are matched against the
+/// current domain list (an unknown name means the table changed). Files of
+/// v0.4 without the end coordinates use the centre for both ends.
+pub fn parse_composites_csv(text: &str, domains: &[DomainCfg]) -> Result<Vec<Composite3d>, String> {
+    let mut lines = text.lines();
+    let head: Vec<&str> = lines.next().ok_or("empty file")?.split(',').map(str::trim).collect();
+    let col = |n: &str| head.iter().position(|h| *h == n);
+    let need = |n: &str| col(n).ok_or_else(|| format!("missing column {n}"));
+    let (ih, ifr, ito, ix, iy, iz, iv, id) = (
+        need("hole")?,
+        need("from")?,
+        need("to")?,
+        need("x")?,
+        need("y")?,
+        need("z")?,
+        need("value")?,
+        need("domain")?,
+    );
+    let ends = ["x_from", "y_from", "z_from", "x_to", "y_to", "z_to"].map(col);
+    let mut holes: HashMap<String, u32> = HashMap::new();
+    let mut out = Vec::new();
+    for (n, line) in lines.enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(',').collect();
+        let get = |i: usize| {
+            f.get(i)
+                .map(|s| s.trim())
+                .ok_or_else(|| format!("line {}: too few fields", n + 2))
+        };
+        let num = |i: usize| -> Result<f64, String> {
+            get(i)?
+                .parse::<f64>()
+                .map_err(|_| format!("line {}: bad number", n + 2))
+        };
+        let dname = get(id)?;
+        let domain = domains
+            .iter()
+            .position(|d| d.name.trim() == dname)
+            .ok_or_else(|| format!("unknown domain {dname}"))? as u32
+            + 1;
+        let next = holes.len() as u32;
+        let hole = get(ih)?.to_string();
+        let hole_index = *holes.entry(hole.clone()).or_insert(next);
+        let xyz = [num(ix)?, num(iy)?, num(iz)?];
+        let end = |k: usize| -> Result<Option<f64>, String> { ends[k].map(num).transpose() };
+        let from_xyz = match (end(0)?, end(1)?, end(2)?) {
+            (Some(a), Some(b), Some(c)) => [a, b, c],
+            _ => xyz,
+        };
+        let to_xyz = match (end(3)?, end(4)?, end(5)?) {
+            (Some(a), Some(b), Some(c)) => [a, b, c],
+            _ => xyz,
+        };
+        out.push(Composite3d {
+            hole,
+            hole_index,
+            from: num(ifr)?,
+            to: num(ito)?,
+            from_xyz,
+            to_xyz,
+            xyz,
+            value: num(iv)?,
+            domain,
+        });
+    }
+    Ok(out)
+}
+
+/// Declustering weights per domain (as computed when compositing).
+pub fn decluster_weights(comps: &[Composite3d], cfg: &ProjectConfig) -> Vec<f64> {
+    let mut weights = vec![1.0; comps.len()];
+    for id in 1..=effective_domains(cfg).len() as u32 {
+        let idx: Vec<usize> = (0..comps.len()).filter(|&k| comps[k].domain == id).collect();
+        let samples: Vec<Sample> = idx.iter().map(|&k| comps[k].sample()).collect();
+        let dc = decluster(&samples, &cfg.rs.decluster_sizes(), cfg.rs.dc_zratio, true);
+        for (&k, w) in idx.iter().zip(&dc.weights) {
+            weights[k] = *w;
+        }
+    }
+    weights
+}
+
+/// What the cached composites were made with.
+pub fn composite_stamp(cfg: &ProjectConfig) -> crate::rsconfig::CompositeStamp {
+    crate::rsconfig::CompositeStamp {
+        variable: var_name(&cfg.dh.assay_attr),
+        domains: effective_domains(cfg).into_iter().map(|d| d.name).collect(),
+    }
 }
 
 /// Draws the composites as coloured lines (replacing the previous drawing).
@@ -364,10 +465,13 @@ pub fn draw_composites(
     n
 }
 
-/// Contact surface from the first contact of each hole.
-pub fn contact_surface(
+/// One contact surface from the first contact (above -> below values) of
+/// each hole, kriged on a grid over the collars.
+fn surface_between(
     holes: &[HoleModel],
     cfg: &ProjectConfig,
+    above: &str,
+    below: &str,
     r: &RsStrings,
 ) -> Result<(GridSurface, usize), String> {
     let c = &cfg.rs.contact;
@@ -377,7 +481,7 @@ pub fn contact_surface(
             .filter(|x| !x.is_empty())
             .collect()
     };
-    let (above, below) = (split(&c.above), split(&c.below));
+    let (above, below) = (split(above), split(below));
     if above.is_empty() || below.is_empty() || cfg.dh.geo_attr.is_empty() {
         return Err(r.m_contact_cfg.to_string());
     }
@@ -412,6 +516,40 @@ pub fn contact_surface(
     Ok((s, pts.len()))
 }
 
+/// Every contact surface of the table (shared kriging parameters).
+pub fn contact_surfaces(
+    holes: &[HoleModel],
+    cfg: &ProjectConfig,
+    r: &RsStrings,
+) -> Result<Vec<(String, GridSurface, usize)>, String> {
+    let rows = cfg.rs.contact_rows();
+    if rows.is_empty() {
+        return Err(r.m_contact_cfg.to_string());
+    }
+    rows.iter()
+        .map(|c| {
+            surface_between(holes, cfg, &c.above, &c.below, r)
+                .map(|(s, n)| (c.name.clone(), s, n))
+                .map_err(|e| format!("{}: {e}", c.name))
+        })
+        .collect()
+}
+
+/// First contact surface (single-contact projects).
+pub fn contact_surface(
+    holes: &[HoleModel],
+    cfg: &ProjectConfig,
+    r: &RsStrings,
+) -> Result<(GridSurface, usize), String> {
+    let row = cfg
+        .rs
+        .contact_rows()
+        .into_iter()
+        .next()
+        .ok_or_else(|| r.m_contact_cfg.to_string())?;
+    surface_between(holes, cfg, &row.above, &row.below, r)
+}
+
 /// Mesh of the surface (quads between finite nodes).
 pub fn surface_mesh(s: &GridSurface, origin: LocalOrigin) -> (Vec<Vec3>, Vec<Vec<usize>>) {
     let mut idx = vec![usize::MAX; s.nx * s.ny];
@@ -441,26 +579,42 @@ pub fn surface_mesh(s: &GridSurface, origin: LocalOrigin) -> (Vec<Vec3>, Vec<Vec
     (v, f)
 }
 
-pub fn draw_surface(sink: &mut dyn CadSink, r: &RsStrings, s: &GridSurface, npoints: usize, origin: LocalOrigin) {
-    let (vertices, faces) = surface_mesh(s, origin);
-    let estimated = s.z.iter().filter(|z| z.is_finite()).count();
+/// Draws every surface (one mesh each), replacing the previous ones.
+pub fn draw_surfaces(
+    sink: &mut dyn CadSink,
+    r: &RsStrings,
+    surfaces: &[(String, GridSurface, usize)],
+    origin: LocalOrigin,
+) {
     sink.begin("MIN_RS_CONTACT");
     sink.ensure_layers(&[LayerDef::new(LAYER_CONTACT, 30)]);
     sink.remove_where(&|t: &Tag| t.class == Class::Surface);
-    if !faces.is_empty() {
-        sink.add(vec![Prim {
-            geom: Geom::Mesh { vertices, faces },
-            layer: LAYER_CONTACT.into(),
-            color: None,
-            tag: Tag::new(Class::Surface)
-                .with("points", npoints)
-                .with("nx", s.nx)
-                .with("ny", s.ny)
-                .with("step", s.dx),
-        }]);
+    for (name, s, npoints) in surfaces {
+        let (vertices, faces) = surface_mesh(s, origin);
+        if !faces.is_empty() {
+            sink.add(vec![Prim {
+                geom: Geom::Mesh { vertices, faces },
+                layer: LAYER_CONTACT.into(),
+                color: None,
+                tag: Tag::new(Class::Surface)
+                    .with("name", name)
+                    .with("points", npoints)
+                    .with("nx", s.nx)
+                    .with("ny", s.ny)
+                    .with("step", s.dx),
+            }]);
+        }
+        let estimated = s.z.iter().filter(|z| z.is_finite()).count();
+        sink.info(&format!(
+            "{name}: {}",
+            fmt(r.m_contact_done, &[npoints, &s.nx, &s.ny, &estimated])
+        ));
     }
     sink.end();
-    sink.info(&fmt(r.m_contact_done, &[&npoints, &s.nx, &s.ny, &estimated]));
+}
+
+pub fn draw_surface(sink: &mut dyn CadSink, r: &RsStrings, s: &GridSurface, npoints: usize, origin: LocalOrigin) {
+    draw_surfaces(sink, r, &[("C1".into(), s.clone(), npoints)], origin);
 }
 
 #[cfg(test)]
@@ -531,7 +685,9 @@ pub(crate) mod fixtures {
                 values: "OXIDO".into(),
                 density: 2.4,
                 cap: 0.0,
+                // v0.4 form on purpose: the legacy single-surface side still works.
                 side: 1,
+                surface: String::new(),
             },
             DomainCfg {
                 name: "Sulfuros".into(),
@@ -539,6 +695,7 @@ pub(crate) mod fixtures {
                 density: 2.8,
                 cap: 0.0,
                 side: 2,
+                surface: String::new(),
             },
         ];
         c.rs.contact.above = "OXIDO".into();
@@ -661,7 +818,7 @@ mod pipeline_tests {
         let r = for_lang(Lang::Es);
         let (c, out, surf) = setup();
         let doms = effective_domains(&c);
-        let regions = build_regions(&doms, &DomainMeshes::new(), Some(&surf), r).unwrap();
+        let regions = build_regions(&doms, &DomainMeshes::new(), &[("C1".to_string(), surf.clone())], r).unwrap();
         let mut model = create_model(&out.composites, &c, &regions).unwrap();
         assert!(model.assigned() > 100);
         assert_eq!(model.domain_names, vec!["Óxidos", "Sulfuros"]);
@@ -733,12 +890,12 @@ mod pipeline_tests {
         let (c, _, _) = setup();
         let mut doms = effective_domains(&c);
         doms[0].side = 0; // no solid, no surface
-        let err = build_regions(&doms, &DomainMeshes::new(), None, r).err().unwrap();
+        let err = build_regions(&doms, &DomainMeshes::new(), &[], r).err().unwrap();
         assert!(err.contains("Óxidos"), "{err}");
         // Missing surface for a domain that needs it.
         doms[0].side = 1;
         assert_eq!(
-            build_regions(&doms, &DomainMeshes::new(), None, r).err().unwrap(),
+            build_regions(&doms, &DomainMeshes::new(), &[], r).err().unwrap(),
             r.m_contact_cfg
         );
         // One domain with nothing covers everything.
@@ -746,22 +903,38 @@ mod pipeline_tests {
             name: "Global".into(),
             ..Default::default()
         }];
-        assert!(build_regions(&one, &DomainMeshes::new(), None, r).is_ok());
+        assert!(build_regions(&one, &DomainMeshes::new(), &[], r).is_ok());
         // Estimation without a saved model names the domain.
         let (mut c2, out, surf) = setup();
         c2.rs.vario.models.remove("Sulfuros");
-        let regions = build_regions(&effective_domains(&c2), &DomainMeshes::new(), Some(&surf), r).unwrap();
+        let regions = build_regions(
+            &effective_domains(&c2),
+            &DomainMeshes::new(),
+            &[("C1".to_string(), surf.clone())],
+            r,
+        )
+        .unwrap();
         let mut model = create_model(&out.composites, &c2, &regions).unwrap();
         assert!(run_estimation(&mut model, &out.composites, &out.weights, &c2, r)
             .unwrap_err()
             .contains("Sulfuros"));
     }
 
+    fn ok_col(m: &BlockModel) -> &[f32] {
+        m.column("au_ok").unwrap()
+    }
+
     #[test]
     fn views_levels_sections_cubes_and_replacement() {
         let r = for_lang(Lang::Es);
         let (mut c, out, surf) = setup();
-        let regions = build_regions(&effective_domains(&c), &DomainMeshes::new(), Some(&surf), r).unwrap();
+        let regions = build_regions(
+            &effective_domains(&c),
+            &DomainMeshes::new(),
+            &[("C1".to_string(), surf.clone())],
+            r,
+        )
+        .unwrap();
         let mut model = create_model(&out.composites, &c, &regions).unwrap();
         run_estimation(&mut model, &out.composites, &out.weights, &c, r).unwrap();
         let none = ViewInput {
@@ -832,6 +1005,31 @@ mod pipeline_tests {
             };
             assert_eq!(vertices.len() / 8 * 6, faces.len());
         }
+        // Over the limit the highest-grade blocks are kept, not the deepest.
+        let all: Vec<usize> = (0..model.len())
+            .filter(|&i| model.domain[i] != 0 && ok_col(&model)[i].is_finite())
+            .collect();
+        let top = pick_cubes(all.clone(), Some(ok_col(&model)), 5);
+        let lowest_kept = top.iter().map(|&i| ok_col(&model)[i]).fold(f32::MAX, f32::min);
+        let best_dropped = all
+            .iter()
+            .filter(|i| !top.contains(i))
+            .map(|&i| ok_col(&model)[i])
+            .fold(f32::MIN, f32::max);
+        assert!(
+            top.len() == 5 && lowest_kept >= best_dropped,
+            "{lowest_kept} < {best_dropped}"
+        );
+        // Without values an even stride covers the whole extent (first and late blocks).
+        let spread = pick_cubes((0..100).collect(), None, 4);
+        assert_eq!(spread, vec![0, 25, 50, 75]);
+        c.rs.bm.view_limit = 3.0;
+        let lim_cubes = view(&model, &c, &none, r, o).unwrap();
+        assert!(lim_cubes.limited && lim_cubes.cubes.unwrap().0 == 3);
+        let mut sink = MockSink::default();
+        draw_view(&mut sink, r, lim_cubes);
+        assert!(sink.infos.iter().any(|m| m.contains("mayor valor")), "{:?}", sink.infos);
+        c.rs.bm.view_limit = 20_000.0;
         // Domain colouring and limit.
         c.rs.bm.view_mode = 0;
         c.rs.bm.view_attr = 3;
@@ -854,12 +1052,77 @@ mod pipeline_tests {
                     prims: vec![],
                     planes: 0,
                     polygons: 0,
-                    limited: false
+                    limited: false,
+                    cubes: None,
                 }
             ),
             0
         );
         assert_eq!(sink.errors.len(), 1);
+    }
+
+    /// Three stacked domains: above C1, between C1 and C2, below C2.
+    #[test]
+    fn three_domains_between_two_named_surfaces() {
+        let r = for_lang(Lang::Es);
+        let flat = |z: f64| GridSurface {
+            x0: -100.0,
+            y0: -100.0,
+            dx: 100.0,
+            dy: 100.0,
+            nx: 3,
+            ny: 3,
+            z: vec![z; 9],
+        };
+        let surfaces = vec![("C1".to_string(), flat(20.0)), ("C2".to_string(), flat(-20.0))];
+        let doms = vec![
+            DomainCfg {
+                name: "Lixiviado".into(),
+                surface: "Encima C1".into(),
+                ..Default::default()
+            },
+            DomainCfg {
+                name: "Óxidos".into(),
+                surface: "Debajo C1; Encima C2".into(),
+                ..Default::default()
+            },
+            DomainCfg {
+                name: "Sulfuros".into(),
+                surface: "debajo c2".into(),
+                ..Default::default()
+            },
+        ];
+        let regions = build_regions(&doms, &DomainMeshes::new(), &surfaces, r).unwrap();
+        let mut m = BlockModel::new(BlockGeometry {
+            origin: [-50.0, -50.0, -60.0],
+            size: [10.0, 10.0, 10.0],
+            n: [10, 10, 12],
+            rotation: 0.0,
+        });
+        let refs: Vec<&dyn Region> = regions.iter().map(|x| x.as_ref()).collect();
+        assign_domains(&mut m, &refs, [2, 2, 2]);
+        for i in 0..m.len() {
+            let z = m.geometry.center(i)[2];
+            let want = if z > 20.0 {
+                1
+            } else if z > -20.0 {
+                2
+            } else {
+                3
+            };
+            assert_eq!(m.domain[i], want, "block at z = {z}");
+        }
+        // A name that is not in the contacts table is explained.
+        let bad = vec![
+            DomainCfg {
+                name: "X".into(),
+                surface: "Encima C9".into(),
+                ..Default::default()
+            },
+            doms[0].clone(),
+        ];
+        let err = build_regions(&bad, &DomainMeshes::new(), &surfaces, r).err().unwrap();
+        assert!(err.contains("C9") && err.contains("X"), "{err}");
     }
 
     #[test]
@@ -981,8 +1244,44 @@ mod tests {
         // Errors: missing configuration, too few points.
         let mut bad = cfg();
         bad.rs.contact.below.clear();
+        bad.rs.contacts.clear();
         assert_eq!(contact_surface(&holes, &bad, r).unwrap_err(), r.m_contact_cfg);
         assert!(contact_surface(&holes[..2], &c, r).is_err());
+    }
+
+    #[test]
+    fn composites_survive_a_csv_roundtrip_and_stale_files_are_refused() {
+        let r = for_lang(Lang::Es);
+        let c = cfg();
+        let out = composite(&dataset(), &c, r).unwrap();
+        let back = parse_composites_csv(&composites_csv(&out.composites, &c.rs.domains), &c.rs.domains).unwrap();
+        assert_eq!(back.len(), out.composites.len());
+        for (a, b) in out.composites.iter().zip(&back) {
+            assert_eq!(
+                (a.hole.as_str(), a.domain, a.from, a.to, a.value),
+                (b.hole.as_str(), b.domain, b.from, b.to, b.value)
+            );
+            assert!((0..3).all(|i| (a.xyz[i] - b.xyz[i]).abs() < 1e-3 && (a.to_xyz[i] - b.to_xyz[i]).abs() < 1e-3));
+        }
+        // Same weights as at compositing time.
+        let w = decluster_weights(&back, &c);
+        assert!(w.iter().zip(&out.weights).all(|(a, b)| (a - b).abs() < 1e-9));
+        // Hole indices are consistent per hole.
+        assert!(back
+            .windows(2)
+            .all(|p| (p[0].hole == p[1].hole) == (p[0].hole_index == p[1].hole_index)));
+        // A domain that is no longer in the table is refused.
+        let renamed = vec![DomainCfg {
+            name: "Otro".into(),
+            ..Default::default()
+        }];
+        assert!(parse_composites_csv(&composites_csv(&out.composites, &c.rs.domains), &renamed).is_err());
+        // v0.4 files (no end coordinates) still load.
+        let old = "hole,from,to,x,y,z,value,domain\nH00,0,4,1,2,3,1.5,Óxidos\n";
+        let o = parse_composites_csv(old, &c.rs.domains).unwrap();
+        assert_eq!((o[0].from_xyz, o[0].domain), ([1.0, 2.0, 3.0], 1));
+        assert!(parse_composites_csv("hole,from\n", &c.rs.domains).is_err());
+        assert_eq!(composite_stamp(&c).domains, vec!["Óxidos", "Sulfuros"]);
     }
 
     #[test]
@@ -991,7 +1290,7 @@ mod tests {
         let c = cfg();
         let out = composite(&dataset(), &c, r).unwrap();
         let csv = composites_csv(&out.composites, &c.rs.domains);
-        assert!(csv.starts_with("hole,from,to,x,y,z,value,domain\n"));
+        assert!(csv.starts_with("hole,from,to,x,y,z,value,domain,"));
         assert_eq!(csv.lines().count(), out.composites.len() + 1);
         assert!(csv.contains("Óxidos") && csv.contains("Sulfuros"));
         let svg = histogram_chart(r, &out.composites, &out.weights, &c.rs.domains, "g/t");
@@ -1191,7 +1490,7 @@ pub type DomainMeshes = HashMap<String, Vec<MeshData>>;
 pub fn build_regions(
     doms: &[DomainCfg],
     meshes: &DomainMeshes,
-    surface: Option<&GridSurface>,
+    surfaces: &[(String, GridSurface)],
     r: &RsStrings,
 ) -> Result<Vec<Box<dyn Region>>, String> {
     let mut out: Vec<Box<dyn Region>> = Vec::new();
@@ -1200,13 +1499,25 @@ pub fn build_regions(
         if let Some(m) = meshes.get(&d.name).filter(|m| !m.is_empty()) {
             parts.push(Box::new(SolidsRegion::new(m)));
         }
-        if d.side != 0 {
-            let Some(s) = surface else {
+        for (name, above) in d.conditions() {
+            if surfaces.is_empty() {
                 return Err(r.m_contact_cfg.to_string());
+            }
+            // An empty name means the first surface.
+            let s = if name.is_empty() {
+                Some(&surfaces[0].1)
+            } else {
+                surfaces
+                    .iter()
+                    .find(|(n, _)| n.trim().eq_ignore_ascii_case(name.trim()))
+                    .map(|(_, s)| s)
+            };
+            let Some(s) = s else {
+                return Err(fmt(r.m_unknown_surface, &[&name, &d.name]));
             };
             parts.push(Box::new(SurfaceSide {
                 surface: s.clone(),
-                above: d.side == 1,
+                above,
             }));
         }
         out.push(match parts.len() {
@@ -1501,6 +1812,30 @@ pub struct ViewOutcome {
     pub planes: usize,
     pub polygons: usize,
     pub limited: bool,
+    /// Cubes view: `(drawn, total)` blocks.
+    pub cubes: Option<(usize, usize)>,
+}
+
+/// Blocks to draw as cubes when there are more than `limit`: the highest
+/// values first (a cut by storage order would keep the deepest levels and
+/// drop the top of the deposit). Without values (domain colouring) an even
+/// stride keeps the whole extent represented.
+pub fn pick_cubes(mut blocks: Vec<usize>, values: Option<&[f32]>, limit: usize) -> Vec<usize> {
+    let limit = limit.max(1);
+    if blocks.len() <= limit {
+        return blocks;
+    }
+    match values {
+        Some(v) => {
+            blocks.sort_by(|a, b| v[*b].total_cmp(&v[*a]).then(a.cmp(b)));
+            blocks.truncate(limit);
+            blocks
+        }
+        None => {
+            let n = blocks.len();
+            (0..limit).map(|k| blocks[k * n / limit]).collect()
+        }
+    }
 }
 
 pub fn view(
@@ -1569,6 +1904,7 @@ pub fn view(
     };
     let mut prims: Vec<Prim> = Vec::new();
     let (mut planes_n, mut limited) = (0usize, false);
+    let mut cubes: Option<(usize, usize)> = None;
     let push_poly = |prims: &mut Vec<Prim>, pts: &[Vec3], i: usize, plane: &str| {
         // Fan polygons with more than 4 corners into triangles-as-quads.
         let loc: Vec<Vec3> = pts.iter().map(|p| origin.to_local(*p)).collect();
@@ -1637,11 +1973,12 @@ pub fn view(
         }
         _ => {
             let blocks: Vec<usize> = (0..model.len()).filter(|&i| accept(i)).collect();
-            if blocks.len() > limit {
-                limited = true;
-            }
+            let total = blocks.len();
+            let chosen = pick_cubes(blocks, values, limit);
+            limited = chosen.len() < total;
+            cubes = Some((chosen.len(), total));
             let mut by_color: BTreeMap<u8, Vec<usize>> = BTreeMap::new();
-            for &i in blocks.iter().take(limit) {
+            for &i in &chosen {
                 by_color.entry(color_of(i)).or_default().push(i);
             }
             for (c, list) in by_color {
@@ -1664,6 +2001,7 @@ pub fn view(
     }
     let polygons = prims.len();
     Ok(ViewOutcome {
+        cubes,
         prims,
         planes: planes_n,
         polygons,
@@ -1681,8 +2019,10 @@ pub fn draw_view(sink: &mut dyn CadSink, r: &RsStrings, out: ViewOutcome) -> usi
     sink.remove_where(&|t: &Tag| t.class == Class::View);
     let n = sink.add(out.prims);
     sink.end();
-    if out.limited {
-        sink.info(&fmt(r.m_view_limited, &[&n]));
+    match (out.limited, out.cubes) {
+        (true, Some((drawn, total))) => sink.info(&fmt(r.m_view_cubes_limited, &[&drawn, &total])),
+        (true, None) => sink.info(&fmt(r.m_view_limited, &[&n])),
+        _ => {}
     }
     sink.info(&fmt(r.m_view_done, &[&n, &out.planes]));
     n

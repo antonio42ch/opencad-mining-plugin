@@ -12,7 +12,7 @@ use crate::cad::CadSink;
 use crate::config::ProjectConfig;
 use crate::host_sink::{record_for, tag_of_app, HostSink};
 use crate::i18n::fmt;
-use crate::interactive::{PickEntities, PickKind, PickSolidSelection, PickViewPoints};
+use crate::interactive::{PickEntities, PickKind, PickSelection, PickViewPoints, SelectionKind};
 use crate::resources::{self as rs, DomainMeshes, ViewInput};
 use crate::rsi18n::{r, RsStrings};
 use crate::state::{self, Pending};
@@ -113,12 +113,61 @@ fn need_data(host: &mut dyn HostApi, tab: u64, r: &RsStrings) -> Option<drillhol
     d
 }
 
-fn need_composites(host: &mut dyn HostApi, tab: u64, r: &RsStrings) -> bool {
-    let ok = state::with_tab(tab, |t| !t.rs.composites.is_empty());
-    if !ok {
-        host.push_error(r.m_no_composites);
+/// Composites of the tab; after reopening a drawing they are recovered from
+/// `<drawing>_composites.csv` when they were made with the current grade
+/// attribute and domain table.
+fn need_composites(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, r: &RsStrings) -> bool {
+    if state::with_tab(tab, |t| !t.rs.composites.is_empty()) {
+        return true;
     }
-    ok
+    let path = rs::model_file(doc_path(host).as_deref(), &cfg.rs.bm.folder, "_composites.csv");
+    let Some(text) = path.as_ref().and_then(|p| std::fs::read_to_string(p).ok()) else {
+        host.push_error(r.m_no_composites);
+        return false;
+    };
+    let doms = rs::effective_domains(cfg);
+    let stamp = rs::composite_stamp(cfg);
+    match rs::parse_composites_csv(&text, &doms) {
+        Ok(comps) if cfg.rs.composited == stamp && !comps.is_empty() => {
+            let weights = rs::decluster_weights(&comps, cfg);
+            host.push_info(&fmt(r.m_reload_comp, &[&path.unwrap().display(), &comps.len()]));
+            state::with_tab(tab, |t| {
+                t.rs.set_composites(comps, weights, stamp.domains, stamp.variable)
+            });
+            true
+        }
+        _ => {
+            host.push_error(r.m_comp_stale);
+            false
+        }
+    }
+}
+
+/// Block model of the tab, recovered from `<drawing>.ombm` after reopening.
+fn need_model(
+    host: &mut dyn HostApi,
+    tab: u64,
+    cfg: &ProjectConfig,
+    r: &RsStrings,
+) -> Option<blockmodel_engine::BlockModel> {
+    if let Some(m) = state::with_tab(tab, |t| t.rs.model.clone()) {
+        return Some(m);
+    }
+    let Some(path) = rs::model_file(doc_path(host).as_deref(), &cfg.rs.bm.folder, ".ombm") else {
+        host.push_error(r.m_bm_no_model);
+        return None;
+    };
+    match blockmodel_engine::file::load(&path) {
+        Ok(m) => {
+            host.push_info(&fmt(r.m_reload_model, &[&path.display()]));
+            state::with_tab(tab, |t| t.rs.model = Some(m.clone()));
+            Some(m)
+        }
+        Err(_) => {
+            host.push_error(r.m_bm_no_model);
+            None
+        }
+    }
 }
 
 fn finish(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, label: &str) {
@@ -171,6 +220,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
                         fmt(r.m_status_comp, &[&out.composites.len(), &doms.len()]),
                         lines.join("\n")
                     );
+                    cfg.rs.composited = rs::composite_stamp(cfg);
                     let names = doms.iter().map(|d| d.name.clone()).collect();
                     state::with_tab(tab, |t| {
                         t.rs.set_composites(out.composites, out.weights, names, rs::var_name(&cfg.dh.assay_attr))
@@ -182,7 +232,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             }
         }
         "MIN_RS_DRAWCOMP" => {
-            if !need_composites(host, tab, r) {
+            if !need_composites(host, tab, cfg, r) {
                 return true;
             }
             let comps = state::with_tab(tab, |t| t.rs.composites.clone());
@@ -192,8 +242,9 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
         "MIN_RS_SETSOLID" => {
             let sel = host.selection();
             if sel.is_empty() {
-                host.start_interactive(Box::new(PickSolidSelection::new(
+                host.start_interactive(Box::new(PickSelection::new(
                     crate::i18n::s().pick_solids.to_string(),
+                    SelectionKind::DomainSolids,
                 )));
             } else {
                 state::set_pending(Pending::DomainSolids(sel));
@@ -222,13 +273,14 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
                 return true;
             };
             let holes = drillhole_engine::pipeline::build_holes(&data);
-            match rs::contact_surface(&holes, cfg, r) {
+            match rs::contact_surfaces(&holes, cfg, r) {
                 Err(e) => host.push_error(&e),
-                Ok((surf, n)) => {
+                Ok(list) => {
                     let mut sink = HostSink::new(host);
-                    rs::draw_surface(&mut sink, r, &surf, n, crate::drillholes::origin(cfg));
+                    rs::draw_surfaces(&mut sink, r, &list, crate::drillholes::origin(cfg));
+                    let surfaces = list.into_iter().map(|(n, s, _)| (n, s)).collect();
                     state::with_tab(tab, |t| {
-                        t.rs.surface = Some(surf);
+                        t.rs.surfaces = surfaces;
                         t.rs.model = None;
                     });
                     finish(host, tab, cfg, "MIN_RS_CONTACT");
@@ -236,7 +288,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             }
         }
         "MIN_RS_VARIO" | "MIN_RS_VARIOUPDATE" => {
-            if !need_composites(host, tab, r) || !domains_ok(host, tab, cfg, r) {
+            if !need_composites(host, tab, cfg, r) || !domains_ok(host, tab, cfg, r) {
                 return true;
             }
             let (idx, dom) = (domain_index(cfg), domain_name(cfg));
@@ -269,7 +321,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             session::refresh_chart(host, cfg, rspanels::VARIO, &svg);
         }
         "MIN_RS_FIT" => {
-            if !need_composites(host, tab, r) || !domains_ok(host, tab, cfg, r) {
+            if !need_composites(host, tab, cfg, r) || !domains_ok(host, tab, cfg, r) {
                 return true;
             }
             let (idx, dom) = (domain_index(cfg), domain_name(cfg));
@@ -315,7 +367,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             }
         }
         "MIN_RS_CROSSVAL" => {
-            if !need_composites(host, tab, r) || !domains_ok(host, tab, cfg, r) {
+            if !need_composites(host, tab, cfg, r) || !domains_ok(host, tab, cfg, r) {
                 return true;
             }
             let dom = domain_name(cfg);
@@ -333,20 +385,20 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             }
         }
         "MIN_RS_BMCREATE" | "MIN_RS_ESTIMATE" => {
-            if !need_composites(host, tab, r) || !domains_ok(host, tab, cfg, r) {
+            if !need_composites(host, tab, cfg, r) || !domains_ok(host, tab, cfg, r) {
                 return true;
             }
             let (comps, weights, surface) = state::with_tab(tab, |t| {
-                (t.rs.composites.clone(), t.rs.weights.clone(), t.rs.surface.clone())
+                (t.rs.composites.clone(), t.rs.weights.clone(), t.rs.surfaces.clone())
             });
             let doms = rs::effective_domains(cfg);
             let meshes = domain_meshes(host);
             // A contact surface is needed when any domain uses one and none is computed yet.
             let mut surface = surface;
-            if surface.is_none() && doms.iter().any(|d| d.side != 0) {
+            if surface.is_empty() && doms.iter().any(|d| !d.conditions().is_empty()) {
                 if let Some(data) = state::with_tab(tab, |t| t.data.clone()) {
-                    match rs::contact_surface(&drillhole_engine::pipeline::build_holes(&data), cfg, r) {
-                        Ok((s, _)) => surface = Some(s),
+                    match rs::contact_surfaces(&drillhole_engine::pipeline::build_holes(&data), cfg, r) {
+                        Ok(list) => surface = list.into_iter().map(|(n, s, _)| (n, s)).collect(),
                         Err(e) => {
                             host.push_error(&e);
                             return true;
@@ -354,7 +406,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
                     }
                 }
             }
-            let regions = match rs::build_regions(&doms, &meshes, surface.as_ref(), r) {
+            let regions = match rs::build_regions(&doms, &meshes, &surface, r) {
                 Ok(v) => v,
                 Err(e) => {
                     host.push_error(&e);
@@ -401,16 +453,15 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             }
             state::with_tab(tab, |t| {
                 t.rs.model = Some(model);
-                t.rs.surface = surface;
+                t.rs.surfaces = surface;
             });
             finish(host, tab, cfg, name);
         }
         "MIN_RS_VALIDATE" => {
-            let Some(model) = state::with_tab(tab, |t| t.rs.model.clone()) else {
-                host.push_error(r.m_bm_no_model);
+            let Some(model) = need_model(host, tab, cfg, r) else {
                 return true;
             };
-            if !need_composites(host, tab, r) || !domains_ok(host, tab, cfg, r) {
+            if !need_composites(host, tab, cfg, r) || !domains_ok(host, tab, cfg, r) {
                 return true;
             }
             let (comps, weights) = state::with_tab(tab, |t| (t.rs.composites.clone(), t.rs.weights.clone()));
@@ -427,8 +478,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             }
         }
         "MIN_RS_BMVIEW" => {
-            if state::with_tab(tab, |t| t.rs.model.is_none()) {
-                host.push_error(r.m_bm_no_model);
+            if need_model(host, tab, cfg, r).is_none() {
                 return true;
             }
             state::with_tab(tab, |t| t.config = cfg.clone());
@@ -451,8 +501,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             let Some(Pending::BmView { axis, points }) = state::take_pending() else {
                 return true;
             };
-            let Some(model) = state::with_tab(tab, |t| t.rs.model.clone()) else {
-                host.push_error(r.m_bm_no_model);
+            let Some(model) = need_model(host, tab, cfg, r) else {
                 return true;
             };
             let axis_pts = match axis {
@@ -491,8 +540,7 @@ pub fn dispatch(host: &mut dyn HostApi, name: &str, tab: u64, cfg: &mut ProjectC
             },
         },
         "MIN_RS_BMEXPORT" => {
-            let Some(model) = state::with_tab(tab, |t| t.rs.model.clone()) else {
-                host.push_error(r.m_bm_no_model);
+            let Some(model) = need_model(host, tab, cfg, r) else {
                 return true;
             };
             match rs::model_file(doc_path(host).as_deref(), &cfg.rs.bm.folder, "_bloques.csv") {

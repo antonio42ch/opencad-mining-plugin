@@ -3,6 +3,34 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-11-20
+
+### Added
+- Geological traces from typed **coordinates** (E, N, Z), bearing/azimuth, length and anchor;
+  the click mode is now `MIN_GM_TRACE_PICK` (live preview, fills the coordinates).
+- **Projection of mapped traces along their dip** (`MIN_GM_PROJECT`): to a target height or by a
+  height difference, dip direction to the right/left of the trace or a fixed azimuth, exact
+  mitre joins on polylines, closed rings, dip taken from the panel or stored with the trace.
+
+- Several named **contact surfaces** (table) and domains between two surfaces
+  (`Debajo C1; Encima C2`); v0.4 single-surface settings still work.
+- Composites and the block model are **recovered after reopening** a drawing from
+  `<drawing>_composites.csv` / `<drawing>.ombm` (composites only when attribute and
+  domains still match).
+- **End-to-end CI test against the official Open CAD Studio release** (`host-smoke` job,
+  `scripts/smoke_serve.py`).
+
+### Changed
+- `MIN_GM_TRACE` now draws from the panel coordinates instead of waiting for a click.
+- The cubes view keeps the highest-value blocks when over the limit (it used to keep
+  the deepest ones) and reports how many were drawn.
+- The composites CSV also stores the from/to coordinates of each composite.
+- Dip and its direction are stored in the trace's XDATA (`dip`, `dipdir`).
+
+### Removed
+- Text annotations of traces (checkbox, `MIN_GM_NOTA` layer, `GM_NOTE` class). The observation
+  fields remain as XDATA metadata. Old drawings keep their existing note texts as plain text.
+
 ## [0.4.0] — 2026-11-19
 
 ### Added

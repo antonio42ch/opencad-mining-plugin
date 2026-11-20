@@ -38,7 +38,7 @@ use ocs_plugin_api::ribbon::CadModule;
 use cad::CadSink;
 use host_sink::HostSink;
 use i18n::{fmt, Lang};
-use interactive::{PickAxisStart, PickEntities, PickKind, PickTracePoint, SectionPick};
+use interactive::{PickAxisStart, PickEntities, PickKind, PickSelection, PickTracePoint, SectionPick, SelectionKind};
 use state::Pending;
 
 /// Keep in sync with `plugin.toml`.
@@ -67,7 +67,7 @@ macro_rules! classes {
                 ("UG_SOLID", $s.cls_solid),
                 ("UG_SECTION", $s.cls_section),
                 ("GM_TRACE", $s.cls_geotrace),
-                ("GM_NOTE", $s.cls_geonote),
+                ("GM_PROJ", $s.cls_geoproj),
                 ("RS_COMP", $r.cls_comp),
                 ("RS_SURFACE", $r.cls_surface),
                 ("RS_VIEW", $r.cls_view),
@@ -247,17 +247,46 @@ impl BuiltinPlugin for MiningPlugin {
                 }
             }
             "MIN_UG_RUN" => run_solid(host, s, tab, &cfg),
+            // Trace from the coordinates, bearing and length typed in the panel.
             "MIN_GM_TRACE" => {
+                let mut sink = HostSink::new(host);
+                sink.begin("MIN_GM_TRACE");
+                geomap::insert(&mut sink, s, &cfg.gm, [cfg.gm.e, cfg.gm.n, cfg.gm.z]);
+                session::commit(&mut sink, s, tab, &cfg);
+                sink.end();
+            }
+            // Trace at a clicked point (live preview); the point fills the coordinates.
+            "MIN_GM_TRACE_PICK" => {
                 state::with_tab(tab, |t| t.config = cfg.clone());
                 host.start_interactive(Box::new(PickTracePoint::new(cfg.gm.clone(), s.pick_point.to_string())));
             }
             "MIN_GM_RUN" => {
                 if let Some(Pending::TracePoint(p)) = state::take_pending() {
+                    (cfg.gm.e, cfg.gm.n, cfg.gm.z) = (p[0], p[1], p[2]);
                     let mut sink = HostSink::new(host);
                     sink.begin("MIN_GM_TRACE");
                     geomap::insert(&mut sink, s, &cfg.gm, p);
                     session::commit(&mut sink, s, tab, &cfg);
                     sink.end();
+                    session::push_panel(host, &cfg, panels::GM, None);
+                }
+            }
+            "MIN_GM_PROJECT" => {
+                state::with_tab(tab, |t| t.config = cfg.clone());
+                let sel = host.selection();
+                if sel.is_empty() {
+                    host.start_interactive(Box::new(PickSelection::new(
+                        s.pick_project.to_string(),
+                        SelectionKind::Projection,
+                    )));
+                } else {
+                    state::set_pending(Pending::Projection(sel));
+                    return self.dispatch(host, "MIN_GM_PROJECT_EXEC");
+                }
+            }
+            "MIN_GM_PROJECT_EXEC" => {
+                if let Some(Pending::Projection(handles)) = state::take_pending() {
+                    run_projection(host, s, tab, &cfg, &handles);
                 }
             }
             "MIN_AX_LINE" | "MIN_AX_CURVE" | "MIN_AX_UNDO" => {
@@ -489,6 +518,46 @@ fn polyline_points(e: &EntityType) -> Option<Vec<mining_core::Vec3>> {
         EntityType::Line(l) => Some(vec![[l.start.x, l.start.y, l.start.z], [l.end.x, l.end.y, l.end.z]]),
         _ => None,
     }
+}
+
+/// Points and closed flag of the line-like entities that can be projected.
+fn polyline_geometry(e: &EntityType) -> Option<(Vec<mining_core::Vec3>, bool)> {
+    let closed = match e {
+        EntityType::Polyline3D(p) => p.flags.closed,
+        EntityType::LwPolyline(p) => p.is_closed,
+        _ => false,
+    };
+    polyline_points(e).map(|p| (p, closed))
+}
+
+fn run_projection(
+    host: &mut dyn HostApi,
+    s: &i18n::Strings,
+    tab: u64,
+    cfg: &config::ProjectConfig,
+    handles: &[Handle],
+) {
+    let ents = host.entities_batch(handles).unwrap_or_default();
+    let sources: Vec<geomap::Source> = handles
+        .iter()
+        .zip(&ents)
+        .filter_map(|(h, e)| {
+            let e = e.as_ref()?;
+            let (points, closed) = polyline_geometry(e)?;
+            Some(geomap::Source {
+                handle: format!("{:X}", h.value()),
+                points,
+                closed,
+                tag: host_sink::tag_of(e),
+            })
+        })
+        .collect();
+    let mut sink = HostSink::new(host);
+    sink.begin("MIN_GM_PROJECT");
+    if geomap::project(&mut sink, s, &cfg.gm, &sources) > 0 {
+        session::commit(&mut sink, s, tab, cfg);
+    }
+    sink.end();
 }
 
 pub(crate) fn fetch_points(host: &dyn HostApi, handles: &[Handle]) -> Option<Vec<Vec<mining_core::Vec3>>> {

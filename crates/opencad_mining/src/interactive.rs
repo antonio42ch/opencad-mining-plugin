@@ -268,18 +268,28 @@ impl InteractiveCommand for SectionPick {
     }
 }
 
-/// Selection of the solids to assign to an estimation domain.
-pub struct PickSolidSelection {
-    prompt: String,
+/// What a gathered selection is for.
+#[derive(Clone, Copy)]
+pub enum SelectionKind {
+    /// Solids to assign to an estimation domain.
+    DomainSolids,
+    /// Mapped traces to project along their dip.
+    Projection,
 }
 
-impl PickSolidSelection {
-    pub fn new(prompt: String) -> Self {
-        PickSolidSelection { prompt }
+/// Gathers a selection (pick or window) and hands it to a follow-up command.
+pub struct PickSelection {
+    prompt: String,
+    kind: SelectionKind,
+}
+
+impl PickSelection {
+    pub fn new(prompt: String, kind: SelectionKind) -> Self {
+        PickSelection { prompt, kind }
     }
 }
 
-impl InteractiveCommand for PickSolidSelection {
+impl InteractiveCommand for PickSelection {
     fn prompt(&self) -> String {
         self.prompt.clone()
     }
@@ -296,8 +306,12 @@ impl InteractiveCommand for PickSolidSelection {
         if handles.is_empty() {
             return CommandStep::NeedPoint;
         }
-        set_pending(Pending::DomainSolids(handles));
-        CommandStep::Dispatch("MIN_RS_SETSOLID_EXEC".into())
+        let (pending, next) = match self.kind {
+            SelectionKind::DomainSolids => (Pending::DomainSolids(handles), "MIN_RS_SETSOLID_EXEC"),
+            SelectionKind::Projection => (Pending::Projection(handles), "MIN_GM_PROJECT_EXEC"),
+        };
+        set_pending(pending);
+        CommandStep::Dispatch(next.into())
     }
 }
 

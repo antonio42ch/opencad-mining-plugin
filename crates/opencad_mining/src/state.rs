@@ -46,6 +46,8 @@ pub enum Pending {
     },
     /// Solids to assign to the estimation domain chosen in the panel.
     DomainSolids(Vec<Handle>),
+    /// Mapped traces to project along their dip.
+    Projection(Vec<Handle>),
     /// Inputs of a block-model section view.
     BmView {
         axis: Option<Handle>,

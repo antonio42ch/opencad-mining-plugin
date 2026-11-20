@@ -95,6 +95,8 @@ impl CadModule for MiningModule {
                     tools: vec![
                         large("MIN_GM_PANEL", t.tool_panel, icon!("geomap")),
                         large("MIN_GM_TRACE", t.tool_trace, icon!("trace")),
+                        small("MIN_GM_TRACE_PICK", t.tool_trace_pick, icon!("trace")),
+                        large("MIN_GM_PROJECT", t.tool_project, icon!("project")),
                     ],
                 },
             ]

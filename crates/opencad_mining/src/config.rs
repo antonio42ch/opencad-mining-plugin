@@ -323,34 +323,51 @@ impl WorkingsConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GeoMapConfig {
+    /// Start / anchor point of the trace.
+    pub e: f64,
+    pub n: f64,
+    pub z: f64,
     pub bearing: String,
     pub length: f64,
     pub anchor: usize,
-    pub annotate: bool,
+    /// Dip 0..90 (empty = use the value stored with the trace).
+    pub dip: String,
+    /// 0 = right of the trace, 1 = left, 2 = fixed azimuth.
+    pub dip_dir: usize,
+    pub dip_az: String,
+    /// 0 = target height, 1 = height difference.
+    pub proj_mode: usize,
+    pub proj_value: f64,
+    // Metadata stored with the trace (never drawn as text).
     pub rock_type: String,
     pub thickness: String,
     pub mineralization: String,
     pub alteration: String,
     pub structure: String,
     pub grade: String,
-    pub dip: String,
     pub sample: String,
 }
 
 impl Default for GeoMapConfig {
     fn default() -> Self {
         GeoMapConfig {
+            e: 0.0,
+            n: 0.0,
+            z: 0.0,
             bearing: "N45E".into(),
             length: 2.0,
             anchor: 1,
-            annotate: true,
+            dip: String::new(),
+            dip_dir: 0,
+            dip_az: String::new(),
+            proj_mode: 0,
+            proj_value: 0.0,
             rock_type: String::new(),
             thickness: String::new(),
             mineralization: String::new(),
             alteration: String::new(),
             structure: String::new(),
             grade: String::new(),
-            dip: String::new(),
             sample: String::new(),
         }
     }
@@ -460,7 +477,13 @@ impl ProjectConfig {
         set!(g.bearing, text("gm_bearing"));
         set!(g.length, num("gm_length"));
         set!(g.anchor, choice("gm_anchor"));
-        set!(g.annotate, flag("gm_annotate"));
+        set!(g.e, num("gm_e"));
+        set!(g.n, num("gm_n"));
+        set!(g.z, num("gm_z"));
+        set!(g.dip_dir, choice("gm_dipdir"));
+        set!(g.dip_az, text("gm_dipaz"));
+        set!(g.proj_mode, choice("gm_pmode"));
+        set!(g.proj_value, num("gm_pvalue"));
         set!(g.rock_type, text("gm_rock"));
         set!(g.thickness, text("gm_thickness"));
         set!(g.mineralization, text("gm_min"));

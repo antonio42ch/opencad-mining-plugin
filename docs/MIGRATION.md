@@ -4,7 +4,7 @@
 |---|---|
 | `PST_SONDAJES` palette (WPF/MVVM) | `MIN_DH_PANEL` panel + `MIN_DH_*` commands |
 | `PSTSOLIDMINE` palette | `MIN_UG_PANEL` panel + `MIN_UG_*` commands |
-| `pstgeomapper` palette / `InsertarMapeoCmd` | `MIN_GM_PANEL` panel + `MIN_GM_TRACE` |
+| `pstgeomapper` palette / `InsertarMapeoCmd` | `MIN_GM_PANEL` panel + `MIN_GM_TRACE` (coordinates) / `MIN_GM_TRACE_PICK` (click). The text annotations of the legacy form were dropped on purpose; the data goes to XDATA |
 | Layers `PST_Trace`, `PST_Collar`, `&&PST_<field>` | `MIN_DH_TRAZA`, `MIN_DH_COLLAR`, `MIN_DH_LEY_<ATTR>` |
 | Layers `PST_SOLIDO`, `PST_SECCION` | `MIN_UG_SOLIDO`, `MIN_UG_SECCION` |
 | XData `PST_SONDAJES` / `GEO_ADDIN_DATA` (free text) | XDATA `OPENMINING` schema v1 (typed keys, class identity) |
