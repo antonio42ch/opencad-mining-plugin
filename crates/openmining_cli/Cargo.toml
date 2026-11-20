@@ -11,4 +11,6 @@ path = "src/main.rs"
 
 [dependencies]
 mining_core = { path = "../mining_core" }
+openmining_ops = { path = "../openmining_ops" }
+serde_json = "1"
 drillhole_engine = { path = "../drillhole_engine", features = ["xlsx"] }

@@ -19,5 +19,6 @@ geostat_engine = { path = "../geostat_engine" }
 blockmodel_engine = { path = "../blockmodel_engine" }
 geomap_engine = { path = "../geomap_engine" }
 geotech_engine = { path = "../geotech_engine" }
+openmining_ops = { path = "../openmining_ops" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

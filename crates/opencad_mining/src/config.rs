@@ -530,7 +530,7 @@ impl ProjectConfig {
         set!(c.sheet_y, num("sc_sheet_y"));
         set!(c.replace, flag("sc_replace"));
         self.rs.apply(v);
-        self.gt.apply(v);
+        crate::opsbind::apply(self, v);
     }
 }
 

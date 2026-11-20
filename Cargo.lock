@@ -966,6 +966,7 @@ dependencies = [
  "geotech_engine",
  "mining_core",
  "ocs_plugin_api",
+ "openmining_ops",
  "serde",
  "serde_json",
  "solids_engine",
@@ -986,6 +987,15 @@ version = "0.6.0"
 dependencies = [
  "drillhole_engine",
  "mining_core",
+ "openmining_ops",
+ "serde_json",
+]
+
+[[package]]
+name = "openmining_ops"
+version = "0.6.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

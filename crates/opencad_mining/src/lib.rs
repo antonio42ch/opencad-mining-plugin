@@ -22,6 +22,8 @@ pub mod gtpanels;
 pub mod host_sink;
 pub mod i18n;
 pub mod interactive;
+pub mod opsbind;
+pub mod opsrun;
 pub mod panels;
 pub mod resources;
 pub mod ribbon;
@@ -119,9 +121,9 @@ impl BuiltinPlugin for MiningPlugin {
             rspanels::comp(rsi18n::r(), &c, ""),
             rspanels::vario(rsi18n::r(), &c, ""),
             rspanels::blocks(rsi18n::r(), &c, ""),
-            gtpanels::data(gti18n::g(), &c),
-            gtpanels::hb(gti18n::g(), &c, ""),
-            gtpanels::model(gti18n::g(), &c),
+            gtpanels::data(&c),
+            gtpanels::hb(&c, ""),
+            gtpanels::model(&c),
         ] {
             let id = def.id.clone();
             if !host.register_panel_for_plugin(MANIFEST.id, def) {
@@ -172,6 +174,9 @@ impl BuiltinPlugin for MiningPlugin {
 
         let tab = host.tab_id();
         let mut cfg = session::config(host, s);
+        if opsrun::try_dispatch(host, cmd, tab, &mut cfg) {
+            return true;
+        }
         match name.as_str() {
             "MIN_DH_LOAD" => {
                 // Optional paths: MIN_DH_LOAD collar [survey [assays [geo]]], "-" skips one.
@@ -438,7 +443,11 @@ impl BuiltinPlugin for MiningPlugin {
                 }
             }
             "MIN_SC_EXEC" => run_sections(host, s, tab, &cfg),
-            other if other.starts_with("MIN_GT_") => return gtcommands::dispatch(host, cmd, other, tab, &mut cfg),
+            "MIN_GT_CLASSIFY_EXEC" => {
+                if let Some(r) = gtcommands::classify_exec(host, tab, &cfg) {
+                    opsrun::emit(host, "gt_classify", &r);
+                }
+            }
             other => return rscommands::dispatch(host, other, tab, &mut cfg),
         }
         true

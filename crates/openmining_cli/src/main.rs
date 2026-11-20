@@ -4,6 +4,8 @@
 //! openmining validate  --collar C [--survey S] [--assays A] [--geo G]
 //! openmining desurvey  --collar C [--survey S] [--out trace.csv]
 //! openmining intervals --collar C [--survey S] --assays A [--out intervals.csv]
+//! openmining mcp-doc                 # docs/MCP.md (operations for AI clients)
+//! openmining ops-schema [name]       # JSON Schema of the operations' arguments
 //! ```
 
 use std::collections::HashMap;
@@ -18,7 +20,7 @@ use drillhole_engine::table::RawTable;
 use drillhole_engine::validate::validate;
 use drillhole_engine::{DataSet, Severity};
 
-const USAGE: &str = "usage: openmining <validate|desurvey|intervals> --collar FILE [--survey FILE] [--assays FILE] [--geo FILE] [--out FILE]";
+const USAGE: &str = "usage: openmining <validate|desurvey|intervals> --collar FILE [--survey FILE] [--assays FILE] [--geo FILE] [--out FILE]\n       openmining mcp-doc | ops-schema [name]";
 
 fn main() -> ExitCode {
     match run(std::env::args().skip(1).collect()) {
@@ -32,6 +34,32 @@ fn main() -> ExitCode {
 
 fn run(args: Vec<String>) -> Result<ExitCode, String> {
     let (cmd, rest) = args.split_first().ok_or(USAGE)?;
+    match cmd.as_str() {
+        "mcp-doc" => {
+            print!("{}", openmining_ops::doc::markdown());
+            return Ok(ExitCode::SUCCESS);
+        }
+        "ops-schema" => {
+            let ops: Vec<_> = openmining_ops::all()
+                .into_iter()
+                .filter(|d| rest.first().is_none_or(|n| d.name == n.as_str()))
+                .map(|d| {
+                    serde_json::json!({
+                        "name": d.name,
+                        "command": d.command,
+                        "description": d.summary,
+                        "input_schema": openmining_ops::schema::input_schema(d),
+                    })
+                })
+                .collect();
+            if ops.is_empty() {
+                return Err(format!("unknown operation '{}'", rest[0]));
+            }
+            println!("{}", serde_json::to_string_pretty(&ops).map_err(|e| e.to_string())?);
+            return Ok(ExitCode::SUCCESS);
+        }
+        _ => {}
+    }
     let mut opts: HashMap<String, String> = HashMap::new();
     let mut it = rest.iter();
     while let Some(k) = it.next() {

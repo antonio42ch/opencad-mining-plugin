@@ -1,20 +1,26 @@
-//! `MIN_GT_*` commands: bind the geotechnical module (`geotech`) to the host
-//! (files, drillholes of the tab, axis polylines, block model, panels).
+//! Handlers of the geotechnical operations (`gt_*`, see `openmining_ops`):
+//! they bind `geotech` to the host (files, drillholes of the tab, axis
+//! polylines, block model, panels) and return a typed result.
 
 use std::collections::BTreeMap;
 
-use geotech_engine::data::{GtField, GtKind};
+use geotech_engine::classify::summarize;
+use geotech_engine::data::{GtField, GtKind, GtTable};
 use ocs_plugin_api::dialog::{DialogControl, DialogDef, DialogResponse, DialogRow, DialogValue};
 use ocs_plugin_api::host::acadrust::EntityType;
 use ocs_plugin_api::host::{Handle, HostApi};
+use openmining_ops::parse::Args;
+use openmining_ops::result::{ErrorCode, OpError, OpResult};
+use serde_json::{json, Value};
 
 use crate::cad::CadSink;
 use crate::config::{flatten, ProjectConfig};
-use crate::geotech::{self as gt, GtState};
+use crate::geotech::{self as gt, GtResult, GtState};
 use crate::gti18n::{g, GtStrings};
 use crate::host_sink::{tag_of, HostSink};
 use crate::i18n::fmt;
 use crate::interactive::{PickSelection, SelectionKind};
+use crate::opsrun::Outcome;
 use crate::state::{self, Pending};
 use crate::{gtpanels, session, MANIFEST};
 
@@ -81,30 +87,24 @@ fn push(host: &mut dyn HostApi, cfg: &ProjectConfig, panel: &'static str, status
     host.update_panel_for_plugin(MANIFEST.id, panel, values);
 }
 
-/// Pushes every geotechnical panel (settings restored from a drawing).
-pub fn push_all(host: &mut dyn HostApi, cfg: &ProjectConfig) {
-    for (panel, values) in gtpanels::values_for(cfg) {
-        host.update_panel_for_plugin(MANIFEST.id, panel, values);
-    }
+fn no_data(msg: &str) -> OpError {
+    OpError::new(ErrorCode::NoData, msg)
 }
 
 /// Tables of the tab; after reopening the drawing they are read again from
 /// the files of the project (no questions: the columns are remembered).
-fn need_tables(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> bool {
+fn need_tables(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Result<(), OpError> {
     if state::with_tab(tab, |t| !t.gt.is_empty()) {
-        return true;
+        return Ok(());
     }
     let gs = g();
     match gt::load(gs, &mut cfg.gt, &mut |_, _, _| None) {
         Ok((st, _)) => {
             host.push_info(gs.m_reloaded);
             state::with_tab(tab, |t| t.gt = st);
-            true
+            Ok(())
         }
-        Err(_) => {
-            host.push_error(gs.m_no_data);
-            false
-        }
+        Err(_) => Err(no_data(gs.m_no_data)),
     }
 }
 
@@ -131,11 +131,134 @@ fn axes_of(host: &dyn HostApi, handles: &[Handle]) -> Vec<(String, Vec<mining_co
         .collect()
 }
 
-fn classify_and_draw(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, axes: &[(String, Vec<mining_core::Vec3>)]) {
+/// Handles of a `handles` argument.
+pub fn handles_arg(args: &Args, key: &str) -> Option<Vec<Handle>> {
+    let list = args.get(key)?.as_array()?;
+    Some(
+        list.iter()
+            .filter_map(|v| u64::from_str_radix(v.as_str()?, 16).ok())
+            .map(Handle::new)
+            .collect(),
+    )
+}
+
+fn table_info(t: &Option<GtTable>) -> Value {
+    match t {
+        None => Value::Null,
+        Some(t) => json!({
+            "records": t.records.len(),
+            "columns": t.mapping.iter().map(|(f, _)| f.key()).collect::<Vec<_>>(),
+            "unused": t.unmapped,
+        }),
+    }
+}
+
+fn load(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
+    let gs = g();
+    let result = {
+        let mut ask = |k, h: &[String], f: &[GtField]| ask_columns(&mut *host, gs, k, h, f);
+        gt::load(gs, &mut cfg.gt, &mut ask)
+    };
+    match result {
+        Err(e) => {
+            push(host, cfg, gtpanels::DATA, Some((gtpanels::DATA_STATUS, e.clone())));
+            let code = if e == gs.m_no_files {
+                ErrorCode::MissingArgument
+            } else {
+                ErrorCode::Failed
+            };
+            Err(OpError::new(code, e))
+        }
+        Ok((st, lines)) => {
+            let mut errors = Vec::new();
+            for (is_err, l) in &lines {
+                if *is_err {
+                    host.push_error(l);
+                    errors.push(l.clone());
+                } else {
+                    host.push_info(l);
+                }
+            }
+            let status = lines.iter().map(|(_, l)| l.clone()).collect::<Vec<_>>().join("\n");
+            let data = json!({
+                "tables": {
+                    "logging": table_info(&st.logging),
+                    "mapping": table_info(&st.mapping),
+                    "lab": if st.lab_rows > 0 { json!({"records": st.lab_rows}) } else { Value::Null },
+                    "joints": table_info(&st.joints),
+                },
+                "lab_lithologies": st.lab_rows,
+                "errors": errors,
+            });
+            state::with_tab(tab, |t| t.gt = st);
+            finish(host, tab, cfg, "MIN_GT_LOAD");
+            push(host, cfg, gtpanels::DATA, Some((gtpanels::DATA_STATUS, status)));
+            Ok(OpResult {
+                warnings: errors,
+                ..OpResult::data(data)
+            })
+        }
+    }
+}
+
+fn classify_data(gs: &GtStrings, results: &[GtResult], drawn: usize) -> Value {
+    let cs: Vec<_> = results.iter().map(|r| r.c.clone()).collect();
+    let sm = summarize(&cs);
+    let mut classes = [0usize; 5];
+    for c in &cs {
+        if let Some(k) = c.class {
+            classes[(k - 1) as usize] += 1;
+        }
+    }
+    let missing: BTreeMap<&str, usize> = sm.missing.iter().map(|(f, n)| (f.key(), *n)).collect();
+    let mut derived: BTreeMap<&str, usize> = BTreeMap::new();
+    for c in &cs {
+        for d in &c.derived {
+            *derived.entry(d.key()).or_default() += 1;
+        }
+    }
+    let invalid: Vec<Value> = results
+        .iter()
+        .flat_map(|r| {
+            r.c.invalid
+                .iter()
+                .map(move |(f, v)| json!({"table": r.kind.key(), "row": r.row, "field": f.key(), "value": v}))
+        })
+        .collect();
+    let unlocated: Vec<&GtResult> = results.iter().filter(|r| r.at.is_err()).collect();
+    let examples: Vec<Value> = unlocated
+        .iter()
+        .take(5)
+        .map(|r| json!({"table": r.kind.key(), "row": r.row, "id": r.label, "reason": gs.locate_error(r.at.as_ref().unwrap_err())}))
+        .collect();
+    json!({
+        "records": sm.total,
+        "with_rmr": sm.with_rmr,
+        "with_q": sm.with_q,
+        "with_gsi": sm.with_gsi,
+        "unclassified": sm.unclassified,
+        "classes": classes,
+        "missing": missing,
+        "invalid": invalid,
+        "derived": derived,
+        "unlocated": unlocated.len(),
+        "unlocated_examples": examples,
+        "drawn": drawn,
+    })
+}
+
+fn classify_and_draw(
+    host: &mut dyn HostApi,
+    tab: u64,
+    cfg: &ProjectConfig,
+    axes: &[(String, Vec<mining_core::Vec3>)],
+) -> Outcome {
     let gs = g();
     let (st, data) = state::with_tab(tab, |t| (t.gt.clone(), t.data.clone()));
+    let mut warnings = Vec::new();
     if st.logging.is_some() && data.is_none() {
         host.push_error(gs.m_need_holes);
+        warnings.push(gs.m_need_holes.to_string());
     }
     let holes = data
         .as_ref()
@@ -146,9 +269,10 @@ fn classify_and_draw(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, axes
     lines.iter().for_each(|l| host.push_info(l));
     let mut sink = HostSink::new(host);
     sink.begin("MIN_GT_CLASSIFY");
-    gt::draw(&mut sink, gs, &cfg.gt, &results, crate::drillholes::origin(cfg));
+    let drawn = gt::draw(&mut sink, gs, &cfg.gt, &results, crate::drillholes::origin(cfg));
     session::commit(&mut sink, crate::i18n::s(), tab, cfg);
     sink.end();
+    let created = std::mem::take(&mut sink.created);
     push(
         host,
         cfg,
@@ -158,177 +282,181 @@ fn classify_and_draw(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, axes
             lines.iter().take(3).cloned().collect::<Vec<_>>().join("\n"),
         )),
     );
+    let data = classify_data(gs, &results, drawn);
     state::with_tab(tab, |t| t.gt.results = results);
+    Ok(OpResult {
+        data,
+        created,
+        warnings,
+        ..Default::default()
+    })
+}
+
+/// Follow-up of the axis pick of `gt_classify`.
+pub fn classify_exec(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig) -> Option<Outcome> {
+    let Some(Pending::GtAxes(handles)) = state::take_pending() else {
+        return None;
+    };
+    Some(classify_with(host, tab, cfg, &handles))
+}
+
+fn classify_with(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, handles: &[Handle]) -> Outcome {
+    let axes = axes_of(host, handles);
+    if axes.is_empty() {
+        return Err(OpError::new(ErrorCode::NotFound, crate::i18n::s().m_not_polyline).at("axes"));
+    }
+    classify_and_draw(host, tab, cfg, &axes)
 }
 
 /// Re-registers the Hoek-Brown panel with a new envelope (the host rebuilds a
 /// changed panel hidden and with defaults: show it and restore the values).
 fn refresh_hb(host: &mut dyn HostApi, cfg: &ProjectConfig, svg: &str, out: String) {
-    if host.register_panel_for_plugin(MANIFEST.id, gtpanels::hb(g(), cfg, svg)) {
+    if host.register_panel_for_plugin(MANIFEST.id, gtpanels::hb(cfg, svg)) {
         host.toggle_panel_for_plugin(MANIFEST.id, gtpanels::HB, Some(true));
     }
     push(host, cfg, gtpanels::HB, Some((gtpanels::HB_OUT, out)));
 }
 
-fn run_hb(host: &mut dyn HostApi, cfg: &ProjectConfig) {
-    match gt::hoek_brown(g(), &cfg.gt) {
-        Err(e) => host.push_error(&e),
-        Ok(o) => {
-            o.text.lines().for_each(|l| host.push_info(l));
-            refresh_hb(host, cfg, &o.svg, o.text);
-        }
-    }
+fn hoek_brown(host: &mut dyn HostApi, cfg: &ProjectConfig) -> Result<Value, OpError> {
+    let o = gt::hoek_brown(g(), &cfg.gt).map_err(|e| OpError::new(ErrorCode::OutOfRange, e))?;
+    o.text.lines().for_each(|l| host.push_info(l));
+    let data = json!({
+        "mb": o.hb.mb,
+        "s": o.hb.s,
+        "a": o.hb.a,
+        "sigma_c": o.hb.sigma_c(),
+        "sigma_t": o.hb.sigma_t(),
+        "sigma_cm": o.hb.sigma_cm(),
+        "erm": o.erm,
+        "sigma3_max": o.s3max,
+        "c": o.c,
+        "phi": o.phi,
+    });
+    refresh_hb(host, cfg, &o.svg, o.text);
+    Ok(data)
 }
 
-pub fn dispatch(host: &mut dyn HostApi, cmd: &str, name: &str, tab: u64, cfg: &mut ProjectConfig) -> bool {
+fn estimate(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
+    let gs = g();
+    need_tables(host, tab, cfg)?;
+    let results = state::with_tab(tab, |t| t.gt.results.clone());
+    if results.is_empty() {
+        return Err(no_data(gs.m_est_none));
+    }
+    let (mut model, created) = match crate::rscommands::current_model(host, tab, cfg) {
+        Some(m) => (m, false),
+        None => {
+            let m = gt::model_for(&results, cfg).map_err(|e| no_data(&e))?;
+            host.push_info(&fmt(gs.m_model_created, &[&m.len()]));
+            (m, true)
+        }
+    };
+    let out = gt::estimate(&mut model, &results, cfg).map_err(|e| no_data(&e))?;
+    let line = fmt(gs.m_est_done, &[&out.estimated, &out.total, &out.columns.join(", ")]);
+    host.push_info(&line);
+    let mut warnings = Vec::new();
+    if out.no_domain > 0 {
+        let w = fmt(gs.m_no_domain, &[&out.no_domain]);
+        host.push_info(&w);
+        warnings.push(w);
+    }
+    let r = crate::rsi18n::r();
+    let saved = match crate::rscommands::save_model(host, cfg, &model, r) {
+        Ok(path) => {
+            host.push_info(&fmt(r.m_bm_saved, &[&path]));
+            Some(path)
+        }
+        Err(e) => {
+            host.push_info(&e);
+            warnings.push(e);
+            None
+        }
+    };
+    state::with_tab(tab, |t| t.rs.model = Some(model));
+    push(host, cfg, gtpanels::MODEL, Some((gtpanels::MODEL_STATUS, line)));
+    finish(host, tab, cfg, "MIN_GT_ESTIMATE");
+    Ok(OpResult {
+        warnings,
+        ..OpResult::data(json!({
+            "estimated": out.estimated,
+            "blocks": out.total,
+            "no_domain": out.no_domain,
+            "columns": out.columns,
+            "model_created": created,
+            "saved": saved,
+        }))
+    })
+}
+
+/// Runs the operation `name` (settings arguments are already in `cfg`).
+pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     let gs = g();
     match name {
-        "MIN_GT_LOAD" => {
-            // Optional paths: MIN_GT_LOAD logging [mapping [lab [joints]]], "-" skips one.
-            let args = crate::command_args(cmd);
-            for (slot, arg) in [
-                &mut cfg.gt.logging,
-                &mut cfg.gt.mapping,
-                &mut cfg.gt.lab,
-                &mut cfg.gt.joints,
-            ]
-            .into_iter()
-            .zip(args.iter().skip(1))
-            {
-                if arg != "-" {
-                    *slot = arg.clone();
-                }
+        "gt_load" => load(host, tab, cfg),
+        "gt_classify" => {
+            need_tables(host, tab, cfg)?;
+            if !state::with_tab(tab, |t| t.gt.needs_axes()) {
+                return classify_and_draw(host, tab, cfg, &[]);
             }
-            let result = {
-                let mut ask = |k, h: &[String], f: &[GtField]| ask_columns(&mut *host, gs, k, h, f);
-                gt::load(gs, &mut cfg.gt, &mut ask)
-            };
-            match result {
-                Err(e) => {
-                    host.push_error(&e);
-                    push(host, cfg, gtpanels::DATA, Some((gtpanels::DATA_STATUS, e)));
-                }
-                Ok((st, lines)) => {
-                    for (is_err, l) in &lines {
-                        if *is_err {
-                            host.push_error(l)
-                        } else {
-                            host.push_info(l)
-                        }
-                    }
-                    let status = lines.iter().map(|(_, l)| l.clone()).collect::<Vec<_>>().join("\n");
-                    state::with_tab(tab, |t| t.gt = st);
-                    finish(host, tab, cfg, "MIN_GT_LOAD");
-                    push(host, cfg, gtpanels::DATA, Some((gtpanels::DATA_STATUS, status)));
-                }
+            if let Some(h) = handles_arg(args, "axes") {
+                return classify_with(host, tab, cfg, &h);
             }
-        }
-        "MIN_GT_CLASSIFY" => {
-            if !need_tables(host, tab, cfg) {
-                return true;
-            }
-            if state::with_tab(tab, |t| t.gt.needs_axes()) {
-                state::with_tab(tab, |t| t.config = cfg.clone());
-                let sel = host.selection();
-                if sel.is_empty() {
-                    host.start_interactive(Box::new(PickSelection::new(
-                        gs.m_pick_axis.to_string(),
-                        SelectionKind::GtAxes,
-                    )));
-                } else {
-                    state::set_pending(Pending::GtAxes(sel));
-                    return dispatch(host, cmd, "MIN_GT_CLASSIFY_EXEC", tab, cfg);
-                }
+            state::with_tab(tab, |t| t.config = cfg.clone());
+            let sel = host.selection();
+            if sel.is_empty() {
+                host.start_interactive(Box::new(PickSelection::new(
+                    gs.m_pick_axis.to_string(),
+                    SelectionKind::GtAxes,
+                )));
+                Ok(OpResult::waiting(gs.m_pick_axis))
             } else {
-                classify_and_draw(host, tab, cfg, &[]);
+                classify_with(host, tab, cfg, &sel)
             }
         }
-        "MIN_GT_CLASSIFY_EXEC" => {
-            if let Some(Pending::GtAxes(handles)) = state::take_pending() {
-                let axes = axes_of(host, &handles);
-                if axes.is_empty() {
-                    host.push_error(crate::i18n::s().m_not_polyline);
-                    return true;
-                }
-                classify_and_draw(host, tab, cfg, &axes);
-            }
+        "gt_clear" => {
+            let n = gt::clear(&mut HostSink::new(host), gs);
+            Ok(OpResult::data(json!({ "removed": n })))
         }
-        "MIN_GT_CLEAR" => {
-            gt::clear(&mut HostSink::new(host), gs);
-        }
-        "MIN_GT_HB" => {
-            run_hb(host, cfg);
+        "gt_hb" => {
+            let data = hoek_brown(host, cfg)?;
             finish(host, tab, cfg, "MIN_GT_HB");
+            Ok(OpResult::data(data))
         }
-        "MIN_GT_HB_DATA" => {
-            if !need_tables(host, tab, cfg) {
-                return true;
-            }
+        "gt_hb_data" => {
+            need_tables(host, tab, cfg)?;
             let st: GtState = state::with_tab(tab, |t| t.gt.clone());
-            match gt::hb_from_data(gs, &mut cfg.gt, &st) {
-                Err(e) => host.push_error(&e),
-                Ok(msg) => {
-                    host.push_info(&msg);
-                    run_hb(host, cfg);
-                    finish(host, tab, cfg, "MIN_GT_HB_DATA");
-                }
-            }
+            let used = gt::hb_from_data(gs, &mut cfg.gt, &st).map_err(|e| no_data(&e))?;
+            host.push_info(&used.message);
+            let hb = hoek_brown(host, cfg)?;
+            finish(host, tab, cfg, "MIN_GT_HB_DATA");
+            Ok(OpResult::data(json!({
+                "gsi": cfg.gt.hb_gsi,
+                "records": used.records,
+                "lab": used.lab,
+                "sigci": cfg.gt.hb_sigci,
+                "mi": cfg.gt.hb_mi,
+                "ei": cfg.gt.hb_ei,
+                "hoek_brown": hb,
+            })))
         }
-        "MIN_GT_ESTIMATE" => {
-            if !need_tables(host, tab, cfg) {
-                return true;
-            }
-            let results = state::with_tab(tab, |t| t.gt.results.clone());
-            if results.is_empty() {
-                host.push_error(gs.m_est_none);
-                return true;
-            }
-            let mut model = match crate::rscommands::current_model(host, tab, cfg) {
-                Some(m) => m,
-                None => match gt::model_for(&results, cfg) {
-                    Ok(m) => {
-                        host.push_info(&fmt(gs.m_model_created, &[&m.len()]));
-                        m
-                    }
-                    Err(e) => {
-                        host.push_error(&e);
-                        return true;
-                    }
-                },
-            };
-            match gt::estimate(&mut model, &results, cfg) {
-                Err(e) => host.push_error(&e),
-                Ok(out) => {
-                    let line = fmt(gs.m_est_done, &[&out.estimated, &out.total, &out.columns.join(", ")]);
-                    host.push_info(&line);
-                    if out.no_domain > 0 {
-                        host.push_info(&fmt(gs.m_no_domain, &[&out.no_domain]));
-                    }
-                    let r = crate::rsi18n::r();
-                    match crate::rscommands::save_model(host, cfg, &model, r) {
-                        Ok(path) => host.push_info(&fmt(r.m_bm_saved, &[&path])),
-                        Err(e) => host.push_info(&e),
-                    }
-                    state::with_tab(tab, |t| t.rs.model = Some(model));
-                    push(host, cfg, gtpanels::MODEL, Some((gtpanels::MODEL_STATUS, line)));
-                    finish(host, tab, cfg, "MIN_GT_ESTIMATE");
-                }
-            }
-        }
-        "MIN_GT_VIEW" => {
+        "gt_estimate" => estimate(host, tab, cfg),
+        "gt_view" => {
             // Same view as Resources, on the geotechnical column; pushed into the
             // resource panel so a pick-based view (re-read after the pick) keeps it.
-            cfg.rs.bm.view_attr = crate::resources::GT_VIEW_ATTR + cfg.gt.md_attr.min(3);
+            let attr = cfg.gt.md_attr.min(3);
+            cfg.rs.bm.view_attr = crate::resources::GT_VIEW_ATTR + attr;
             state::with_tab(tab, |t| t.config = cfg.clone());
             session::push_rs(host, cfg);
-            return crate::rscommands::dispatch(host, "MIN_RS_BMVIEW", tab, cfg);
+            crate::rscommands::dispatch(host, "MIN_RS_BMVIEW", tab, cfg);
+            let key = ["rmr", "gsi", "logq", "class"][attr];
+            Ok(OpResult::data(json!({
+                "attribute": key,
+                "column": gt::COLUMNS[attr],
+            })))
         }
-        _ => return false,
+        other => Err(OpError::new(
+            ErrorCode::UnknownCommand,
+            format!("unknown geotechnical operation {other}"),
+        )),
     }
-    true
-}
-
-/// Values tracked from the geotechnical panels (`state::track_value`).
-pub fn is_panel(id: &str) -> bool {
-    gtpanels::ALL.contains(&id)
 }

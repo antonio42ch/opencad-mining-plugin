@@ -26,6 +26,8 @@ pub struct HostSink<'a> {
     /// Nested `begin`s join the outermost undo group: a command and the
     /// settings it saves are one undo step.
     depth: u32,
+    /// Handles (hex) of every entity created through this sink.
+    pub created: Vec<String>,
 }
 
 impl<'a> HostSink<'a> {
@@ -34,6 +36,7 @@ impl<'a> HostSink<'a> {
             host,
             appid_registered: false,
             depth: 0,
+            created: Vec::new(),
         }
     }
 }
@@ -126,6 +129,12 @@ impl CadSink for HostSink<'_> {
             let first_tag = chunk.first().map(|p| p.tag.clone());
             let handles = self.host.add_entities(chunk.into_iter().map(to_entity).collect());
             created += handles.iter().filter(|h| !h.is_null()).count();
+            self.created.extend(
+                handles
+                    .iter()
+                    .filter(|h| !h.is_null())
+                    .map(|h| format!("{:X}", h.value())),
+            );
             // Embedded XDATA travels with the entity; one `write_record`
             // registers the APPID so it survives DWG/DXF save.
             if !self.appid_registered {

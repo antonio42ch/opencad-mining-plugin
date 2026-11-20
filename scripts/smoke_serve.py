@@ -28,6 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
+RESULT = "OPENMINING_RESULT "
 PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model"]
 
 
@@ -198,19 +199,48 @@ def main():
         run("MIN_RS_BMVIEW")
         c.need(count(layer("MIN_RS_VISTA")) >= 1, "composite + estimate + view draw block polygons")
 
-        # 6. Geotechnics: logging on the loaded holes + lab -> RMR/Q/GSI -> model.
-        run(f'MIN_GT_LOAD "{data / "gt_logging.csv"}" - "{data / "gt_lab.csv"}"')
-        run("MIN_GT_CLASSIFY")
-        c.need(count(layer("MIN_GT_SONDAJE")) >= 5, "MIN_GT_LOAD + MIN_GT_CLASSIFY draw the 5 logged intervals")
-        run("MIN_GT_HB")
-        run("MIN_GT_ESTIMATE")
-        run("MIN_GT_VIEW")
-        hist = s.control("history", quiet=True)
-        texts = [e.get("text", "") for e in hist.get("entries", hist.get("result", {}).get("entries", []))]
-        c.need(any("Clasificación:" in t for t in texts), "classification report in the command line")
-        c.need(any("Hoek-Brown: mb" in t for t in texts), "MIN_GT_HB reports the Hoek-Brown parameters")
-        c.need(any("Modelo geotécnico:" in t for t in texts), "MIN_GT_ESTIMATE fills the geotechnical columns")
-        c.need(count(layer("MIN_RS_VISTA")) >= 1, "MIN_GT_VIEW draws the model coloured by RMR")
+        # 6. Geotechnics through the operations format an AI client uses:
+        #    key=value arguments and the OPENMINING_RESULT line of each command.
+        def result(op):
+            hist = s.control("history", quiet=True)
+            entries = hist.get("entries", hist.get("result", {}).get("entries", []))
+            for e in reversed(entries):
+                t = e.get("text", "")
+                i = t.find(RESULT)
+                if i >= 0:
+                    r = json.loads(t[i + len(RESULT):])
+                    if r.get("op") == op:
+                        return r
+            return {}
+
+        run(f'MIN_GT_LOAD logging="{data / "gt_logging.csv"}" lab="{data / "gt_lab.csv"}"')
+        r = result("gt_load")
+        c.need(r.get("ok") and r["data"]["tables"]["logging"]["records"] == 5 and r["data"]["lab_lithologies"] == 2,
+               f"gt_load result: 5 logged intervals, 2 lithologies ({r.get('data') or r.get('error')})")
+        run("MIN_GT_CLASSIFY color_by=q_class")
+        r = result("gt_classify")
+        d = r.get("data", {})
+        c.need(r.get("ok") and d.get("with_rmr") == 5 and d.get("classes") == [1, 2, 0, 2, 0] and d.get("drawn") == 5,
+               f"gt_classify result: RMR for 5, classes I1 II2 IV2, 5 drawn ({d or r.get('error')})")
+        c.need(len(r.get("created", [])) == 5, "gt_classify reports the 5 created handles")
+        c.need(count(layer("MIN_GT_SONDAJE")) >= 5, "the 5 intervals are on MIN_GT_SONDAJE")
+        run("MIN_GT_HB sigci=100 gsi=50 mi=10 d=0")
+        r = result("gt_hb")
+        c.need(r.get("ok") and abs(r["data"]["mb"] - 1.6767) < 1e-3 and abs(r["data"]["a"] - 0.5057) < 1e-3,
+               f"gt_hb result: mb 1.677, a 0.506 ({r.get('data') or r.get('error')})")
+        run("MIN_GT_HB gsi=150")
+        r = result("gt_hb")
+        c.need(r.get("ok") is False and r["error"]["code"] == "out_of_range" and r["error"]["param"] == "gsi",
+               "an out-of-range argument is refused with code out_of_range")
+        run("MIN_GT_HB nope=1")
+        c.need(result("gt_hb").get("error", {}).get("code") == "unknown_argument", "an unknown argument is refused")
+        run("MIN_GT_ESTIMATE method=idw radius1=80 radius2=80 radius3=40")
+        r = result("gt_estimate")
+        c.need(r.get("ok") and r["data"]["estimated"] > 0 and "gt_rmr" in r["data"]["columns"],
+               f"gt_estimate result fills gt_rmr ({r.get('data') or r.get('error')})")
+        run("MIN_GT_VIEW attribute=class")
+        c.need(result("gt_view").get("data", {}).get("column") == "gt_class" and count(layer("MIN_RS_VISTA")) >= 1,
+               "gt_view draws the model coloured by rock mass class")
     finally:
         hist = s.control("history", quiet=True)
         entries = hist.get("entries", hist.get("result", {}).get("entries", []))
