@@ -230,7 +230,7 @@ def main():
         ok("rs_stats", "rs_stats reports the composites by domain", lambda d: d["domains"][0]["count"] > 0)
         run("MIN_BM_INFO")
         ok("bm_info", "bm_info reports blocks and estimated columns", lambda d: d.get("blocks", 0) > 0 and any(k.endswith("_ok") or k.endswith("_nn") for k in d.get("columns", {})))
-        run("MIN_BM_SAMPLE point=500000,8500000,3950")
+        run("MIN_BM_SAMPLE point=500000,8500000,3985")
         ok("bm_sample", "bm_sample finds the block under VERT", lambda d: d["samples"][0]["block"] is not None)
         run("MIN_BM_RESOURCES cutoffs=0,1")
         ok("bm_resources", "bm_resources reports two cut-offs", lambda d: len(d.get("table", [])) == 2)
