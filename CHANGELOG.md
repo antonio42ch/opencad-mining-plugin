@@ -27,6 +27,15 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 - The composites CSV also stores the from/to coordinates of each composite.
 - Dip and its direction are stored in the trace's XDATA (`dip`, `dipdir`).
 
+- `MIN_DH_LOAD [collar [survey [assays [geo]]]]`: file paths as arguments (scripts, automation).
+
+### Fixed (found by the new end-to-end test against the real host)
+- Panels were never read directly: the plugin called `panel_snapshot_for_plugin`, which
+  out of process always fails; it now uses `panel_snapshot`. Settings typed in a panel no
+  longer depend on change notifications arriving before the command runs.
+- One unreadable control (a field never edited, an empty dropdown) discarded the whole
+  panel; every readable value is now used.
+
 ### Removed
 - Text annotations of traces (checkbox, `MIN_GM_NOTA` layer, `GM_NOTE` class). The observation
   fields remain as XDATA metadata. Old drawings keep their existing note texts as plain text.
