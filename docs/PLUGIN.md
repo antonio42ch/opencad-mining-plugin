@@ -8,7 +8,7 @@ Plugin id `opencad.mining`, command prefix `MIN_`, XDATA application
 | Command | Action |
 |---|---|
 | `MIN_DH_PANEL` / `MIN_UG_PANEL` / `MIN_GM_PANEL` | Show/hide the module panel |
-| `MIN_DH_LOAD` | Read collar/survey/assays/geology (CSV, TXT, TSV, XLSX, XLS, ODS), map columns, validate |
+| `MIN_DH_LOAD [collar [survey [assays [geo]]]]` | Read collar/survey/assays/geology (CSV, TXT, TSV, XLSX, XLS, ODS), map columns, validate. Paths given as arguments (quoted when they contain spaces, `-` to skip one) replace the panel's; scripts and automation use this form |
 | `MIN_DH_DRAW` | Draw (replacing any previous drawing of the same holes) |
 | `MIN_DH_CLEAR` | Remove every drillhole entity created by the plugin |
 | `MIN_DH_GEOCOLORS` | Fill the geology colour table with the values of the selected attribute |

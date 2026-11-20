@@ -162,6 +162,22 @@ impl BuiltinPlugin for MiningPlugin {
         let mut cfg = session::config(host, s);
         match name.as_str() {
             "MIN_DH_LOAD" => {
+                // Optional paths: MIN_DH_LOAD collar [survey [assays [geo]]], "-" skips one.
+                // Automation and scripts use this (the host cannot type into file pickers).
+                let args = command_args(cmd);
+                for (slot, arg) in [
+                    &mut cfg.dh.collar,
+                    &mut cfg.dh.survey,
+                    &mut cfg.dh.assays,
+                    &mut cfg.dh.geo,
+                ]
+                .into_iter()
+                .zip(args.iter().skip(1))
+                {
+                    if arg != "-" {
+                        *slot = arg.clone();
+                    }
+                }
                 let result = {
                     let mut ask = |t, h: &[String], r: &[_], o: &[_]| session::ask_mapping(&mut *host, s, t, h, r, o);
                     drillholes::load(s, &mut cfg, &mut ask)
@@ -520,6 +536,35 @@ fn polyline_points(e: &EntityType) -> Option<Vec<mining_core::Vec3>> {
     }
 }
 
+/// Words of a command line; `"..."` keeps spaces (Windows paths).
+pub fn command_args(cmd: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let (mut quoted, mut any) = (false, false);
+    for ch in cmd.chars() {
+        match ch {
+            '"' => {
+                quoted = !quoted;
+                any = true;
+            }
+            c if c.is_whitespace() && !quoted => {
+                if any {
+                    out.push(std::mem::take(&mut cur));
+                    any = false;
+                }
+            }
+            c => {
+                cur.push(c);
+                any = true;
+            }
+        }
+    }
+    if any {
+        out.push(cur);
+    }
+    out
+}
+
 /// Points and closed flag of the line-like entities that can be projected.
 fn polyline_geometry(e: &EntityType) -> Option<(Vec<mining_core::Vec3>, bool)> {
     let closed = match e {
@@ -602,6 +647,21 @@ fn run_solid(host: &mut dyn HostApi, s: &i18n::Strings, tab: u64, cfg: &config::
 }
 
 ocs_plugin_api::export_plugin!(MiningPlugin);
+
+#[cfg(test)]
+mod args_tests {
+    use super::command_args;
+
+    #[test]
+    fn quoted_paths_keep_their_spaces() {
+        assert_eq!(
+            command_args(r#"MIN_DH_LOAD "C:\Mis datos\collar.csv" /tmp/s.csv - "x y.csv""#),
+            vec!["MIN_DH_LOAD", r"C:\Mis datos\collar.csv", "/tmp/s.csv", "-", "x y.csv"]
+        );
+        assert_eq!(command_args("  MIN_DH_LOAD  "), vec!["MIN_DH_LOAD"]);
+        assert_eq!(command_args(r#"A "" B"#), vec!["A", "", "B"]);
+    }
+}
 
 #[cfg(test)]
 mod manifest_tests {

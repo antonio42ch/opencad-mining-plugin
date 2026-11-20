@@ -182,9 +182,8 @@ def main():
             c.need(False, "3DPOLY created a polyline")
 
         # 4. Drillholes from CSV (Spanish Excel collar: ';' + decimal comma).
-        for ctl, f in (("dh_collar", "collar.csv"), ("dh_survey", "survey.csv"), ("dh_assays", "assays.csv")):
-            field("min_drillholes", ctl, str(data / f))
-        run("MIN_DH_LOAD")
+        # File pickers cannot be typed into over automation: paths go as arguments.
+        run(f'MIN_DH_LOAD "{data / "collar.csv"}" "{data / "survey.csv"}" "{data / "assays.csv"}"')
         run("MIN_DH_DRAW")
         c.need(count(layer("MIN_DH_TRAZA")) >= 3, "MIN_DH_LOAD + MIN_DH_DRAW draw the 3 reference holes")
 
