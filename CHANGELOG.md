@@ -3,6 +3,32 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — unreleased
+
+### Added
+- **Operations for AI clients (MCP).** Every action is a typed operation (new crate
+  `openmining_ops`): `key=value` arguments validated against the definition (types,
+  limits, choices by key or label, domains and attributes by name), one
+  `OPENMINING_RESULT {json}` line per command with the data, the created handles and coded
+  errors (`no_data`, `out_of_range`, `not_found`, `unknown_argument`...). Guide generated
+  from the definitions: `docs/MCP.md`, with typical workflows.
+- Inputs that were clicked can be passed as arguments: `axis=`, `solids=`, `traces=`,
+  `lines=`, `axes=`, `p1=`/`p2=`/`p3=`, `point=`/`toward=`, `at=`.
+- **Read-only operations:** `MIN_STATUS` (what is loaded and the next steps),
+  `MIN_DH_LIST`, `MIN_RS_STATS`, `MIN_RS_VARIOGRAM`, `MIN_BM_INFO`, `MIN_BM_SAMPLE`
+  (point or line), `MIN_BM_RESOURCES` (several cut-offs), `MIN_GT_SUMMARY`, `MIN_ENTITIES`.
+- `openmining_cli mcp-doc` and `ops-schema`; `api25` feature with native tools for the
+  next host plugin API (checked in CI, not released).
+
+### Changed
+- Panels are generated from the operation definitions (same layout); panel control ids
+  are now the settings path (`gt.md_power`, `dh.collar`...).
+- An argument given to a command is kept as the project setting, like the panel.
+
+### Compatibility
+- Drawings and settings of 0.4–0.6 open unchanged (the v0.4 single contact and domain side
+  are kept). Old command forms still work.
+
 ## [0.6.0] — 2026-11-20
 
 ### Added

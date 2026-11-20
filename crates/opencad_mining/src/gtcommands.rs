@@ -197,7 +197,7 @@ fn load(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     }
 }
 
-fn classify_data(gs: &GtStrings, results: &[GtResult], drawn: usize) -> Value {
+pub(crate) fn classify_data(gs: &GtStrings, results: &[GtResult], drawn: usize) -> Value {
     let cs: Vec<_> = results.iter().map(|r| r.c.clone()).collect();
     let sm = summarize(&cs);
     let mut classes = [0usize; 5];

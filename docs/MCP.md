@@ -28,7 +28,98 @@ OPENMINING_RESULT {"op":"gt_hb","ok":false,"error":{"code":"out_of_range","messa
 | `cancelled` | the user cancelled a dialog or pick |
 | `failed` | the operation could not complete (see the message) |
 
+## Typical workflows
+
+Start with `MIN_STATUS`: it says what is loaded and lists the next operations (`next`). After an error
+with code `no_data`, call it again. Entity handles come from the `created` list of a result, from
+`MIN_ENTITIES class=...`, or from the host's own query/selection tools. Search the history for the text
+`OPENMINING_RESULT ` (the host may put an icon before it) and parse the JSON after it.
+
+**Drillholes**
+
+```
+MIN_DH_LOAD collar="C:\data\collar.csv" survey="C:\data\survey.csv" assays="C:\data\assays.csv"
+MIN_DH_LIST
+MIN_DH_DRAW assay_attr=cu% scheme=rainbow
+```
+
+**Resource estimation** (one variogram model saved per domain before estimating)
+
+```
+MIN_RS_COMPOSITE comp_length=2 domains=[["Oxides","OX"],["Sulphides","SU"]]
+MIN_RS_STATS
+MIN_RS_VARIO domain=Oxides lag=10 nlags=12
+MIN_RS_FIT domain=Oxides fit_kind=spherical
+MIN_RS_MODELSAVE domain=Oxides
+(repeat for every domain)
+MIN_RS_ESTIMATE size_x=10 size_y=10 size_z=5 radius1=120 radius2=80 radius3=30
+MIN_BM_RESOURCES cutoffs=0.2,0.5,1
+MIN_RS_BMVIEW mode=levels attribute=grade_ok
+```
+
+Solids as domains: `MIN_RS_SETSOLID target=Oxides solids=1A3F,1A40` (closed meshes).
+
+**Workings and sections**
+
+```
+MIN_AX_LINE e=500000 n=8500000 z=3000 bearing=N90E length=100 grade=1
+MIN_UG_AXIS axis=<handle of the axis> profile=horseshoe width=4 height=4
+MIN_SC_RUN mode=axis axis=<handle> solids=<solid handle> interval=10
+```
+
+**Geological mapping**
+
+```
+MIN_GM_TRACE e=1000 n=2000 z=300 bearing=N45E length=20 dip=60
+MIN_GM_PROJECT traces=<handle> proj_mode=delta proj_value=-10
+```
+
+**Geotechnics**
+
+```
+MIN_GT_LOAD logging="C:\data\logging.csv" lab="C:\data\lab.csv"
+MIN_GT_CLASSIFY
+MIN_GT_HB_DATA lithology=Andesite
+MIN_GT_ESTIMATE method=idw radius1=60 radius2=60 radius3=20
+MIN_BM_SAMPLE from=500000,8500000,3100 to=500100,8500000,3100 columns=gt_rmr,gt_class
+MIN_GT_VIEW attribute=class
+```
+
+## Project
+
+### `status` — `MIN_STATUS`
+
+*Read-only.* What the project holds and what can be done next: drillholes, composites, domains and variogram models, block model, contact surfaces, geotechnical tables, axis being designed, drawing path. Call it first, and after an error with code no_data.
+
+No arguments.
+
+Result `data`: `drawing` (path or null), `drillholes` (`loaded`, `holes`, `assay_attributes`, `geo_attributes`, `assay_attr`), `composites` (`count`, `variable`, `stale`), `domains` (list of `{name, values, density, model_saved}`), `surfaces`, `block_model` (`blocks`, `columns`) or null, `geotechnics` (`tables`, `classified`), `axis` (current axis or null), `next` (suggested operations with the reason).
+
+### `entities` — `MIN_ENTITIES`
+
+*Read-only.* Entities created by Open Mining with their class and attributes (XDATA decoded): volume of solids, area of sections, RMR of geotechnical records, hole/from/to of intervals...
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `class` | text |  | Class key filter (DH_TRACE, DH_ASSAY, UG_SOLID, UG_SECTION, GM_TRACE, GM_PROJ, AX_AXIS, SC_CUT, SC_SHEET, RS_COMP, RS_SURFACE, RS_VIEW, GT_REC; comma-separated). |
+| `layer` | text |  | Layer filter (exact name). |
+| `limit` | integer 1..10000 |  | Maximum entities returned (default 500). |
+| `offset` | integer ≥ 0 |  | Entities to skip (paging). |
+
+Result `data`: `total` (matching), `entities`: list of `{handle, class, layer, attributes}`, `next_offset` (null at the end).
+
 ## Drillholes
+
+### `dh_list` — `MIN_DH_LIST`
+
+*Read-only.* List the loaded drillholes (collar, depth, interval counts) or, with `hole`, the intervals of one hole with their values.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `hole` | text |  | Hole id: return its intervals (assays and geology) instead of the list of holes. |
+| `limit` | integer 1..10000 |  | Maximum holes or intervals returned (default 500). |
+
+Result `data`: `holes`: list of `{id, x, y, z, depth, azimuth, dip, assays, geo}`; with `hole`: `{id, assays: [{from, to, values}], geo: [{from, to, values}]}`.
 
 ### `dh_load` — `MIN_DH_LOAD`
 
@@ -305,6 +396,57 @@ Result `data`: `projected` (traces), `skipped` (with reasons), `shift` (horizont
 
 ## Resource estimation
 
+### `rs_stats` — `MIN_RS_STATS`
+
+*Read-only.* Statistics of the current composites by domain (count, mean, declustered mean, CV, quantiles), without recompositing.
+
+No arguments.
+
+Result `data`: `variable`, `domains`: list of `{name, count, length, mean, declustered_mean, cv, min, p25, median, p75, max}`.
+
+### `rs_variogram` — `MIN_RS_VARIOGRAM`
+
+*Read-only.* Experimental variogram points cached for a domain (run rs_vario first) and the working / saved model.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `domain` | name or index among the domains |  | Domain (name or index); default the one of the variography settings. |
+
+Result `data`: `domain`, `directions`: list of `{direction, points: [{lag, gamma, pairs}]}`, `working_model`, `saved_model` (null when not saved).
+
+### `bm_info` — `MIN_BM_INFO`
+
+*Read-only.* Geometry, domains and columns of the block model (tab or .ombm file).
+
+No arguments.
+
+Result `data`: `origin`, `size`, `counts`, `rotation`, `blocks`, `assigned`, `domains` (name -> blocks), `columns` (name -> `{estimated, min, max, mean}`).
+
+### `bm_sample` — `MIN_BM_SAMPLE`
+
+*Read-only.* Values of the block model at a point, or along a line every `step` metres (one entry per block crossed).
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `point` | point `x,y[,z]` |  | Block containing this point (world x,y,z). |
+| `from` | point `x,y[,z]` |  | Start of a line to sample along (with `to`). |
+| `to` | point `x,y[,z]` |  | End of the line. |
+| `step` | number ≥ 0.01 |  | Sampling step along the line (default: the smallest block size). |
+| `columns` | text |  | Comma-separated columns to return (default all). |
+
+Result `data`: `samples`: list of `{at, block, ijk, domain, values}` (`block` null outside the model).
+
+### `bm_resources` — `MIN_BM_RESOURCES`
+
+*Read-only.* Tonnes, grade, metal and volume by domain above one or more cut-offs on a grade column of the block model.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `column` | text |  | Grade column (default: OK, else NN/IDW/SK of the estimated variable). |
+| `cutoffs` | text |  | Comma-separated cut-offs (default: the view cut-off). |
+
+Result `data`: `column`, `table`: list of `{cutoff, rows: [{domain, blocks, tonnes, grade, metal, volume}]}` (a Total row per cut-off).
+
 ### `rs_composite` — `MIN_RS_COMPOSITE`
 
 Composite the assays of dh_assay_attr by domain (domains table: geology values, solids, surface conditions), cap them, decluster, report statistics and the histogram. Saves <drawing>_composites.csv. Needs dh_load.
@@ -567,6 +709,14 @@ Export the block model to <drawing>_bloques.csv.
 Result `data`: `file`.
 
 ## Geotechnics
+
+### `gt_summary` — `MIN_GT_SUMMARY`
+
+*Read-only.* Summary of the last geotechnical classification (same data as gt_classify, without redrawing).
+
+No arguments.
+
+Result `data`: as gt_classify (`drawn` is null).
 
 ### `gt_load` — `MIN_GT_LOAD`
 

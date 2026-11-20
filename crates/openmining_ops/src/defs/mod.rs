@@ -6,6 +6,7 @@ mod axes;
 mod drillholes;
 mod geology;
 mod geotech;
+mod queries;
 mod resources;
 mod sections;
 mod workings;
@@ -15,6 +16,7 @@ use crate::{OpDef, PanelSpec};
 pub fn all() -> Vec<&'static OpDef> {
     let mut v: Vec<&'static OpDef> = Vec::new();
     for m in [
+        queries::OPS,
         drillholes::OPS,
         workings::OPS,
         axes::OPS,

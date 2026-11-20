@@ -5,6 +5,65 @@ use std::fmt::Write;
 use crate::result::{ErrorCode, PREFIX};
 use crate::{Group, Kind, OpDef, OpKind};
 
+const WORKFLOWS: &str = r#"## Typical workflows
+
+Start with `MIN_STATUS`: it says what is loaded and lists the next operations (`next`). After an error
+with code `no_data`, call it again. Entity handles come from the `created` list of a result, from
+`MIN_ENTITIES class=...`, or from the host's own query/selection tools. Search the history for the text
+`OPENMINING_RESULT ` (the host may put an icon before it) and parse the JSON after it.
+
+**Drillholes**
+
+```
+MIN_DH_LOAD collar="C:\data\collar.csv" survey="C:\data\survey.csv" assays="C:\data\assays.csv"
+MIN_DH_LIST
+MIN_DH_DRAW assay_attr=cu% scheme=rainbow
+```
+
+**Resource estimation** (one variogram model saved per domain before estimating)
+
+```
+MIN_RS_COMPOSITE comp_length=2 domains=[["Oxides","OX"],["Sulphides","SU"]]
+MIN_RS_STATS
+MIN_RS_VARIO domain=Oxides lag=10 nlags=12
+MIN_RS_FIT domain=Oxides fit_kind=spherical
+MIN_RS_MODELSAVE domain=Oxides
+(repeat for every domain)
+MIN_RS_ESTIMATE size_x=10 size_y=10 size_z=5 radius1=120 radius2=80 radius3=30
+MIN_BM_RESOURCES cutoffs=0.2,0.5,1
+MIN_RS_BMVIEW mode=levels attribute=grade_ok
+```
+
+Solids as domains: `MIN_RS_SETSOLID target=Oxides solids=1A3F,1A40` (closed meshes).
+
+**Workings and sections**
+
+```
+MIN_AX_LINE e=500000 n=8500000 z=3000 bearing=N90E length=100 grade=1
+MIN_UG_AXIS axis=<handle of the axis> profile=horseshoe width=4 height=4
+MIN_SC_RUN mode=axis axis=<handle> solids=<solid handle> interval=10
+```
+
+**Geological mapping**
+
+```
+MIN_GM_TRACE e=1000 n=2000 z=300 bearing=N45E length=20 dip=60
+MIN_GM_PROJECT traces=<handle> proj_mode=delta proj_value=-10
+```
+
+**Geotechnics**
+
+```
+MIN_GT_LOAD logging="C:\data\logging.csv" lab="C:\data\lab.csv"
+MIN_GT_CLASSIFY
+MIN_GT_HB_DATA lithology=Andesite
+MIN_GT_ESTIMATE method=idw radius1=60 radius2=60 radius3=20
+MIN_BM_SAMPLE from=500000,8500000,3100 to=500100,8500000,3100 columns=gt_rmr,gt_class
+MIN_GT_VIEW attribute=class
+```
+
+"#;
+
 fn kind_detail(k: &Kind) -> String {
     match k {
         Kind::Number { min, max, .. } => match (min, max) {
@@ -103,6 +162,7 @@ the history tool):\n\n```\n{PREFIX}{{\"op\":\"gt_load\",\"ok\":true,\"status\":\
         let _ = writeln!(out, "| `{}` | {} |", c.as_str(), c.describe());
     }
     out.push('\n');
+    out.push_str(WORKFLOWS);
     let groups = [
         Group::Project,
         Group::Drillholes,

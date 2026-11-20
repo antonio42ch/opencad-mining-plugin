@@ -15,9 +15,28 @@ crates/
                         (OK, SK), IDW, nearest neighbour, cross-validation, 2D contact surfaces
   blockmodel_engine/ C  rotated block model, domain regions (solids, surfaces), parallel
                         estimation, binary file, swath / grade-tonnage reports, views
-  openmining_cli/    C  the engines from the command line (batch, QA, CI)
-  opencad_mining/    B  cdylib: manifest, ribbon, panels, commands, XDATA, settings
+  geotech_engine/    C  geotechnical tables, RMR89 / Q / GSI, Hoek-Brown, locating records
+  openmining_ops/    C  one typed definition per operation: parameters bound to the project
+                        settings, key=value / JSON argument parsing, JSON Schema, panel
+                        layouts, result and error format, the generated docs/MCP.md
+  openmining_cli/    C  the engines from the command line (batch, QA, CI, mcp-doc, ops-schema)
+  opencad_mining/    B  cdylib: manifest, ribbon, panels built from the definitions,
+                        operation handlers, XDATA, settings
 ```
+
+## Operations
+
+Every action is an operation of `openmining_ops` (see [MCP.md](MCP.md)). A command line
+`MIN_X key=value ...` is parsed against the definition (`opsrun`), setting arguments are
+written into the project settings (JSON pointers into `ProjectConfig`, the same values the
+panels show), the module's handler runs (`commands`, `rscommands`, `gtcommands`,
+`queries`) and returns `Result<OpResult, OpError>`, and one `OPENMINING_RESULT {json}`
+line is written to the command history. Panels are generated from `PanelSpec`s
+(`opsbind`), so a panel, the arguments and the schema cannot drift apart. Inputs a user
+clicks (axes, solids, points) are arguments too; without them the interactive pick starts
+and its follow-up command (`*_EXEC`, `*_RUN`) writes the result of the same operation.
+With the `api25` feature the same definitions become native AI tools
+(`BuiltinPlugin::tools` / `call_tool`) once the host publishes plugin API 25.
 
 ## Rules
 

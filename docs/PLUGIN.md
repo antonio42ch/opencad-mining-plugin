@@ -5,6 +5,10 @@ Plugin id `opencad.mining`, command prefix `MIN_`, XDATA application
 
 ## Commands
 
+Every command below is an operation with `key=value` arguments and a result line for AI
+clients; the full list of arguments, results and error codes is in [MCP.md](MCP.md). The
+forms below (positional paths, picks) keep working.
+
 | Command | Action |
 |---|---|
 | `MIN_DH_PANEL` / `MIN_UG_PANEL` / `MIN_GM_PANEL` | Show/hide the module panel |

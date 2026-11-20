@@ -38,7 +38,9 @@ python3 scripts/smoke_serve.py ~/ocs/squashfs-root/AppRun
 ```
 
 Uses a temporary config and plugins folder and drives every module over
-`--serve`: plugin loaded and its 11 panels registered, geology trace from
+`--serve` **the way an AI client does** — `key=value` arguments, handles instead of
+clicks, and the `OPENMINING_RESULT` line of every command checked — plus one value typed
+into a generated panel: plugin loaded and its 11 panels registered, status queries, geology trace from
 coordinates and projection along the dip, axis solid and level sections,
 drillholes from the reference CSVs (typed into the panel), composites, a saved
 variogram model, block model estimation and a block view, then geotechnics

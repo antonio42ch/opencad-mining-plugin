@@ -26,6 +26,7 @@ pub mod interactive;
 pub mod opsbind;
 pub mod opsrun;
 pub mod panels;
+pub mod queries;
 pub mod resources;
 pub mod ribbon;
 pub mod rscommands;
@@ -129,6 +130,28 @@ impl BuiltinPlugin for MiningPlugin {
             HostNotification::DocumentTabClosed { tab_id } => state::close_tab(tab_id),
             _ => {}
         }
+    }
+
+    /// Every operation as a native tool for AI clients (host API 25+).
+    #[cfg(feature = "api25")]
+    fn tools(&self) -> Vec<ocs_plugin_api::host::PluginTool> {
+        openmining_ops::all()
+            .into_iter()
+            .map(|d| ocs_plugin_api::host::PluginTool {
+                name: d.name.to_string(),
+                description: d.summary.to_string(),
+                input_schema: openmining_ops::schema::input_schema(d).to_string(),
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "api25")]
+    fn call_tool(&mut self, host: &mut dyn HostApi, name: &str, arguments: &str) -> Result<String, String> {
+        let value: serde_json::Value = serde_json::from_str(arguments).map_err(|e| e.to_string())?;
+        let tab = host.tab_id();
+        let mut cfg = session::config(host, i18n::s());
+        let r = opsrun::run_json(host, name, &value, tab, &mut cfg);
+        Ok(openmining_ops::result::to_json(name, &r).to_string())
     }
 
     fn dispatch(&self, host: &mut dyn HostApi, cmd: &str) -> bool {

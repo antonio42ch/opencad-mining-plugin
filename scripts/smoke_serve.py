@@ -168,6 +168,10 @@ def main():
             c.need(good, f"{what} ({json.dumps(r.get('data') if r.get('ok') else r.get('error'))[:240]})")
             return r
 
+        # 1b. Status of an empty project points at loading drillholes.
+        run("MIN_STATUS")
+        ok("status", "status of an empty project suggests dh_load", lambda d: (d.get("next") or [{}])[0].get("op") == "dh_load")
+
         # 2. Geology through arguments: trace, then projection along the dip.
         run("MIN_GM_TRACE e=1000 n=2000 z=300 bearing=N90E length=20 anchor=start")
         r = ok("gm_trace", "gm_trace draws at E1000 N2000 Z300, azimuth 90", lambda d: abs(d.get("azimuth", 0) - 90) < 1e-9)
@@ -195,6 +199,8 @@ def main():
             if solid:
                 run(f"MIN_SC_RUN mode=levels z_from=1 z_to=9 z_step=4 draw_sheets=false solids={solid[0]}")
                 ok("sc_run", "sc_run cuts the solid with 3 level planes", lambda d: d.get("planes") == 3 and d.get("cut", 0) >= 1)
+                run("MIN_ENTITIES class=UG_SOLID")
+                ok("entities", "entities lists the solid with its volume", lambda d: d.get("total", 0) >= 1 and "volume" in d["entities"][0]["attributes"])
             else:
                 c.need(False, "the solid is on MIN_UG_SOLIDO")
         else:
@@ -202,10 +208,14 @@ def main():
 
         # 4. Drillholes (Spanish Excel collar: ';' + decimal comma), paths as arguments.
         run(f'MIN_DH_LOAD collar="{data / "collar.csv"}" survey="{data / "survey.csv"}" assays="{data / "assays.csv"}"')
-        ok("dh_load", "dh_load reads the 3 reference holes", lambda d: d.get("holes") == 3 and "CU%" in d.get("assay_attributes", []))
+        ok("dh_load", "dh_load reads the 3 reference holes", lambda d: d.get("holes") == 3 and "cu%" in d.get("assay_attributes", []))
         run("MIN_DH_DRAW assay_attr=CU% scheme=rainbow")
         ok("dh_draw", "dh_draw draws them coloured by CU%", lambda d: d.get("entities", 0) > 0)
         c.need(count(layer("MIN_DH_TRAZA")) >= 3, "3 traces on MIN_DH_TRAZA")
+        run("MIN_DH_LIST")
+        ok("dh_list", "dh_list lists the 3 holes", lambda d: d.get("total") == 3)
+        run("MIN_DH_LIST hole=VERT")
+        ok("dh_list", "dh_list hole=VERT returns its assay intervals", lambda d: len(d.get("assays", [])) >= 3)
 
         # 5. Resources: composites -> model saved for the domain -> estimate -> view.
         run("MIN_RS_COMPOSITE comp_length=10")
@@ -216,6 +226,16 @@ def main():
         ok("rs_estimate", "rs_estimate estimates blocks", lambda d: d.get("estimated", 0) > 0)
         run("MIN_RS_BMVIEW mode=levels attribute=grade_ok")
         ok("rs_bmview", "rs_bmview draws block polygons", lambda d: d.get("polygons", 0) > 0)
+        run("MIN_RS_STATS")
+        ok("rs_stats", "rs_stats reports the composites by domain", lambda d: d["domains"][0]["count"] > 0)
+        run("MIN_BM_INFO")
+        ok("bm_info", "bm_info reports blocks and estimated columns", lambda d: d.get("blocks", 0) > 0 and any(k.endswith("_ok") or k.endswith("_nn") for k in d.get("columns", {})))
+        run("MIN_BM_SAMPLE point=500000,8500000,3950")
+        ok("bm_sample", "bm_sample finds the block under VERT", lambda d: d["samples"][0]["block"] is not None)
+        run("MIN_BM_RESOURCES cutoffs=0,1")
+        ok("bm_resources", "bm_resources reports two cut-offs", lambda d: len(d.get("table", [])) == 2)
+        run("MIN_STATUS")
+        ok("status", "status after estimating knows the block model", lambda d: d.get("block_model") is not None and d["drillholes"]["holes"] == 3)
         run("MIN_RS_VARIO domain=NoExiste")
         c.need(result("rs_vario").get("error", {}).get("code") == "not_found", "an unknown domain name is refused with not_found")
 
@@ -249,6 +269,8 @@ def main():
         run("MIN_GT_VIEW attribute=class")
         c.need(result("gt_view").get("data", {}).get("column") == "gt_class" and count(layer("MIN_RS_VISTA")) >= 1,
                "gt_view draws the model coloured by rock mass class")
+        run("MIN_GT_SUMMARY")
+        ok("gt_summary", "gt_summary repeats the classification", lambda d: d.get("with_rmr") == 5)
     finally:
         hist = s.control("history", quiet=True)
         entries = hist.get("entries", hist.get("result", {}).get("entries", []))

@@ -23,25 +23,42 @@ pub fn emit(host: &mut dyn HostApi, op: &str, r: &Outcome) {
 /// Replaces names given to `Index` parameters (a domain by name) by their
 /// index in the run-time list.
 fn resolve_names(def: &OpDef, args: &mut Args, lists: &crate::opsbind::Lists) -> Result<(), OpError> {
+    let unknown = |key: &str, name: &str, list: &[String]| {
+        OpError::new(
+            ErrorCode::NotFound,
+            format!("{key}: '{name}' is not one of {}", list.join(", ")),
+        )
+        .at(key)
+    };
     for p in def.params {
-        let ops::Kind::Index { source, all } = p.kind else {
-            continue;
+        let (source, all) = match p.kind {
+            ops::Kind::Index { source, all } => (source, Some(all)),
+            // A name is matched without case (attributes are stored lower-case);
+            // unknown names are refused when the list is known.
+            ops::Kind::Name { source } => (source, None),
+            _ => continue,
         };
         let Some(name) = args.get(p.key).and_then(|v| v.as_str()).map(str::to_string) else {
             continue;
         };
         let list = lists.get(source);
-        let pos = list
-            .iter()
-            .position(|n| n.eq_ignore_ascii_case(name.trim()))
-            .ok_or_else(|| {
-                OpError::new(
-                    ErrorCode::NotFound,
-                    format!("{}: '{name}' is not one of {}", p.key, list.join(", ")),
-                )
-                .at(p.key)
-            })?;
-        args.insert(p.key.to_string(), serde_json::json!(pos + usize::from(all.is_some())));
+        match all {
+            None if list.is_empty() => {}
+            None => {
+                let found = list
+                    .iter()
+                    .find(|n| n.eq_ignore_ascii_case(name.trim()))
+                    .ok_or_else(|| unknown(p.key, &name, list))?;
+                args.insert(p.key.to_string(), serde_json::json!(found));
+            }
+            Some(all) => {
+                let pos = list
+                    .iter()
+                    .position(|n| n.eq_ignore_ascii_case(name.trim()))
+                    .ok_or_else(|| unknown(p.key, &name, list))?;
+                args.insert(p.key.to_string(), serde_json::json!(pos + usize::from(all.is_some())));
+            }
+        }
     }
     Ok(())
 }
@@ -84,11 +101,34 @@ pub fn apply_settings(
 }
 
 fn handler(host: &mut dyn HostApi, def: &OpDef, args: &Args, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
+    if def.kind == ops::OpKind::Query {
+        return crate::queries::run(host, def.name, args, tab, cfg);
+    }
     match def.group {
         ops::Group::Geotechnics => crate::gtcommands::run(host, def.name, args, tab, cfg),
         ops::Group::Resources => crate::rscommands::run(host, def.name, args, tab, cfg),
         _ => crate::commands::run(host, def.name, args, tab, cfg),
     }
+}
+
+/// Runs the operation `name` with JSON arguments (native tools).
+#[cfg_attr(not(feature = "api25"), allow(dead_code))]
+pub fn run_json(
+    host: &mut dyn HostApi,
+    name: &str,
+    value: &serde_json::Value,
+    tab: u64,
+    cfg: &mut ProjectConfig,
+) -> Outcome {
+    let def =
+        ops::find(name).ok_or_else(|| OpError::new(ErrorCode::UnknownCommand, format!("unknown tool '{name}'")))?;
+    let mut args = ops::parse::args_from_json(def, value)?;
+    apply_settings(host, def, &mut args, tab, cfg)?;
+    let r = handler(host, def, &args, tab, cfg);
+    if let Err(e) = &r {
+        host.push_error(&e.message);
+    }
+    r
 }
 
 /// Runs `line` when its command is an operation; `false` otherwise.
@@ -129,6 +169,19 @@ mod tests {
         let mut args = parse_command(vario, "MIN_RS_VARIO domain=Nada").unwrap();
         assert_eq!(
             resolve_names(vario, &mut args, &lists).unwrap_err().code,
+            ErrorCode::NotFound
+        );
+        let draw = ops::find("dh_draw").unwrap();
+        let lists = crate::opsbind::Lists {
+            assay: vec!["au".into(), "cu%".into()],
+            ..Default::default()
+        };
+        let mut args = parse_command(draw, "MIN_DH_DRAW assay_attr=CU%").unwrap();
+        resolve_names(draw, &mut args, &lists).unwrap();
+        assert_eq!(args["assay_attr"], json!("cu%"));
+        let mut args = parse_command(draw, "MIN_DH_DRAW assay_attr=ZN").unwrap();
+        assert_eq!(
+            resolve_names(draw, &mut args, &lists).unwrap_err().code,
             ErrorCode::NotFound
         );
     }
