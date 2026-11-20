@@ -133,7 +133,6 @@ pub fn fit(exp: &[ExpVariogram], start: &VariogramModel, cfg: &FitConfig) -> Fit
     } else {
         cfg.kinds[..cfg.kinds.len().min(3)].to_vec()
     };
-    let ns = kinds.len();
     let cfg = FitConfig { kinds, ..cfg.clone() };
     // Nothing to fit: keep the starting model and say so with a NaN score.
     if exp.iter().all(|e| e.points.is_empty()) {
@@ -156,9 +155,9 @@ pub fn fit(exp: &[ExpVariogram], start: &VariogramModel, cfg: &FitConfig) -> Fit
     };
     let mut x0 = vec![start.nugget];
     let mut step = vec![(start.nugget.abs() * 0.3).max(0.05)];
-    for s in 0..ns {
+    for (s, kind) in cfg.kinds.iter().enumerate() {
         let st = start.structures.get(s).copied().unwrap_or(Structure {
-            kind: cfg.kinds[s],
+            kind: *kind,
             sill: start.total_sill() * 0.5,
             ranges: [start.max_range().max(10.0); 3],
         });
