@@ -174,8 +174,10 @@ def main():
             if sh:
                 choose("min_sections", "sc_mode", 2)
                 s.send({"op": "select", "handles": sh[:1]})
-                run("MIN_SC_RUN")
+                rr = run("MIN_SC_RUN")
                 c.soft(count(layer("MIN_SC_CORTE")) >= 1, "MIN_SC_RUN cuts the solid with level planes")
+                if rr.get("status") == "waiting_input":
+                    s.control("cancel", document_id=doc)  # never leave a pick armed
         else:
             c.need(False, "3DPOLY created a polyline")
 
