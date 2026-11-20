@@ -31,10 +31,12 @@ pub enum Class {
     View,
     /// A solid assigned to an estimation domain (`APP_DOMAIN`).
     DomainSolid,
+    /// A classified geotechnical record (interval, mapped stretch or point).
+    GtRec,
 }
 
 impl Class {
-    pub const ALL: [Class; 16] = [
+    pub const ALL: [Class; 17] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -51,6 +53,7 @@ impl Class {
         Class::Surface,
         Class::View,
         Class::DomainSolid,
+        Class::GtRec,
     ];
 
     pub fn key(self) -> &'static str {
@@ -71,6 +74,7 @@ impl Class {
             Self::Surface => "RS_SURFACE",
             Self::View => "RS_VIEW",
             Self::DomainSolid => "RS_DOMAIN",
+            Self::GtRec => "GT_REC",
         }
     }
 

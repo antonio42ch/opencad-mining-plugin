@@ -9,7 +9,8 @@ the same commands and panel fields a user would:
 
   plugin loaded + panels registered -> geology trace + projection along dip ->
   axis solid + sections -> drillholes load/draw -> composites -> variogram
-  model -> block model estimate -> block view
+  model -> block model estimate -> block view -> geotechnics (load, classify,
+  Hoek-Brown, block model columns, view)
 
 Each check is reported; on failure the host's command-line history is printed.
 Exit code 0 = all required checks passed.
@@ -26,7 +27,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm"]
+GT_DATA = ROOT / "crates/geotech_engine/tests/data"
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model"]
 
 
 class Server:
@@ -113,6 +115,8 @@ def main():
     data.mkdir()
     for f in ("collar.csv", "survey.csv", "assays.csv"):
         shutil.copy(DATA / f, data / f)
+    for f in ("logging.csv", "lab.csv"):
+        shutil.copy(GT_DATA / f, data / ("gt_" + f))
 
     c = Checks()
     s = Server(a.exe, env)
@@ -193,6 +197,20 @@ def main():
         run("MIN_RS_ESTIMATE")
         run("MIN_RS_BMVIEW")
         c.need(count(layer("MIN_RS_VISTA")) >= 1, "composite + estimate + view draw block polygons")
+
+        # 6. Geotechnics: logging on the loaded holes + lab -> RMR/Q/GSI -> model.
+        run(f'MIN_GT_LOAD "{data / "gt_logging.csv"}" - "{data / "gt_lab.csv"}"')
+        run("MIN_GT_CLASSIFY")
+        c.need(count(layer("MIN_GT_SONDAJE")) >= 5, "MIN_GT_LOAD + MIN_GT_CLASSIFY draw the 5 logged intervals")
+        run("MIN_GT_HB")
+        run("MIN_GT_ESTIMATE")
+        run("MIN_GT_VIEW")
+        hist = s.control("history", quiet=True)
+        texts = [e.get("text", "") for e in hist.get("entries", hist.get("result", {}).get("entries", []))]
+        c.need(any("Clasificación:" in t for t in texts), "classification report in the command line")
+        c.need(any("Hoek-Brown: mb" in t for t in texts), "MIN_GT_HB reports the Hoek-Brown parameters")
+        c.need(any("Modelo geotécnico:" in t for t in texts), "MIN_GT_ESTIMATE fills the geotechnical columns")
+        c.need(count(layer("MIN_RS_VISTA")) >= 1, "MIN_GT_VIEW draws the model coloured by RMR")
     finally:
         hist = s.control("history", quiet=True)
         entries = hist.get("entries", hist.get("result", {}).get("entries", []))

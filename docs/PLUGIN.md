@@ -34,6 +34,11 @@ Commands, methods, file format and XDATA of the estimation modules are in
 [RESOURCES.md](RESOURCES.md). Second XDATA application `OPENMINING_DOM` marks
 solids as estimation domains.
 
+## Geotechnics
+
+Commands, tables, formulas, layers and XDATA (`GT_REC`) of the geotechnical
+module are in [GEOTECH.md](GEOTECH.md).
+
 ## Geological mapping
 
 **Trace.** E / N / Z + bearing (`N45E`, `S30W`, `N10O`, or a plain azimuth) + length and
@@ -130,6 +135,8 @@ offsets/elevations as labels), title, area and the axis marker. With
 | `MIN_RS_COMP_<VAR>` | composites | per grade |
 | `MIN_RS_CONTACTO` | contact surface | 30 |
 | `MIN_RS_VISTA` | block model views | per value |
+| `MIN_GT_SONDAJE` | classified logging intervals | per class |
+| `MIN_GT_MAPEO` | classified face mapping and labels | per class |
 | `MIN_SC_LAMINA` | sheet frames, titles, areas, sections, markers | 7 |
 | `MIN_SC_GRILLA` | sheet grids and grid labels | 8 |
 
@@ -159,6 +166,7 @@ bump. A breaking change increments `schema`.
 | `GM_PROJ` | Traza proyectada | `src` (hex handle of the source), `dip`, `dipdir`, and `height` (target) or `delta` |
 | `AX_AXIS` | Eje de labor | `id`, `e`, `n`, `z`, `az` (start), `length`, `elements`, `e1`…`eN` (see below) |
 | `SC_CUT` | Sección 3D | `set` (run id), `plane` (title), `area` |
+| `GT_REC` | Registro geotécnico | `src`, `row`, `id`, `rmr`?, `q`?, `qp`?, `gsi`?, `class`?, `lith`?, `label`? — see GEOTECH.md |
 | `SC_SHEET` | Lámina de sección | `set`, `plane`, `role` (`frame`/`grid`/`grid_label`/`title`/`area`/`section`/`marker`) |
 
 Axis elements (`eN`), `;`-separated, grade as `p;<percent>` or `d;<degrees>`:

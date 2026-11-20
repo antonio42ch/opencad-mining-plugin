@@ -24,6 +24,7 @@ pub struct ProjectConfig {
     pub ax: AxesConfig,
     pub sc: SectionsConfig,
     pub rs: crate::rsconfig::ResourcesConfig,
+    pub gt: crate::gtconfig::GeotechConfig,
 }
 
 impl Default for ProjectConfig {
@@ -37,6 +38,7 @@ impl Default for ProjectConfig {
             ax: Default::default(),
             sc: Default::default(),
             rs: Default::default(),
+            gt: Default::default(),
         }
     }
 }
@@ -528,6 +530,7 @@ impl ProjectConfig {
         set!(c.sheet_y, num("sc_sheet_y"));
         set!(c.replace, flag("sc_replace"));
         self.rs.apply(v);
+        self.gt.apply(v);
     }
 }
 

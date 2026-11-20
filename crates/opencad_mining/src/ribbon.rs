@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 
 use ocs_plugin_api::ribbon::{CadModule, IconKind, ModuleEvent, RibbonGroup, RibbonItem, ToolDef};
 
+use crate::gti18n::g;
 use crate::i18n::s;
 use crate::rsi18n::r;
 
@@ -45,6 +46,7 @@ impl CadModule for MiningModule {
         GROUPS.get_or_init(|| {
             let t = s();
             let rs = r();
+            let gt = g();
             vec![
                 RibbonGroup {
                     title: t.grp_drillholes,
@@ -88,6 +90,17 @@ impl CadModule for MiningModule {
                         small("MIN_RS_COMPOSITE", rs.tool_composite, icon!("composite")),
                         small("MIN_RS_ESTIMATE", rs.tool_estimate, icon!("estimate")),
                         small("MIN_RS_BMVIEW", rs.tool_view, icon!("modelview")),
+                    ],
+                },
+                RibbonGroup {
+                    title: gt.grp_geotech,
+                    tools: vec![
+                        large("MIN_GT_DATA_PANEL", gt.tool_data, icon!("geotech")),
+                        large("MIN_GT_HB_PANEL", gt.tool_hb, icon!("hoekbrown")),
+                        large("MIN_GT_MODEL_PANEL", gt.tool_model, icon!("blocks")),
+                        small("MIN_GT_LOAD", gt.tool_load, icon!("load")),
+                        small("MIN_GT_CLASSIFY", gt.tool_classify, icon!("geotech")),
+                        small("MIN_GT_ESTIMATE", gt.tool_estimate, icon!("estimate")),
                     ],
                 },
                 RibbonGroup {
