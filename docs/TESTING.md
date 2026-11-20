@@ -70,3 +70,25 @@ Uses a temporary config and plugins folder, runs `MIN_GM_TRACE` and
 
 Logs: the host writes plugin load errors (API/wire-schema mismatch, runner
 crashes) to the command line and to `automation/gui.log` in the config folder.
+
+## Resource estimation (v0.4)
+
+Use the drillhole test data or your own (collar, survey, assays with an
+attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
+
+14. Sondajes → **Cargar**, choose the grade attribute (Colores) and the geology attribute.
+15. Recursos → **Compósitos**: fill the *Dominios* table (name, geology values separated by `;`,
+    density, top-cut, surface *Encima*/*Debajo*), **Compositar y analizar** → statistics on the
+    command line and in the panel, a histogram per domain, `<drawing>_composites.csv` next to the DWG;
+    **Dibujar compósitos** twice → no duplicates.
+16. **Calcular superficie de contacto** (geology above/below) → a surface mesh on `MIN_RS_CONTACTO`.
+    Optionally select wireframe meshes and **Asignar sólidos seleccionados** to a domain.
+17. Recursos → **Variografía**: pick a domain, **Calcular variogramas** → chart with the 3 axes
+    (+ omni); **Autoajustar** → fields change and the curve follows; **Guardar en el dominio**;
+    **Validación cruzada** → statistics line. The panel must stay open after each chart refresh.
+18. Recursos → **Modelo**: **Estimar** → block/estimation lines and resources by domain on the
+    command line; `<drawing>.ombm` appears next to the DWG (save the drawing first).
+19. **Validar** with each chart type (swath / tonnage curve / histogram).
+20. **Dibujar vista**: *Niveles*, *Secciones por 2 puntos* (pick 2 points), *Secciones perpendiculares
+    a un eje* (pick a polyline), *Cubos sobre la ley de corte*; redraw → the previous view is replaced.
+21. Close and reopen the DWG: the panels come back configured; **Cargar archivo** restores the model.

@@ -10,6 +10,7 @@
 
 pub mod axes;
 pub mod cad;
+pub mod charts;
 pub mod config;
 pub mod drillholes;
 pub mod geomap;
@@ -17,7 +18,12 @@ pub mod host_sink;
 pub mod i18n;
 pub mod interactive;
 pub mod panels;
+pub mod resources;
 pub mod ribbon;
+pub mod rscommands;
+pub mod rsconfig;
+pub mod rsi18n;
+pub mod rspanels;
 pub mod sections;
 pub mod session;
 pub mod solids;
@@ -43,12 +49,12 @@ pub static MANIFEST: PluginManifest = PluginManifest {
     description: "Mining & geology: drillholes, underground workings and geological mapping",
     api_version: ApiVersion::CURRENT,
     ribbon_order: 40,
-    xdata_apps: &[xdata::APP],
+    xdata_apps: &[xdata::APP, xdata::APP_DOMAIN],
     command_prefixes: &["MIN_"],
 };
 
 macro_rules! classes {
-    ($name:ident, $s:expr) => {
+    ($name:ident, $s:expr, $r:expr) => {
         static $name: EntityClasses = EntityClasses {
             app_id: xdata::APP,
             class_prefix: xdata::CLASS_PREFIX,
@@ -62,6 +68,9 @@ macro_rules! classes {
                 ("UG_SECTION", $s.cls_section),
                 ("GM_TRACE", $s.cls_geotrace),
                 ("GM_NOTE", $s.cls_geonote),
+                ("RS_COMP", $r.cls_comp),
+                ("RS_SURFACE", $r.cls_surface),
+                ("RS_VIEW", $r.cls_view),
                 ("AX_AXIS", $s.cls_axis),
                 ("SC_CUT", $s.cls_cut),
                 ("SC_SHEET", $s.cls_sheet),
@@ -69,9 +78,9 @@ macro_rules! classes {
         };
     };
 }
-classes!(CLASSES_ES, i18n::ES);
-classes!(CLASSES_EN, i18n::EN);
-classes!(CLASSES_PT, i18n::PT);
+classes!(CLASSES_ES, i18n::ES, rsi18n::ES);
+classes!(CLASSES_EN, i18n::EN, rsi18n::EN);
+classes!(CLASSES_PT, i18n::PT, rsi18n::PT);
 
 pub struct MiningPlugin;
 
@@ -101,6 +110,9 @@ impl BuiltinPlugin for MiningPlugin {
             panels::geomap(s, &c),
             panels::axes(s, &c),
             panels::sections(s, &c),
+            rspanels::comp(rsi18n::r(), &c, ""),
+            rspanels::vario(rsi18n::r(), &c, ""),
+            rspanels::blocks(rsi18n::r(), &c, ""),
         ] {
             let id = def.id.clone();
             if !host.register_panel_for_plugin(MANIFEST.id, def) {
@@ -136,6 +148,9 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_GM_PANEL" => Some(panels::GM),
             "MIN_AX_PANEL" => Some(panels::AX),
             "MIN_SC_PANEL" => Some(panels::SC),
+            "MIN_RS_COMP_PANEL" => Some(rspanels::COMP),
+            "MIN_RS_VARIO_PANEL" => Some(rspanels::VARIO),
+            "MIN_RS_BM_PANEL" => Some(rspanels::BM),
             _ => None,
         };
         if let Some(p) = panel {
@@ -366,7 +381,7 @@ impl BuiltinPlugin for MiningPlugin {
                 }
             }
             "MIN_SC_EXEC" => run_sections(host, s, tab, &cfg),
-            _ => return false,
+            other => return rscommands::dispatch(host, other, tab, &mut cfg),
         }
         true
     }
@@ -374,7 +389,7 @@ impl BuiltinPlugin for MiningPlugin {
 
 /// Faces of the mesh-like entities (Mesh, PolyfaceMesh); all 3DFACEs are
 /// merged into one mesh so their section chains across faces.
-fn meshes_of(ents: &[Option<EntityType>]) -> Vec<solids_engine::cut::MeshData> {
+pub(crate) fn meshes_of(ents: &[Option<EntityType>]) -> Vec<solids_engine::cut::MeshData> {
     use solids_engine::cut::MeshData;
     let v3 = |p: &ocs_plugin_api::host::acadrust::types::Vector3| [p.x, p.y, p.z];
     let mut out = Vec::new();
@@ -476,7 +491,7 @@ fn polyline_points(e: &EntityType) -> Option<Vec<mining_core::Vec3>> {
     }
 }
 
-fn fetch_points(host: &dyn HostApi, handles: &[Handle]) -> Option<Vec<Vec<mining_core::Vec3>>> {
+pub(crate) fn fetch_points(host: &dyn HostApi, handles: &[Handle]) -> Option<Vec<Vec<mining_core::Vec3>>> {
     let ents = host.entities_batch(handles).ok()?;
     ents.iter().map(|e| e.as_ref().and_then(polyline_points)).collect()
 }
@@ -539,7 +554,9 @@ mod manifest_tests {
         assert_eq!(field("version"), MANIFEST.version);
         assert_eq!(field("api_version"), MANIFEST.api_version.major.to_string());
         assert_eq!(field("ribbon_order"), MANIFEST.ribbon_order.to_string());
-        assert!(toml.contains(&format!("\"{}\"", MANIFEST.xdata_apps[0])));
+        for app in MANIFEST.xdata_apps {
+            assert!(toml.contains(&format!("\"{app}\"")));
+        }
         assert!(toml.contains(&format!("\"{}\"", MANIFEST.command_prefixes[0])));
     }
 }

@@ -1,6 +1,6 @@
 //! `CadSink` over the Open CAD Studio `HostApi`.
 
-use ocs_plugin_api::host::acadrust::entities::{Line, Mesh, MeshFace, Point, Polyline3D, Text};
+use ocs_plugin_api::host::acadrust::entities::{Face3D, Line, Mesh, MeshFace, Point, Polyline3D, Text};
 use ocs_plugin_api::host::acadrust::objects::{XRecordEntry, XRecordValue};
 use ocs_plugin_api::host::acadrust::types::{Color, Vector3};
 use ocs_plugin_api::host::acadrust::xdata::{ExtendedDataRecord, XDataValue};
@@ -50,7 +50,12 @@ pub fn record(tag: &Tag) -> ExtendedDataRecord {
 }
 
 pub fn tag_of(e: &EntityType) -> Option<Tag> {
-    let rec = e.common().extended_data.get_record(APP)?;
+    tag_of_app(e, APP)
+}
+
+/// Tag stored under XDATA application `app`.
+pub fn tag_of_app(e: &EntityType, app: &str) -> Option<Tag> {
+    let rec = e.common().extended_data.get_record(app)?;
     let strings: Vec<&str> = rec
         .values
         .iter()
@@ -65,6 +70,13 @@ pub fn tag_of(e: &EntityType) -> Option<Tag> {
     Tag::decode(strings)
 }
 
+pub fn record_for(app: &str, tag: &Tag) -> ExtendedDataRecord {
+    ExtendedDataRecord {
+        application_name: app.to_string(),
+        values: tag.encode().into_iter().map(XDataValue::String).collect(),
+    }
+}
+
 fn to_entity(p: Prim) -> EntityType {
     let mut e = match p.geom {
         Geom::Polyline3d(pts) => EntityType::Polyline3D(Polyline3D::from_points(pts.into_iter().map(v3).collect())),
@@ -74,6 +86,10 @@ fn to_entity(p: Prim) -> EntityType {
         Geom::Line(a, b) => EntityType::Line(Line::from_points(v3(a), v3(b))),
         Geom::Point(a) => EntityType::Point(Point::from_coords(a[0], a[1], a[2])),
         Geom::Text { at, height, value } => EntityType::Text(Text::with_value(value, v3(at)).with_height(height)),
+        Geom::Face(p) => {
+            let c = |i: usize| v3(*p.get(i).or(p.last()).unwrap_or(&[0.0; 3]));
+            EntityType::Face3D(Face3D::new(c(0), c(1), c(2), c(3)))
+        }
         Geom::Mesh { vertices, faces } => {
             let mut m = Mesh::new();
             m.vertices = vertices.into_iter().map(v3).collect();

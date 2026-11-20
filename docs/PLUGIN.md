@@ -26,6 +26,12 @@ Plugin id `opencad.mining`, command prefix `MIN_`, XDATA application
 | `MIN_AX_SETSTART` / `MIN_AX_SETFROMPOLY` / `MIN_SC_EXEC` | Internal follow-ups of the interactive picks |
 | `MIN_UG_RUN` / `MIN_GM_RUN` | Internal: follow-ups of the interactive picks |
 
+## Resources
+
+Commands, methods, file format and XDATA of the estimation modules are in
+[RESOURCES.md](RESOURCES.md). Second XDATA application `OPENMINING_DOM` marks
+solids as estimation domains.
+
 ## Axis designer
 
 - Lengths are **horizontal** (plan); Z changes by grade × horizontal length.
@@ -90,6 +96,9 @@ offsets/elevations as labels), title, area and the axis marker. With
 | `MIN_GM_NOTA` | trace annotations | 7 |
 | `MIN_AX_EJE` | designed axes (3D polylines) | 6 |
 | `MIN_SC_CORTE` | 3D sections in place | 1 |
+| `MIN_RS_COMP_<VAR>` | composites | per grade |
+| `MIN_RS_CONTACTO` | contact surface | 30 |
+| `MIN_RS_VISTA` | block model views | per value |
 | `MIN_SC_LAMINA` | sheet frames, titles, areas, sections, markers | 7 |
 | `MIN_SC_GRILLA` | sheet grids and grid labels | 8 |
 

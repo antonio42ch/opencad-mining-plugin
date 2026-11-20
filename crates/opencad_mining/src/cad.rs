@@ -22,6 +22,8 @@ pub enum Geom {
         vertices: Vec<Vec3>,
         faces: Vec<Vec<usize>>,
     },
+    /// Filled planar face (3 or 4 corners).
+    Face(Vec<Vec3>),
 }
 
 /// One entity to create: geometry, layer, optional colour (ACI; `None` =

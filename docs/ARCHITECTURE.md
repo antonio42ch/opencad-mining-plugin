@@ -11,6 +11,10 @@ crates/
                         interval mapping, R07; parallel with rayon) → colour schemes
   solids_engine/     C  sections, AAA frames, axis and boundary methods → ClosedMesh
   geomap_engine/     C  geological trace geometry and annotation layout
+  geostat_engine/    C  composites, statistics, declustering, variography + auto-fit, kriging
+                        (OK, SK), IDW, nearest neighbour, cross-validation, 2D contact surfaces
+  blockmodel_engine/ C  rotated block model, domain regions (solids, surfaces), parallel
+                        estimation, binary file, swath / grade-tonnage reports, views
   openmining_cli/    C  the engines from the command line (batch, QA, CI)
   opencad_mining/    B  cdylib: manifest, ribbon, panels, commands, XDATA, settings
 ```

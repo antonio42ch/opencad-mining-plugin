@@ -14,6 +14,7 @@ pub mod boundary;
 pub mod cut;
 pub mod error;
 pub mod frame;
+pub mod inside;
 pub mod mesh;
 pub mod polyline;
 pub mod section;

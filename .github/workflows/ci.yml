@@ -33,4 +33,4 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo build -p opencad_mining --release --locked
       # Benchmarks must keep compiling; they are run manually.
-      - run: cargo bench -p drillhole_engine --no-run --locked
+      - run: cargo bench -p drillhole_engine -p blockmodel_engine --no-run --locked

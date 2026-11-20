@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 use ocs_plugin_api::ribbon::{CadModule, IconKind, ModuleEvent, RibbonGroup, RibbonItem, ToolDef};
 
 use crate::i18n::s;
+use crate::rsi18n::r;
 
 macro_rules! icon {
     ($name:literal) => {
@@ -43,6 +44,7 @@ impl CadModule for MiningModule {
         static GROUPS: OnceLock<Vec<RibbonGroup>> = OnceLock::new();
         GROUPS.get_or_init(|| {
             let t = s();
+            let rs = r();
             vec![
                 RibbonGroup {
                     title: t.grp_drillholes,
@@ -75,6 +77,17 @@ impl CadModule for MiningModule {
                     tools: vec![
                         large("MIN_SC_PANEL", t.tool_panel, icon!("sections")),
                         small("MIN_SC_RUN", t.tool_sections, icon!("sectionrun")),
+                    ],
+                },
+                RibbonGroup {
+                    title: rs.grp_resources,
+                    tools: vec![
+                        large("MIN_RS_COMP_PANEL", rs.tool_comp, icon!("composite")),
+                        large("MIN_RS_VARIO_PANEL", rs.tool_vario, icon!("variogram")),
+                        large("MIN_RS_BM_PANEL", rs.tool_bm, icon!("blocks")),
+                        small("MIN_RS_COMPOSITE", rs.tool_composite, icon!("composite")),
+                        small("MIN_RS_ESTIMATE", rs.tool_estimate, icon!("estimate")),
+                        small("MIN_RS_BMVIEW", rs.tool_view, icon!("modelview")),
                     ],
                 },
                 RibbonGroup {

@@ -23,6 +23,7 @@ pub struct ProjectConfig {
     pub origin: OriginConfig,
     pub ax: AxesConfig,
     pub sc: SectionsConfig,
+    pub rs: crate::rsconfig::ResourcesConfig,
 }
 
 impl Default for ProjectConfig {
@@ -35,6 +36,7 @@ impl Default for ProjectConfig {
             origin: Default::default(),
             ax: Default::default(),
             sc: Default::default(),
+            rs: Default::default(),
         }
     }
 }
@@ -502,6 +504,7 @@ impl ProjectConfig {
         set!(c.sheet_x, num("sc_sheet_x"));
         set!(c.sheet_y, num("sc_sheet_y"));
         set!(c.replace, flag("sc_replace"));
+        self.rs.apply(v);
     }
 }
 

@@ -17,6 +17,8 @@ pub enum PickKind {
     },
     /// Polyline whose end continues an axis.
     AxisPolyline,
+    /// Axis polyline for block-model sections.
+    ViewAxis,
 }
 
 pub struct PickEntities {
@@ -67,6 +69,13 @@ impl InteractiveCommand for PickEntities {
                 "MIN_UG_RUN",
             ),
             PickKind::AxisPolyline => (Pending::AxisFromPolyline(p[0]), "MIN_AX_SETFROMPOLY"),
+            PickKind::ViewAxis => (
+                Pending::BmView {
+                    axis: Some(p[0]),
+                    points: Vec::new(),
+                },
+                "MIN_RS_BMVIEW_EXEC",
+            ),
         };
         set_pending(pending);
         CommandStep::Dispatch(next.into())
@@ -256,5 +265,79 @@ impl InteractiveCommand for SectionPick {
                 }]
             }
         }
+    }
+}
+
+/// Selection of the solids to assign to an estimation domain.
+pub struct PickSolidSelection {
+    prompt: String,
+}
+
+impl PickSolidSelection {
+    pub fn new(prompt: String) -> Self {
+        PickSolidSelection { prompt }
+    }
+}
+
+impl InteractiveCommand for PickSolidSelection {
+    fn prompt(&self) -> String {
+        self.prompt.clone()
+    }
+    fn on_point(&mut self, _pt: [f64; 3]) -> CommandStep {
+        CommandStep::NeedPoint
+    }
+    fn is_selection_gathering(&self) -> bool {
+        true
+    }
+    fn accepts_drag_selection(&self) -> bool {
+        true
+    }
+    fn on_selection_complete(&mut self, handles: Vec<Handle>) -> CommandStep {
+        if handles.is_empty() {
+            return CommandStep::NeedPoint;
+        }
+        set_pending(Pending::DomainSolids(handles));
+        CommandStep::Dispatch("MIN_RS_SETSOLID_EXEC".into())
+    }
+}
+
+/// Two points defining a vertical section of the block model.
+pub struct PickViewPoints {
+    prompts: [String; 2],
+    first: Option<Vec3>,
+}
+
+impl PickViewPoints {
+    pub fn new(prompts: [String; 2]) -> Self {
+        PickViewPoints { prompts, first: None }
+    }
+}
+
+impl InteractiveCommand for PickViewPoints {
+    fn prompt(&self) -> String {
+        self.prompts[usize::from(self.first.is_some())].clone()
+    }
+    fn on_point(&mut self, pt: [f64; 3]) -> CommandStep {
+        match self.first {
+            None => {
+                self.first = Some(pt);
+                CommandStep::NeedPoint
+            }
+            Some(p) => {
+                set_pending(Pending::BmView {
+                    axis: None,
+                    points: vec![p, pt],
+                });
+                CommandStep::Dispatch("MIN_RS_BMVIEW_EXEC".into())
+            }
+        }
+    }
+    fn on_cursor_move(&mut self, pt: [f64; 3]) -> Vec<PreviewWire> {
+        self.first.map_or_else(Vec::new, |p| {
+            vec![PreviewWire::Polyline {
+                points: vec![p, pt],
+                color: Some([0.3, 0.8, 1.0, 1.0]),
+            }]
+        })
     }
 }

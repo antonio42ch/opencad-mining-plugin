@@ -1,0 +1,23 @@
+[package]
+name = "blockmodel_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Block models for Open Mining: rotated regular geometry, domain regions (solids, surfaces), parallel estimation, binary file, swath plots, grade-tonnage curves and drawing views."
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon", "geostat_engine/parallel"]
+
+[dependencies]
+mining_core = { path = "../mining_core" }
+geostat_engine = { path = "../geostat_engine", default-features = false }
+solids_engine = { path = "../solids_engine" }
+rayon = { version = "1.10", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "estimate"
+harness = false

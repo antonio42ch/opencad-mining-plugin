@@ -56,7 +56,50 @@ pub fn commit(sink: &mut dyn CadSink, s: &Strings, tab: u64, cfg: &ProjectConfig
     }
 }
 
+/// Pushes the resource panels' values (domain lists included).
+pub fn push_rs(host: &mut dyn HostApi, cfg: &ProjectConfig) {
+    for (panel, values) in crate::rspanels::values_for(cfg, crate::rsi18n::r()) {
+        host.update_panel_for_plugin(MANIFEST.id, panel, values);
+    }
+}
+
+/// Replaces the chart of a resource panel. The host rebuilds a panel whose
+/// definition changed (it comes back hidden and with default values), so the
+/// panel is shown again and every value restored from `cfg`.
+pub fn refresh_chart(host: &mut dyn HostApi, cfg: &ProjectConfig, panel: &'static str, svg: &str) {
+    let r = crate::rsi18n::r();
+    let def = match panel {
+        crate::rspanels::COMP => crate::rspanels::comp(r, cfg, svg),
+        crate::rspanels::VARIO => crate::rspanels::vario(r, cfg, svg),
+        _ => crate::rspanels::blocks(r, cfg, svg),
+    };
+    if host.register_panel_for_plugin(MANIFEST.id, def) {
+        host.toggle_panel_for_plugin(MANIFEST.id, panel, Some(true));
+    }
+    push_rs(host, cfg);
+}
+
+/// Sets a status label of a resource panel.
+pub fn set_label(host: &mut dyn HostApi, panel: &'static str, id: &str, text: String) {
+    host.update_panel_for_plugin(
+        MANIFEST.id,
+        panel,
+        HashMap::from([(id.to_string(), DialogValue::Text(text))]),
+    );
+}
+
+/// Current value of a control that is not part of the saved settings.
+pub fn panel_value(host: &mut dyn HostApi, panel: &str, id: &str) -> Option<DialogValue> {
+    if let Ok(snap) = host.panel_snapshot_for_plugin(MANIFEST.id, panel) {
+        if let Some(v) = flatten(&snap.values).remove(id) {
+            return Some(v);
+        }
+    }
+    state::tracked_values().remove(id)
+}
+
 pub fn push_panels(host: &mut dyn HostApi, cfg: &ProjectConfig, assay_attrs: &[String], geo_attrs: &[String]) {
+    push_rs(host, cfg);
     for (panel, values) in panels::values_for(cfg, assay_attrs, geo_attrs) {
         host.update_panel_for_plugin(MANIFEST.id, panel, values);
     }

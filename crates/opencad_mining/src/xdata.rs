@@ -6,6 +6,9 @@
 //! readable by any tool; numbers are written with `{}` (shortest round-trip).
 
 pub const APP: &str = "OPENMINING";
+/// Second application: marks solids as estimation domains (kept apart so it
+/// does not replace the record of the solid itself).
+pub const APP_DOMAIN: &str = "OPENMINING_DOM";
 pub const CLASS_PREFIX: &str = "OPENMINING-CLASS:";
 pub const SCHEMA: u32 = 1;
 
@@ -23,10 +26,15 @@ pub enum Class {
     Axis,
     Cut,
     Sheet,
+    Comp,
+    Surface,
+    View,
+    /// A solid assigned to an estimation domain (`APP_DOMAIN`).
+    DomainSolid,
 }
 
 impl Class {
-    pub const ALL: [Class; 12] = [
+    pub const ALL: [Class; 16] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -39,6 +47,10 @@ impl Class {
         Class::Axis,
         Class::Cut,
         Class::Sheet,
+        Class::Comp,
+        Class::Surface,
+        Class::View,
+        Class::DomainSolid,
     ];
 
     pub fn key(self) -> &'static str {
@@ -55,6 +67,10 @@ impl Class {
             Self::Axis => "AX_AXIS",
             Self::Cut => "SC_CUT",
             Self::Sheet => "SC_SHEET",
+            Self::Comp => "RS_COMP",
+            Self::Surface => "RS_SURFACE",
+            Self::View => "RS_VIEW",
+            Self::DomainSolid => "RS_DOMAIN",
         }
     }
 

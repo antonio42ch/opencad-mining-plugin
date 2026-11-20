@@ -1,0 +1,18 @@
+[package]
+name = "geostat_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Geostatistics for Open Mining: compositing, statistics, declustering, variography, kriging (OK, SK), IDW, nearest neighbour, cross-validation, 2D contact surfaces. std + mining_core + drillhole_engine."
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon"]
+
+[dependencies]
+mining_core = { path = "../mining_core" }
+drillhole_engine = { path = "../drillhole_engine" }
+rayon = { version = "1.10", optional = true }
+
+[dev-dependencies]
+proptest = "1"

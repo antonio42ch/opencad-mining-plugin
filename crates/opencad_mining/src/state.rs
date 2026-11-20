@@ -21,6 +21,7 @@ pub struct TabState {
     pub settings_checked: bool,
     /// Axis being designed (elements are appended to it).
     pub axis: Option<AxisState>,
+    pub rs: crate::resources::RsState,
 }
 
 /// What an interactive pick hands over to the follow-up command.
@@ -40,6 +41,13 @@ pub enum Pending {
     AxisFromPolyline(Handle),
     Sections {
         solids: Vec<Handle>,
+        axis: Option<Handle>,
+        points: Vec<Vec3>,
+    },
+    /// Solids to assign to the estimation domain chosen in the panel.
+    DomainSolids(Vec<Handle>),
+    /// Inputs of a block-model section view.
+    BmView {
         axis: Option<Handle>,
         points: Vec<Vec3>,
     },

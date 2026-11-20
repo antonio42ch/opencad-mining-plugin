@@ -3,6 +3,21 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-11-19
+
+### Added
+- Resource estimation (phases 1–3): compositing with domains, top-cut and cell
+  declustering; domains by geology attribute, 3D solids (tagged with XDATA) and
+  a kriged contact surface; experimental variograms (sector method) with model
+  editing, automatic fit and live chart; ordinary / simple kriging, IDW and
+  nearest neighbour on a rotated regular block model with octant, per-hole and
+  multi-pass search; cross-validation; swath plots, grade-tonnage curves and
+  resource totals by domain; level, section and cube views; `.ombm` model file
+  and CSV export. Three panels in a new **Recursos** ribbon group (es/en/pt).
+- Engines `geostat_engine` and `blockmodel_engine`; `solids_engine::inside`
+  (point-in-mesh index). 165 k blocks estimated in ≈ 0.4 s.
+- See docs/RESOURCES.md.
+
 ## [0.3.0] — 2026-11-19
 
 ### Added
