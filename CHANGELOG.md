@@ -3,7 +3,7 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
-## [0.6.0] — unreleased
+## [0.6.0] — 2026-11-20
 
 ### Added
 - **Geotechnics, phase 1** (new ribbon group and three panels) — see `docs/GEOTECH.md`:
