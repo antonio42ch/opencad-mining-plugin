@@ -126,11 +126,18 @@ def main():
         for p in PANELS:
             c.need(p in panels_json, f"panel {p} registered")
         s.send({"op": "new"})
+        # Panel requests of the control protocol are addressed to a document.
+        doc = s.send({"op": "query", "layer": "0"}).get("document_id")
+        c.need(doc is not None, "document id readable after NEW")
 
         def field(panel, control, value):
             kw = {"value": value} if isinstance(value, (int, float)) else {"text": str(value)}
-            r = s.control("panel_input", panel_id=panel, control_id=control, **kw)
-            return r.get("ok", True) is not False
+            r = s.control("panel_input", panel_id=panel, control_id=control, document_id=doc, **kw)
+            return c.need(r.get("ok", True) is not False, f"panel {panel}: {control} = {value}")
+
+        def choose(panel, control, index):
+            r = s.control("panel_action", panel_id=panel, control_id=control, action="change", value={"index": index}, document_id=doc)
+            return c.need(r.get("ok", True) is not False, f"panel {panel}: {control} -> option {index}")
 
         def run(cmd):
             return s.send({"op": "run", "cmd": cmd})
@@ -143,7 +150,7 @@ def main():
             field("min_geomap", ctl, v)
         run("MIN_GM_TRACE")
         trace = layer("MIN_GM_TRAZA")
-        c.need(count(trace) >= 1, "MIN_GM_TRACE draws a trace from the typed coordinates")
+        c.need(count(trace) >= 1, "MIN_GM_TRACE draws a trace")
         th = handles(trace)
         if th:
             field("min_geomap", "gm_dip", 45)
@@ -165,7 +172,7 @@ def main():
             c.need(count(solid) >= 1, "MIN_UG_AXIS builds a solid on the selected axis")
             sh = handles(solid)
             if sh:
-                s.control("panel_action", panel_id="min_sections", control_id="sc_mode", action="change", value={"index": 2})
+                choose("min_sections", "sc_mode", 2)
                 s.send({"op": "select", "handles": sh[:1]})
                 run("MIN_SC_RUN")
                 c.soft(count(layer("MIN_SC_CORTE")) >= 1, "MIN_SC_RUN cuts the solid with level planes")
@@ -174,7 +181,7 @@ def main():
 
         # 4. Drillholes from CSV (Spanish Excel collar: ';' + decimal comma).
         for ctl, f in (("dh_collar", "collar.csv"), ("dh_survey", "survey.csv"), ("dh_assays", "assays.csv")):
-            c.need(field("min_drillholes", ctl, str(data / f)), f"panel accepts the {ctl} path")
+            field("min_drillholes", ctl, str(data / f))
         run("MIN_DH_LOAD")
         run("MIN_DH_DRAW")
         c.need(count(layer("MIN_DH_TRAZA")) >= 3, "MIN_DH_LOAD + MIN_DH_DRAW draw the 3 reference holes")
