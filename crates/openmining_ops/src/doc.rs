@@ -131,7 +131,8 @@ mod tests {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/MCP.md");
         let now = super::markdown();
         match std::fs::read_to_string(path) {
-            Ok(saved) if saved == now => {}
+            // Windows checkouts may turn LF into CRLF.
+            Ok(saved) if saved.replace("\r\n", "\n") == now => {}
             _ if std::env::var_os("OPENMINING_BLESS").is_some() => std::fs::write(path, now).unwrap(),
             _ => panic!("docs/MCP.md is stale: run `OPENMINING_BLESS=1 cargo test -p openmining_ops`"),
         }
