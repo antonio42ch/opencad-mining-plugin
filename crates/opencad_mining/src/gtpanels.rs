@@ -1,8 +1,6 @@
 //! Panels of the geotechnical module (built from `openmining_ops` defs).
 
-use std::collections::HashMap;
-
-use ocs_plugin_api::dialog::{DialogValue, PanelDef};
+use ocs_plugin_api::dialog::PanelDef;
 
 use crate::config::ProjectConfig;
 use crate::opsbind;
@@ -28,20 +26,4 @@ pub fn hb(c: &ProjectConfig, svg: &str) -> PanelDef {
 
 pub fn model(c: &ProjectConfig) -> PanelDef {
     opsbind::panel(MODEL, c, &[])
-}
-
-pub fn values_for(c: &ProjectConfig) -> HashMap<&'static str, HashMap<String, DialogValue>> {
-    ALL.iter().map(|id| (*id, opsbind::values(id, c))).collect()
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn ids_match_the_definitions() {
-        let mut ids = crate::opsbind::panel_ids();
-        ids.sort();
-        let mut ours = super::ALL.to_vec();
-        ours.sort();
-        assert_eq!(ids, ours);
-    }
 }

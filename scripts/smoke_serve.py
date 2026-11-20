@@ -150,57 +150,6 @@ def main():
         def layer(name):
             return s.send({"op": "query", "layer": name})
 
-        # 2. Geology: trace from coordinates, then projection along the dip.
-        for ctl, v in (("gm_e", 1000), ("gm_n", 2000), ("gm_z", 300), ("gm_bearing", "N90E"), ("gm_length", 20)):
-            field("min_geomap", ctl, v)
-        run("MIN_GM_TRACE")
-        trace = layer("MIN_GM_TRAZA")
-        c.need(count(trace) >= 1, "MIN_GM_TRACE draws a trace")
-        th = handles(trace)
-        if th:
-            field("min_geomap", "gm_dip", 45)
-            field("min_geomap", "gm_pvalue", 290)
-            s.send({"op": "select", "handles": th[:1]})
-            run("MIN_GM_PROJECT")
-            c.need(count(layer("MIN_GM_PROYECCION")) >= 1, "MIN_GM_PROJECT projects the trace to another height")
-        else:
-            c.need(False, "trace handle readable from query (reply format?)")
-
-        # 3. Workings: solid along a 3D polyline, then level sections.
-        run("3DPOLY 0,0,0 0,50,0 0,80,10")
-        polys = s.send({"op": "query", "type": "Polyline3D", "layer": "0"})
-        ph = handles(polys) or handles(s.send({"op": "query", "type": "Polyline3D"}))
-        if ph:
-            s.send({"op": "select", "handles": ph[-1:]})
-            run("MIN_UG_AXIS")
-            solid = layer("MIN_UG_SOLIDO")
-            c.need(count(solid) >= 1, "MIN_UG_AXIS builds a solid on the selected axis")
-            sh = handles(solid)
-            if sh:
-                choose("min_sections", "sc_mode", 2)
-                s.send({"op": "select", "handles": sh[:1]})
-                rr = run("MIN_SC_RUN")
-                c.soft(count(layer("MIN_SC_CORTE")) >= 1, "MIN_SC_RUN cuts the solid with level planes")
-                if rr.get("status") == "waiting_input":
-                    s.control("cancel", document_id=doc)  # never leave a pick armed
-        else:
-            c.need(False, "3DPOLY created a polyline")
-
-        # 4. Drillholes from CSV (Spanish Excel collar: ';' + decimal comma).
-        # File pickers cannot be typed into over automation: paths go as arguments.
-        run(f'MIN_DH_LOAD "{data / "collar.csv"}" "{data / "survey.csv"}" "{data / "assays.csv"}"')
-        run("MIN_DH_DRAW")
-        c.need(count(layer("MIN_DH_TRAZA")) >= 3, "MIN_DH_LOAD + MIN_DH_DRAW draw the 3 reference holes")
-
-        # 5. Resources: composites -> model saved for the domain -> estimate -> view.
-        run("MIN_RS_COMPOSITE")
-        run("MIN_RS_MODELSAVE")
-        run("MIN_RS_ESTIMATE")
-        run("MIN_RS_BMVIEW")
-        c.need(count(layer("MIN_RS_VISTA")) >= 1, "composite + estimate + view draw block polygons")
-
-        # 6. Geotechnics through the operations format an AI client uses:
-        #    key=value arguments and the OPENMINING_RESULT line of each command.
         def result(op):
             hist = s.control("history", quiet=True)
             entries = hist.get("entries", hist.get("result", {}).get("entries", []))
@@ -213,6 +162,65 @@ def main():
                         return r
             return {}
 
+        def ok(op, what, cond=lambda d: True):
+            r = result(op)
+            good = bool(r.get("ok")) and cond(r.get("data") or {})
+            c.need(good, f"{what} ({json.dumps(r.get('data') if r.get('ok') else r.get('error'))[:240]})")
+            return r
+
+        # 2. Geology through arguments: trace, then projection along the dip.
+        run("MIN_GM_TRACE e=1000 n=2000 z=300 bearing=N90E length=20 anchor=start")
+        r = ok("gm_trace", "gm_trace draws at E1000 N2000 Z300, azimuth 90", lambda d: abs(d.get("azimuth", 0) - 90) < 1e-9)
+        th = r.get("created", [])
+        if th:
+            run(f"MIN_GM_PROJECT dip=45 dip_dir=right proj_mode=height proj_value=290 traces={th[0]}")
+            ok("gm_project", "gm_project projects 1 trace 10 m down at 45 degrees", lambda d: d.get("projected") == 1)
+            c.need(count(layer("MIN_GM_PROYECCION")) >= 1, "the projection is on MIN_GM_PROYECCION")
+        else:
+            c.need(False, "gm_trace reports the created handle")
+        # A value typed in a generated panel reaches the next run without arguments.
+        field("min_geomap", "gm.length", 25)
+        run("MIN_GM_TRACE")
+        ok("gm_trace", "a panel value (gm.length = 25) is used by the next run", lambda d: abs(d.get("length", 0) - 25) < 1e-9)
+
+        # 3. Workings and sections with handles instead of clicks.
+        run("3DPOLY 0,0,0 0,50,0 0,80,10")
+        polys = s.send({"op": "query", "type": "Polyline3D", "layer": "0"})
+        ph = handles(polys) or handles(s.send({"op": "query", "type": "Polyline3D"}))
+        if ph:
+            run(f"MIN_UG_AXIS axis={ph[-1]} profile=rectangular width=4 height=3.5 interval=2")
+            r = ok("ug_axis", "ug_axis builds a solid on the given axis", lambda d: d.get("volume", 0) > 0)
+            sh = [h for h in r.get("created", [])]
+            solid = handles(layer("MIN_UG_SOLIDO"))
+            if solid:
+                run(f"MIN_SC_RUN mode=levels z_from=1 z_to=9 z_step=4 draw_sheets=false solids={solid[0]}")
+                ok("sc_run", "sc_run cuts the solid with 3 level planes", lambda d: d.get("planes") == 3 and d.get("cut", 0) >= 1)
+            else:
+                c.need(False, "the solid is on MIN_UG_SOLIDO")
+        else:
+            c.need(False, "3DPOLY created a polyline")
+
+        # 4. Drillholes (Spanish Excel collar: ';' + decimal comma), paths as arguments.
+        run(f'MIN_DH_LOAD collar="{data / "collar.csv"}" survey="{data / "survey.csv"}" assays="{data / "assays.csv"}"')
+        ok("dh_load", "dh_load reads the 3 reference holes", lambda d: d.get("holes") == 3 and "CU%" in d.get("assay_attributes", []))
+        run("MIN_DH_DRAW assay_attr=CU% scheme=rainbow")
+        ok("dh_draw", "dh_draw draws them coloured by CU%", lambda d: d.get("entities", 0) > 0)
+        c.need(count(layer("MIN_DH_TRAZA")) >= 3, "3 traces on MIN_DH_TRAZA")
+
+        # 5. Resources: composites -> model saved for the domain -> estimate -> view.
+        run("MIN_RS_COMPOSITE comp_length=10")
+        ok("rs_composite", "rs_composite makes composites of CU%", lambda d: d.get("composites", 0) > 0)
+        run("MIN_RS_MODELSAVE")
+        ok("rs_modelsave", "rs_modelsave stores the model of the domain")
+        run("MIN_RS_ESTIMATE size_x=10 size_y=10 size_z=10 radius1=300 radius2=300 radius3=300")
+        ok("rs_estimate", "rs_estimate estimates blocks", lambda d: d.get("estimated", 0) > 0)
+        run("MIN_RS_BMVIEW mode=levels attribute=grade_ok")
+        ok("rs_bmview", "rs_bmview draws block polygons", lambda d: d.get("polygons", 0) > 0)
+        run("MIN_RS_VARIO domain=NoExiste")
+        c.need(result("rs_vario").get("error", {}).get("code") == "not_found", "an unknown domain name is refused with not_found")
+
+        # 6. Geotechnics through the operations format an AI client uses:
+        #    key=value arguments and the OPENMINING_RESULT line of each command.
         run(f'MIN_GT_LOAD logging="{data / "gt_logging.csv"}" lab="{data / "gt_lab.csv"}"')
         r = result("gt_load")
         c.need(r.get("ok") and r["data"]["tables"]["logging"]["records"] == 5 and r["data"]["lab_lithologies"] == 2,

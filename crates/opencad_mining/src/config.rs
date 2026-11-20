@@ -392,144 +392,9 @@ impl ProjectConfig {
         serde_json::from_str(s).ok()
     }
 
-    /// Applies flattened panel values (control id -> value).
+    /// Applies flattened panel values (control id -> value): the controls of
+    /// the panels built from the operation definitions.
     pub fn apply(&mut self, v: &HashMap<String, DialogValue>) {
-        let text = |k: &str| match v.get(k) {
-            Some(DialogValue::Text(s)) | Some(DialogValue::FilePath(s)) => Some(s.clone()),
-            Some(DialogValue::Number(n)) => Some(n.to_string()),
-            _ => None,
-        };
-        let num = |k: &str| match v.get(k) {
-            Some(DialogValue::Number(n)) => Some(*n),
-            Some(DialogValue::Text(s)) => s.trim().replace(',', ".").parse().ok(),
-            _ => None,
-        };
-        let flag = |k: &str| match v.get(k) {
-            Some(DialogValue::Bool(b)) => Some(*b),
-            _ => None,
-        };
-        let choice = |k: &str| match v.get(k) {
-            Some(DialogValue::Choice { index, .. }) => Some(*index),
-            _ => None,
-        };
-        let choice_text = |k: &str| match v.get(k) {
-            Some(DialogValue::Choice { text, .. }) => Some(text.clone()),
-            _ => None,
-        };
-        let table = |k: &str| match v.get(k) {
-            Some(DialogValue::Table(rows)) => Some(rows.clone()),
-            _ => None,
-        };
-        macro_rules! set {
-            ($dst:expr, $src:expr) => {
-                if let Some(x) = $src {
-                    $dst = x;
-                }
-            };
-        }
-        let d = &mut self.dh;
-        set!(d.collar, text("dh_collar"));
-        set!(d.survey, text("dh_survey"));
-        set!(d.assays, text("dh_assays"));
-        set!(d.geo, text("dh_geo"));
-        set!(d.draw_trace, flag("dh_draw_trace"));
-        set!(d.draw_collar, flag("dh_draw_collar"));
-        set!(d.draw_assays, flag("dh_draw_assays"));
-        set!(d.draw_geo, flag("dh_draw_geo"));
-        set!(d.draw_labels, flag("dh_draw_labels"));
-        set!(d.assay_attr, choice_text("dh_assay_attr").filter(|s| !s.is_empty()));
-        set!(d.geo_attr, choice_text("dh_geo_attr").filter(|s| !s.is_empty()));
-        set!(d.scheme, choice("dh_scheme"));
-        set!(d.scope, choice("dh_scope"));
-        set!(d.label_height, num("dh_label_h").filter(|h| *h > 0.0));
-        if let Some(rows) = table("dh_ranges") {
-            d.custom_ranges = rows
-                .iter()
-                .filter_map(|r| {
-                    let p = |i: usize| r.get(i).and_then(|s| s.trim().replace(',', ".").parse::<f64>().ok());
-                    Some((p(0)?, p(1)?, r.get(2)?.trim().to_string()))
-                })
-                .collect();
-        }
-        if let Some(rows) = table("dh_geo_colors") {
-            d.geo_colors = rows
-                .iter()
-                .filter_map(|r| Some((r.first()?.trim().to_string(), r.get(1)?.trim().to_string())))
-                .filter(|(k, _)| !k.is_empty())
-                .collect();
-        }
-        let o = &mut self.origin;
-        set!(o.enabled, flag("or_enabled"));
-        set!(o.x, num("or_x"));
-        set!(o.y, num("or_y"));
-        set!(o.z, num("or_z"));
-        let u = &mut self.ug;
-        set!(u.profile, choice("ug_profile"));
-        set!(u.width, num("ug_width"));
-        set!(u.height, num("ug_height"));
-        set!(u.top_width, num("ug_top"));
-        set!(u.radius, num("ug_radius"));
-        set!(u.wall_height, num("ug_wall"));
-        set!(u.interval, num("ug_interval"));
-        set!(u.h_align, choice("ug_halign"));
-        set!(u.v_align, choice("ug_valign"));
-        set!(u.draw_sections, flag("ug_sections"));
-        set!(u.tangent_3d, flag("ug_tangent3d"));
-        let g = &mut self.gm;
-        set!(g.bearing, text("gm_bearing"));
-        set!(g.length, num("gm_length"));
-        set!(g.anchor, choice("gm_anchor"));
-        set!(g.e, num("gm_e"));
-        set!(g.n, num("gm_n"));
-        set!(g.z, num("gm_z"));
-        set!(g.dip_dir, choice("gm_dipdir"));
-        set!(g.dip_az, text("gm_dipaz"));
-        set!(g.proj_mode, choice("gm_pmode"));
-        set!(g.proj_value, num("gm_pvalue"));
-        set!(g.rock_type, text("gm_rock"));
-        set!(g.thickness, text("gm_thickness"));
-        set!(g.mineralization, text("gm_min"));
-        set!(g.alteration, text("gm_alt"));
-        set!(g.structure, text("gm_struct"));
-        set!(g.grade, text("gm_grade"));
-        set!(g.dip, text("gm_dip"));
-        set!(g.sample, text("gm_sample"));
-        let a = &mut self.ax;
-        set!(a.e, num("ax_e"));
-        set!(a.n, num("ax_n"));
-        set!(a.z, num("ax_z"));
-        set!(a.bearing, text("ax_bearing"));
-        set!(a.grade, num("ax_grade"));
-        set!(a.grade_unit, choice("ax_grade_unit"));
-        set!(a.length, num("ax_length"));
-        set!(a.curve_method, choice("ax_curve_method"));
-        set!(a.radius, num("ax_radius"));
-        set!(a.curve_length, num("ax_curve_length"));
-        set!(a.angle, num("ax_angle"));
-        set!(a.turn, choice("ax_turn"));
-        set!(a.segment, num("ax_segment"));
-        set!(a.update_start, flag("ax_update_start"));
-        let c = &mut self.sc;
-        set!(c.mode, choice("sc_mode"));
-        set!(c.interval, num("sc_interval"));
-        set!(c.ch_from, num("sc_from"));
-        set!(c.ch_to, num("sc_to"));
-        set!(c.spacing, num("sc_spacing"));
-        set!(c.count, num("sc_count"));
-        set!(c.z_from, num("sc_z_from"));
-        set!(c.z_to, num("sc_z_to"));
-        set!(c.z_step, num("sc_z_step"));
-        set!(c.draw_3d, flag("sc_draw_3d"));
-        set!(c.draw_sheets, flag("sc_draw_sheets"));
-        set!(c.columns, num("sc_columns"));
-        set!(c.gap, num("sc_gap"));
-        set!(c.grid, num("sc_grid"));
-        set!(c.text_height, num("sc_text_h"));
-        set!(c.auto_place, flag("sc_auto_place"));
-        set!(c.sheet_x, num("sc_sheet_x"));
-        set!(c.sheet_y, num("sc_sheet_y"));
-        set!(c.replace, flag("sc_replace"));
-        self.rs.apply(v);
         crate::opsbind::apply(self, v);
     }
 }
@@ -579,19 +444,19 @@ mod tests {
             (
                 "files".to_string(),
                 DialogValue::Fields(HashMap::from([(
-                    "dh_collar".to_string(),
+                    "dh.collar".to_string(),
                     DialogValue::FilePath("c.csv".into()),
                 )])),
             ),
             (
-                "dh_scheme".to_string(),
+                "dh.scheme".to_string(),
                 DialogValue::Choice {
                     index: 2,
                     text: "x".into(),
                 },
             ),
             (
-                "dh_ranges".to_string(),
+                "dh.custom_ranges".to_string(),
                 DialogValue::Table(vec![vec!["0".into(), "1,5".into(), "Verde".into()], vec!["bad".into()]]),
             ),
         ]);

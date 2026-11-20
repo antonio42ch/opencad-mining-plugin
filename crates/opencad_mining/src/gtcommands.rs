@@ -80,11 +80,7 @@ fn finish(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, label: &str) {
 }
 
 fn push(host: &mut dyn HostApi, cfg: &ProjectConfig, panel: &'static str, status: Option<(&str, String)>) {
-    let mut values = gtpanels::values_for(cfg).remove(panel).unwrap_or_default();
-    if let Some((id, text)) = status {
-        values.insert(id.to_string(), DialogValue::Text(text));
-    }
-    host.update_panel_for_plugin(MANIFEST.id, panel, values);
+    crate::opsbind::push_one(host, cfg, panel, status);
 }
 
 fn no_data(msg: &str) -> OpError {
@@ -447,7 +443,7 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
             cfg.rs.bm.view_attr = crate::resources::GT_VIEW_ATTR + attr;
             state::with_tab(tab, |t| t.config = cfg.clone());
             session::push_rs(host, cfg);
-            crate::rscommands::dispatch(host, "MIN_RS_BMVIEW", tab, cfg);
+            crate::rscommands::run(host, "rs_bmview", &Args::new(), tab, cfg)?;
             let key = ["rmr", "gsi", "logq", "class"][attr];
             Ok(OpResult::data(json!({
                 "attribute": key,

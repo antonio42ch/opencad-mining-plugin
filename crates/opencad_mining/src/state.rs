@@ -91,6 +91,11 @@ pub fn set_pending(p: Pending) {
     *lock(&PENDING) = Some(p);
 }
 
+/// The pending action without taking it.
+pub fn peek_pending() -> Option<Pending> {
+    lock(&PENDING).clone()
+}
+
 pub fn take_pending() -> Option<Pending> {
     lock(&PENDING).take()
 }

@@ -41,7 +41,13 @@ fn property(p: &Param) -> Value {
         Kind::Handles => {
             json!({"type": "array", "items": {"type": "string", "pattern": "^[0-9A-Fa-f]+$"}, "minItems": 1})
         }
-        Kind::Table { columns } => json!({
+        Kind::Name { source } => {
+            json!({"type": "string", "description": format!("one of the {source} of the project")})
+        }
+        Kind::Index { source, .. } => {
+            json!({"type": ["string", "integer"], "description": format!("name or 0-based index among the {source}")})
+        }
+        Kind::Table { columns, .. } => json!({
             "type": "array",
             "items": {"type": "array", "items": {"type": "string"}},
             "description": format!("rows of [{}]", columns.iter().map(|c| c.en).collect::<Vec<_>>().join(", ")),

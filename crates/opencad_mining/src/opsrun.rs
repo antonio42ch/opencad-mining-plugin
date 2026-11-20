@@ -20,28 +20,74 @@ pub fn emit(host: &mut dyn HostApi, op: &str, r: &Outcome) {
     host.push_info(&line(op, r));
 }
 
-/// Stores the setting arguments of `def` in `cfg` and shows them in the panels.
-pub fn apply_settings(host: &mut dyn HostApi, def: &OpDef, args: &Args, cfg: &mut ProjectConfig) {
+/// Replaces names given to `Index` parameters (a domain by name) by their
+/// index in the run-time list.
+fn resolve_names(def: &OpDef, args: &mut Args, lists: &crate::opsbind::Lists) -> Result<(), OpError> {
+    for p in def.params {
+        let ops::Kind::Index { source, all } = p.kind else {
+            continue;
+        };
+        let Some(name) = args.get(p.key).and_then(|v| v.as_str()).map(str::to_string) else {
+            continue;
+        };
+        let list = lists.get(source);
+        let pos = list
+            .iter()
+            .position(|n| n.eq_ignore_ascii_case(name.trim()))
+            .ok_or_else(|| {
+                OpError::new(
+                    ErrorCode::NotFound,
+                    format!("{}: '{name}' is not one of {}", p.key, list.join(", ")),
+                )
+                .at(p.key)
+            })?;
+        args.insert(p.key.to_string(), serde_json::json!(pos + usize::from(all.is_some())));
+    }
+    Ok(())
+}
+
+/// Stores the setting arguments of `def` in `cfg` (table arguments through
+/// their codec) and shows them in the panels.
+pub fn apply_settings(
+    host: &mut dyn HostApi,
+    def: &OpDef,
+    args: &mut Args,
+    tab: u64,
+    cfg: &mut ProjectConfig,
+) -> Result<(), OpError> {
     if !def
         .params
         .iter()
         .any(|p| p.setting.is_some() && args.contains_key(p.key))
     {
-        return;
+        return Ok(());
     }
+    resolve_names(def, args, &crate::opsbind::Lists::of(tab, cfg))?;
     let mut root = crate::opsbind::settings_json(cfg);
-    ops::settings::apply(def, args, &mut root);
+    for p in def.params {
+        if let (ops::Kind::Table { codec, .. }, Some(ptr), Some(v)) = (p.kind, p.setting, args.get(p.key)) {
+            let value = crate::opsbind::table_json(codec, v).ok_or_else(|| {
+                OpError::new(ErrorCode::InvalidArgument, format!("{}: unreadable table", p.key)).at(p.key)
+            })?;
+            ops::settings::set(&mut root, ptr, value);
+        }
+    }
+    let plain: Args = args
+        .iter()
+        .filter(|(k, _)| !matches!(def.param(k).map(|p| p.kind), Some(ops::Kind::Table { .. })))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    ops::settings::apply(def, &plain, &mut root);
     crate::opsbind::from_json(cfg, root);
     crate::opsbind::push_all(host, cfg);
+    Ok(())
 }
 
 fn handler(host: &mut dyn HostApi, def: &OpDef, args: &Args, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     match def.group {
         ops::Group::Geotechnics => crate::gtcommands::run(host, def.name, args, tab, cfg),
-        _ => Err(OpError::new(
-            ErrorCode::UnknownCommand,
-            format!("{} has no handler", def.name),
-        )),
+        ops::Group::Resources => crate::rscommands::run(host, def.name, args, tab, cfg),
+        _ => crate::commands::run(host, def.name, args, tab, cfg),
     }
 }
 
@@ -53,10 +99,37 @@ pub fn try_dispatch(host: &mut dyn HostApi, line_text: &str, tab: u64, cfg: &mut
     else {
         return false;
     };
-    let r = parse_command(def, line_text).and_then(|args| {
-        apply_settings(host, def, &args, cfg);
+    let r = parse_command(def, line_text).and_then(|mut args| {
+        apply_settings(host, def, &mut args, tab, cfg)?;
         handler(host, def, &args, tab, cfg)
     });
     emit(host, def.name, &r);
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn domain_names_become_indices() {
+        let lists = crate::opsbind::Lists {
+            domains: vec!["Óxidos".into(), "Sulfuros".into()],
+            ..Default::default()
+        };
+        let view = ops::find("rs_bmview").unwrap();
+        let mut args = parse_command(view, "MIN_RS_BMVIEW domain=sulfuros").unwrap();
+        resolve_names(view, &mut args, &lists).unwrap();
+        assert_eq!(args["domain"], json!(2), "0 is 'all'");
+        let vario = ops::find("rs_vario").unwrap();
+        let mut args = parse_command(vario, "MIN_RS_VARIO domain=Sulfuros").unwrap();
+        resolve_names(vario, &mut args, &lists).unwrap();
+        assert_eq!(args["domain"], json!(1));
+        let mut args = parse_command(vario, "MIN_RS_VARIO domain=Nada").unwrap();
+        assert_eq!(
+            resolve_names(vario, &mut args, &lists).unwrap_err().code,
+            ErrorCode::NotFound
+        );
+    }
 }

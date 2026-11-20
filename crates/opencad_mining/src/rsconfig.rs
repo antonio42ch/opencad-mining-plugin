@@ -1,14 +1,13 @@
 //! Settings of the resource-estimation modules (saved in the drawing with
 //! the rest of `ProjectConfig`).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use geostat_engine::bridge::DomainRule;
 use geostat_engine::composite::{CompositeConfig, Remainder};
 use geostat_engine::model::{Kind, Orientation, Structure, VariogramModel};
 use geostat_engine::search::Neighborhood;
 use geostat_engine::surface::SurfaceParams;
-use ocs_plugin_api::dialog::DialogValue;
 use serde::{Deserialize, Serialize};
 
 pub const KINDS: [Kind; 3] = [Kind::Spherical, Kind::Exponential, Kind::Gaussian];
@@ -415,6 +414,8 @@ pub struct ResourcesConfig {
     pub composited: CompositeStamp,
     /// Contact surfaces (name, geology above, geology below).
     pub contacts: Vec<ContactRow>,
+    /// Domain that `rs_setsolid` assigns solids to (index).
+    pub target: usize,
 }
 
 impl Default for ResourcesConfig {
@@ -435,6 +436,7 @@ impl Default for ResourcesConfig {
             bm: BlockCfg::default(),
             composited: CompositeStamp::default(),
             contacts: Vec::new(),
+            target: 0,
         }
     }
 }
@@ -486,6 +488,18 @@ impl ResourcesConfig {
         }
     }
 
+    /// v0.4 domains kept the side of the single contact in `side` (not
+    /// serialized any more): write it as the equivalent surface word so it
+    /// survives a round trip through the settings JSON.
+    pub fn migrate_legacy(&mut self) {
+        for d in &mut self.domains {
+            if d.surface.trim().is_empty() && d.side != 0 {
+                d.surface = if d.side == 1 { "above" } else { "below" }.into();
+                d.side = 0;
+            }
+        }
+    }
+
     pub fn domain_names(&self) -> Vec<String> {
         self.domains.iter().map(|d| d.name.clone()).collect()
     }
@@ -493,156 +507,6 @@ impl ResourcesConfig {
     /// Saved model of a domain (falls back to the working model).
     pub fn model_of(&self, name: &str) -> Option<&ModelCfg> {
         self.vario.models.get(name)
-    }
-
-    /// Applies flattened panel values.
-    pub fn apply(&mut self, v: &HashMap<String, DialogValue>) {
-        let num = |k: &str| match v.get(k) {
-            Some(DialogValue::Number(n)) => Some(*n),
-            Some(DialogValue::Text(s)) => s.trim().replace(',', ".").parse().ok(),
-            _ => None,
-        };
-        let text = |k: &str| match v.get(k) {
-            Some(DialogValue::Text(s)) | Some(DialogValue::FilePath(s)) => Some(s.clone()),
-            _ => None,
-        };
-        let flag = |k: &str| match v.get(k) {
-            Some(DialogValue::Bool(b)) => Some(*b),
-            _ => None,
-        };
-        let choice = |k: &str| match v.get(k) {
-            Some(DialogValue::Choice { index, .. }) => Some(*index),
-            _ => None,
-        };
-        let table = |k: &str| match v.get(k) {
-            Some(DialogValue::Table(r)) => Some(r.clone()),
-            _ => None,
-        };
-        macro_rules! set {
-            ($dst:expr, $src:expr) => {
-                if let Some(x) = $src {
-                    $dst = x;
-                }
-            };
-        }
-        set!(self.comp_length, num("rs_comp_len").filter(|x| *x > 0.0));
-        set!(self.comp_remainder, choice("rs_comp_rem"));
-        set!(self.comp_min_fraction, num("rs_comp_minfrac"));
-        set!(self.comp_min_coverage, num("rs_comp_mincov"));
-        set!(self.dc_min, num("rs_dc_min"));
-        set!(self.dc_max, num("rs_dc_max"));
-        set!(self.dc_steps, num("rs_dc_steps"));
-        set!(self.dc_zratio, num("rs_dc_z"));
-        set!(self.unit, text("rs_unit").filter(|s| !s.trim().is_empty()));
-        if let Some(rows) = table("rs_domains") {
-            let num_of = |r: &Vec<String>, i: usize, d: f64| {
-                r.get(i)
-                    .and_then(|s| s.trim().replace(',', ".").parse::<f64>().ok())
-                    .unwrap_or(d)
-            };
-            self.domains = rows
-                .iter()
-                .filter(|r| r.first().is_some_and(|n| !n.trim().is_empty()))
-                .map(|r| DomainCfg {
-                    name: r[0].trim().to_string(),
-                    values: r.get(1).cloned().unwrap_or_default(),
-                    density: num_of(r, 2, 2.7),
-                    cap: num_of(r, 3, 0.0),
-                    side: 0,
-                    surface: r.get(4).map(|s| s.trim().to_string()).unwrap_or_default(),
-                })
-                .collect();
-        }
-        if let Some(rows) = table("rs_contacts") {
-            self.contacts = rows
-                .iter()
-                .filter(|r| r.iter().any(|c| !c.trim().is_empty()))
-                .enumerate()
-                .map(|(i, r)| ContactRow {
-                    name: r
-                        .first()
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .unwrap_or_else(|| format!("C{}", i + 1)),
-                    above: r.get(1).map(|s| s.trim().to_string()).unwrap_or_default(),
-                    below: r.get(2).map(|s| s.trim().to_string()).unwrap_or_default(),
-                })
-                .collect();
-        }
-        let c = &mut self.contact;
-        set!(c.step, num("rs_ct_step").filter(|x| *x > 0.0));
-        set!(c.kind, choice("rs_ct_kind"));
-        set!(c.nugget, num("rs_ct_nugget"));
-        set!(c.sill, num("rs_ct_sill"));
-        set!(c.range, num("rs_ct_range"));
-        set!(c.radius, num("rs_ct_radius"));
-        set!(c.min_samples, num("rs_ct_min"));
-        set!(c.max_samples, num("rs_ct_max"));
-        let g = &mut self.vario;
-        set!(g.domain, choice("rs_v_domain"));
-        set!(g.lag, num("rs_v_lag").filter(|x| *x > 0.0));
-        set!(g.nlags, num("rs_v_nlags"));
-        set!(g.az_tol, num("rs_v_aztol"));
-        set!(g.dip_tol, num("rs_v_diptol"));
-        set!(g.bw_h, num("rs_v_bwh"));
-        set!(g.bw_v, num("rs_v_bwv"));
-        set!(g.omni, flag("rs_v_omni"));
-        set!(g.fit_kind1, choice("rs_v_fitkind"));
-        set!(g.fit_two, flag("rs_v_fittwo"));
-        set!(g.fix_nugget, flag("rs_v_fixnug"));
-        let w = &mut g.work;
-        set!(w.azimuth, num("rs_m_az"));
-        set!(w.dip, num("rs_m_dip"));
-        set!(w.rake, num("rs_m_rake"));
-        set!(w.nugget, num("rs_m_nugget"));
-        for (i, s) in w.structures.iter_mut().enumerate() {
-            let k = i + 1;
-            set!(s.kind, choice(&format!("rs_m_s{k}_kind")));
-            set!(s.sill, num(&format!("rs_m_s{k}_sill")));
-            for (a, r) in s.ranges.iter_mut().enumerate() {
-                set!(*r, num(&format!("rs_m_s{k}_r{}", a + 1)));
-            }
-        }
-        let b = &mut self.bm;
-        set!(b.auto_extent, flag("rs_b_auto"));
-        for (a, name) in ["x", "y", "z"].iter().enumerate() {
-            set!(b.origin[a], num(&format!("rs_b_o{name}")));
-            set!(b.counts[a], num(&format!("rs_b_n{name}")));
-            set!(b.size[a], num(&format!("rs_b_s{name}")).filter(|x| *x > 0.0));
-            set!(b.disc[a], num(&format!("rs_b_d{name}")));
-            set!(b.radii[a], num(&format!("rs_b_r{}", a + 1)).filter(|x| *x > 0.0));
-        }
-        set!(b.pad, num("rs_b_pad"));
-        set!(b.rotation, num("rs_b_rot"));
-        set!(b.ordinary, flag("rs_b_ok"));
-        set!(b.simple, flag("rs_b_sk"));
-        set!(b.idw, flag("rs_b_idw"));
-        set!(b.idw_power, num("rs_b_idwp"));
-        set!(b.nearest, flag("rs_b_nn"));
-        set!(b.min_samples, num("rs_b_min"));
-        set!(b.max_samples, num("rs_b_max"));
-        set!(b.max_per_octant, num("rs_b_oct"));
-        set!(b.max_per_hole, num("rs_b_hole"));
-        set!(b.pass2, num("rs_b_p2"));
-        set!(b.pass2_min, num("rs_b_p2min"));
-        set!(b.pass3, num("rs_b_p3"));
-        set!(b.pass3_min, num("rs_b_p3min"));
-        set!(b.min_fraction, num("rs_b_minfrac"));
-        set!(b.folder, text("rs_b_folder"));
-        set!(b.view_mode, choice("rs_w_mode"));
-        set!(b.view_attr, choice("rs_w_attr"));
-        set!(b.view_cutoff, num("rs_w_cutoff"));
-        set!(b.view_z_from, num("rs_w_zfrom"));
-        set!(b.view_z_to, num("rs_w_zto"));
-        set!(b.view_z_step, num("rs_w_zstep").filter(|x| *x > 0.0));
-        set!(b.view_spacing, num("rs_w_spacing"));
-        set!(b.view_count, num("rs_w_count"));
-        set!(b.view_interval, num("rs_w_interval"));
-        set!(b.view_domain, choice("rs_w_domain"));
-        set!(b.view_limit, num("rs_w_limit"));
-        set!(b.swath_axis, choice("rs_w_axis"));
-        set!(b.swath_width, num("rs_w_swath"));
-        set!(b.chart, choice("rs_w_chart"));
     }
 }
 
@@ -742,18 +606,20 @@ mod tests {
 
     #[test]
     fn json_is_forward_compatible_and_panel_values_apply() {
-        let mut c = ResourcesConfig::default();
+        use ocs_plugin_api::dialog::DialogValue;
+        use std::collections::HashMap;
+        let mut pc = crate::config::ProjectConfig::default();
         let v: HashMap<String, DialogValue> = [
-            ("rs_comp_len".to_string(), DialogValue::Number(2.0)),
+            ("rs.comp_length".to_string(), DialogValue::Number(2.0)),
             (
-                "rs_comp_rem".to_string(),
+                "rs.comp_remainder".to_string(),
                 DialogValue::Choice {
                     index: 1,
                     text: String::new(),
                 },
             ),
             (
-                "rs_domains".to_string(),
+                "rs.domains".to_string(),
                 DialogValue::Table(vec![
                     vec![
                         "Óxidos".into(),
@@ -766,13 +632,14 @@ mod tests {
                     vec!["Sulfuros".into(), "SULFURO".into()],
                 ]),
             ),
-            ("rs_m_s2_sill".to_string(), DialogValue::Number(4.5)),
-            ("rs_b_sz".to_string(), DialogValue::Number(12.0)),
-            ("rs_b_sx".to_string(), DialogValue::Number(-3.0)),
+            ("rs.vario.work.structures.1.sill".to_string(), DialogValue::Number(4.5)),
+            ("rs.bm.size.2".to_string(), DialogValue::Number(12.0)),
+            ("rs.bm.size.0".to_string(), DialogValue::Number(-3.0)),
         ]
         .into_iter()
         .collect();
-        c.apply(&v);
+        pc.apply(&v);
+        let c = pc.rs.clone();
         assert_eq!((c.comp_length, c.comp_remainder), (2.0, 1));
         assert_eq!(c.domains.len(), 2);
         assert_eq!(c.domains[0].value_list(), vec!["OXIDO", "OX"]);

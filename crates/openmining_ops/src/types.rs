@@ -71,8 +71,21 @@ pub enum Kind {
     /// Entity handles, comma-separated (hex).
     Handles,
     /// Rows of cells; `columns` name them.
+    /// `codec` names the plugin's conversion between rows and the settings value.
     Table {
         columns: &'static [L],
+        codec: &'static str,
+    },
+    /// A name chosen from a list known only at run time (`source`, e.g. the
+    /// assay attributes loaded); stored as the name.
+    Name {
+        source: &'static str,
+    },
+    /// An entry of a run-time list (`source`, e.g. the domains) given by name
+    /// or index; stored as the index. `all` adds a first "all" entry.
+    Index {
+        source: &'static str,
+        all: Option<L>,
     },
 }
 
@@ -92,6 +105,8 @@ impl Kind {
             Kind::Handle => "handle",
             Kind::Handles => "handles",
             Kind::Table { .. } => "table",
+            Kind::Name { .. } => "name",
+            Kind::Index { .. } => "index",
         }
     }
 }

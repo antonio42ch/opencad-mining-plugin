@@ -103,7 +103,12 @@ pub fn convert(p: &Param, s: &str) -> Result<Value, OpError> {
             "0" | "false" | "no" | "não" | "nao" | "off" => json!(false),
             _ => return Err(bad(p, format!("'{s}' is not true/false"))),
         },
-        Kind::Text | Kind::Path { .. } => json!(s),
+        Kind::Text | Kind::Path { .. } | Kind::Name { .. } => json!(s),
+        // An index or a name; the plugin resolves names against its list.
+        Kind::Index { .. } => match s.trim().parse::<u64>() {
+            Ok(i) => json!(i),
+            Err(_) => json!(s.trim()),
+        },
         Kind::Choice { options } => {
             let t = s.trim();
             let by_key = options.iter().find(|o| o.key.eq_ignore_ascii_case(t));
@@ -174,6 +179,7 @@ pub fn from_json(p: &Param, v: &Value) -> Result<Value, OpError> {
         (_, Value::String(s)) => convert(p, s),
         (Kind::Number { .. } | Kind::Integer { .. }, Value::Number(n)) => convert(p, &n.to_string()),
         (Kind::Bool, Value::Bool(b)) => Ok(json!(b)),
+        (Kind::Index { .. }, Value::Number(n)) if n.is_u64() => Ok(v.clone()),
         (Kind::Choice { options }, Value::Number(n)) => n
             .as_u64()
             .and_then(|i| options.get(i as usize))
@@ -307,6 +313,16 @@ mod tests {
         opt("nn", L::same("Nearest")),
     ];
     const P: &[Param] = &[
+        input(
+            "dom",
+            Kind::Index {
+                source: "domains",
+                all: None,
+            },
+            false,
+            L::same("d"),
+            "domain",
+        ),
         setting(
             "path",
             Kind::Path { extensions: &["csv"] },
@@ -341,7 +357,16 @@ mod tests {
             L::same("c"),
             "count",
         ),
-        input("rows", Kind::Table { columns: &[] }, false, L::same("r"), "rows"),
+        input(
+            "rows",
+            Kind::Table {
+                columns: &[],
+                codec: "t",
+            },
+            false,
+            L::same("r"),
+            "rows",
+        ),
         input("must", Kind::Text, true, L::same("m"), "required"),
     ];
     const D: OpDef = OpDef {
@@ -370,6 +395,12 @@ mod tests {
         assert_eq!(a["labels"], json!(true));
         assert_eq!(a["at"], json!([1.5, 2.0, 3.0]));
         assert_eq!(a["axes"], json!(["1A", "2B"]));
+        let a = parse_command(&D, "MIN_T dom=2 must=x").unwrap();
+        assert_eq!(a["dom"], json!(2));
+        assert_eq!(
+            parse_command(&D, r#"MIN_T dom="Óxidos A" must=x"#).unwrap()["dom"],
+            json!("Óxidos A")
+        );
         let a = parse_command(&D, "MIN_T power=2,5 method=Inverso at=1,2 rows=a,b;c,d must=y count=3").unwrap();
         assert_eq!(
             (a["power"].clone(), a["method"].clone(), a["at"].clone()),

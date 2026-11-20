@@ -19,11 +19,13 @@ pub fn set(root: &mut Value, ptr: &str, v: Value) -> bool {
 }
 
 /// Settings form of a normalized argument (a choice is stored by index).
-pub fn to_setting(p: &Param, v: &Value) -> Value {
-    match (&p.kind, v) {
+/// `None` for an index still given by name (the plugin resolves it first).
+pub fn to_setting(p: &Param, v: &Value) -> Option<Value> {
+    Some(match (&p.kind, v) {
+        (Kind::Index { .. }, Value::String(_)) => return None,
         (Kind::Choice { options }, Value::String(k)) => json!(options.iter().position(|o| o.key == k).unwrap_or(0)),
         _ => v.clone(),
-    }
+    })
 }
 
 /// Argument form of a stored setting (a choice index becomes its key).
@@ -40,8 +42,8 @@ pub fn from_setting(p: &Param, v: &Value) -> Value {
 /// Stores every given setting argument into `root`.
 pub fn apply(def: &OpDef, args: &Args, root: &mut Value) {
     for p in def.params {
-        if let (Some(ptr), Some(v)) = (p.setting, args.get(p.key)) {
-            set(root, ptr, to_setting(p, v));
+        if let (Some(ptr), Some(v)) = (p.setting, args.get(p.key).and_then(|v| to_setting(p, v))) {
+            set(root, ptr, v);
         }
     }
 }
@@ -65,10 +67,11 @@ pub fn check_against(root: &Value) {
                 .unwrap_or_else(|| panic!("{}.{}: {ptr} not in the settings", d.name, p.key));
             let ok = match p.kind {
                 Kind::Number { .. } => v.is_number(),
-                Kind::Integer { .. } | Kind::Choice { .. } => v.is_u64() || v.is_i64(),
+                Kind::Integer { .. } | Kind::Choice { .. } | Kind::Index { .. } => v.is_u64() || v.is_i64(),
                 Kind::Bool => v.is_boolean(),
-                Kind::Text | Kind::Path { .. } => v.is_string(),
-                Kind::Table { .. } => v.is_array(),
+                Kind::Text | Kind::Path { .. } | Kind::Name { .. } => v.is_string(),
+                // A table codec may store rows as an array or a map.
+                Kind::Table { .. } => v.is_array() || v.is_object(),
                 Kind::Point | Kind::Handle | Kind::Handles => false,
             };
             assert!(
@@ -90,7 +93,7 @@ mod tests {
     fn roundtrip_choice() {
         let d = crate::find("gt_estimate").unwrap();
         let p = d.param("method").unwrap();
-        assert_eq!(to_setting(p, &json!("nn")), json!(1));
+        assert_eq!(to_setting(p, &json!("nn")), Some(json!(1)));
         assert_eq!(from_setting(p, &json!(1)), json!("nn"));
         let mut root = json!({"gt": {"md_method": 0, "md_power": 2.0}});
         let mut args = Args::new();

@@ -26,7 +26,9 @@ fn kind_detail(k: &Kind) -> String {
         Kind::Handle => "entity handle (hex)".into(),
         Kind::Handles => "handles `1A,2B`".into(),
         Kind::Path { .. } => "file path".into(),
-        Kind::Table { columns } => format!(
+        Kind::Name { source } => format!("name among the {source}"),
+        Kind::Index { source, .. } => format!("name or index among the {source}"),
+        Kind::Table { columns, .. } => format!(
             "table `{}`",
             columns.iter().map(|c| c.en).collect::<Vec<_>>().join(" | ")
         ),

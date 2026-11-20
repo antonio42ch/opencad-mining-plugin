@@ -30,7 +30,142 @@ pub fn panel_ids() -> Vec<&'static str> {
 }
 
 pub fn settings_json(cfg: &ProjectConfig) -> Value {
-    serde_json::to_value(cfg).unwrap_or(Value::Null)
+    let mut c = cfg.clone();
+    c.rs.migrate_legacy();
+    serde_json::to_value(&c).unwrap_or(Value::Null)
+}
+
+/// Run-time lists behind `Name` / `Index` parameters.
+#[derive(Debug, Clone, Default)]
+pub struct Lists {
+    pub assay: Vec<String>,
+    pub geo: Vec<String>,
+    pub domains: Vec<String>,
+}
+
+impl Lists {
+    /// Lists of a tab: attributes of its loaded drillholes, domains of `cfg`.
+    pub fn of(tab: u64, cfg: &ProjectConfig) -> Lists {
+        let (assay, geo) = crate::state::with_tab(tab, |t| {
+            t.data.as_ref().map_or((Vec::new(), Vec::new()), |d| {
+                (
+                    drillhole_engine::import::assay_attributes(&d.assays),
+                    drillhole_engine::import::geo_attributes(&d.geo),
+                )
+            })
+        });
+        Lists {
+            assay,
+            geo,
+            domains: cfg.rs.domain_names(),
+        }
+    }
+    pub fn get(&self, source: &str) -> &[String] {
+        match source {
+            "assay attributes" => &self.assay,
+            "geology attributes" => &self.geo,
+            _ => &self.domains,
+        }
+    }
+    /// Choice entries of an `Index` parameter (with the "all" entry).
+    fn index_options(&self, source: &str, all: Option<ops::L>, l: ops::Lang) -> Vec<String> {
+        all.map(|a| a.get(l).to_string())
+            .into_iter()
+            .chain(self.get(source).iter().cloned())
+            .collect()
+    }
+}
+
+/// Rows shown by a table control (typed settings: legacy forms included).
+fn rows_of(codec: &str, cfg: &ProjectConfig) -> Vec<Vec<String>> {
+    let r = crate::rsi18n::r();
+    match codec {
+        "ranges" => cfg
+            .dh
+            .custom_ranges
+            .iter()
+            .map(|(a, b, c)| vec![a.to_string(), b.to_string(), c.clone()])
+            .collect(),
+        "geo_colors" => cfg
+            .dh
+            .geo_colors
+            .iter()
+            .map(|(k, v)| vec![k.clone(), v.clone()])
+            .collect(),
+        "domains" => cfg
+            .rs
+            .domains
+            .iter()
+            .map(|d| {
+                let surface = if !d.surface.trim().is_empty() {
+                    d.surface.clone()
+                } else {
+                    ["", r.word_above, r.word_below][d.side.min(2)].to_string()
+                };
+                vec![
+                    d.name.clone(),
+                    d.values.clone(),
+                    d.density.to_string(),
+                    d.cap.to_string(),
+                    surface,
+                ]
+            })
+            .collect(),
+        "contacts" => cfg
+            .rs
+            .contact_rows()
+            .into_iter()
+            .map(|c| vec![c.name, c.above, c.below])
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn parse_num(s: &str) -> Option<f64> {
+    s.trim().replace(',', ".").parse::<f64>().ok().filter(|v| v.is_finite())
+}
+
+/// Settings value of table rows (rows that cannot be read are dropped).
+fn json_of(codec: &str, rows: &[Vec<String>]) -> Option<Value> {
+    let cell = |r: &Vec<String>, i: usize| r.get(i).map(|s| s.trim().to_string()).unwrap_or_default();
+    Some(match codec {
+        "ranges" => json!(rows
+            .iter()
+            .filter_map(|r| Some(json!([parse_num(r.first()?)?, parse_num(r.get(1)?)?, cell(r, 2)])))
+            .collect::<Vec<_>>()),
+        "geo_colors" => Value::Object(rows.iter().filter(|r| !cell(r, 0).is_empty()).map(|r| (cell(r, 0), json!(cell(r, 1)))).collect()),
+        "domains" => json!(rows
+            .iter()
+            .filter(|r| !cell(r, 0).is_empty())
+            .map(|r| json!({
+                "name": cell(r, 0),
+                "values": r.get(1).cloned().unwrap_or_default(),
+                "density": r.get(2).and_then(|s| parse_num(s)).unwrap_or(2.7),
+                "cap": r.get(3).and_then(|s| parse_num(s)).unwrap_or(0.0),
+                "surface": cell(r, 4),
+            }))
+            .collect::<Vec<_>>()),
+        "contacts" => json!(rows
+            .iter()
+            .filter(|r| r.iter().any(|c| !c.trim().is_empty()))
+            .enumerate()
+            .map(|(i, r)| {
+                let name = cell(r, 0);
+                json!({"name": if name.is_empty() { format!("C{}", i + 1) } else { name }, "above": cell(r, 1), "below": cell(r, 2)})
+            })
+            .collect::<Vec<_>>()),
+        _ => return None,
+    })
+}
+
+/// Settings value of a table argument (rows given as strings).
+pub fn table_json(codec: &str, v: &Value) -> Option<Value> {
+    let rows: Vec<Vec<String>> = v
+        .as_array()?
+        .iter()
+        .map(|r| r.as_array().map(|c| c.iter().map(cell).collect()).unwrap_or_default())
+        .collect();
+    json_of(codec, &rows)
 }
 
 /// Back from JSON; an impossible value keeps the previous settings.
@@ -46,23 +181,31 @@ fn param(op: &str, key: &str) -> &'static Param {
         .expect("panel items are checked by openmining_ops tests")
 }
 
-fn to_dialog(p: &Param, v: &Value) -> DialogValue {
+fn to_dialog(p: &Param, v: &Value, cfg: &ProjectConfig, lists: &Lists, l: ops::Lang) -> DialogValue {
     match p.kind {
+        Kind::Name { source } => {
+            let list = lists.get(source).to_vec();
+            let cur = v.as_str().unwrap_or("");
+            DialogValue::ChoiceOptions {
+                selected_index: list.iter().position(|a| a == cur).unwrap_or(0),
+                options: list,
+            }
+        }
+        Kind::Index { source, all } => {
+            let list = lists.index_options(source, all, l);
+            let i = v.as_u64().unwrap_or(0) as usize;
+            DialogValue::ChoiceOptions {
+                selected_index: i.min(list.len().saturating_sub(1)),
+                options: list,
+            }
+        }
+        Kind::Table { codec, .. } => DialogValue::Table(rows_of(codec, cfg)),
         Kind::Number { .. } | Kind::Integer { .. } => DialogValue::Number(v.as_f64().unwrap_or(0.0)),
         Kind::Bool => DialogValue::Bool(v.as_bool().unwrap_or(false)),
         Kind::Choice { .. } => DialogValue::Choice {
             index: v.as_u64().unwrap_or(0) as usize,
             text: String::new(),
         },
-        Kind::Table { .. } => DialogValue::Table(
-            v.as_array()
-                .map(|rows| {
-                    rows.iter()
-                        .map(|r| r.as_array().map(|c| c.iter().map(cell).collect()).unwrap_or_default())
-                        .collect()
-                })
-                .unwrap_or_default(),
-        ),
         _ => DialogValue::Text(v.as_str().unwrap_or("").to_string()),
     }
 }
@@ -76,19 +219,28 @@ fn cell(v: &Value) -> String {
 
 /// Settings value of a panel control (`None` = unreadable for this kind).
 fn from_dialog(p: &Param, v: &DialogValue) -> Option<Value> {
+    let in_range =
+        |x: f64, min: Option<f64>, max: Option<f64>| min.is_none_or(|m| x >= m) && max.is_none_or(|m| x <= m);
     Some(match (&p.kind, v) {
-        (Kind::Number { .. }, DialogValue::Number(n)) if n.is_finite() => json!(n),
-        (Kind::Number { .. }, DialogValue::Text(s)) => json!(s.trim().replace(',', ".").parse::<f64>().ok()?),
+        // Out-of-range panel values keep the previous setting (as the hand-written panels did).
+        (Kind::Number { min, max, .. }, DialogValue::Number(n)) if n.is_finite() && in_range(*n, *min, *max) => {
+            json!(n)
+        }
+        (Kind::Number { min, max, .. }, DialogValue::Text(s)) => {
+            json!(parse_num(s).filter(|x| in_range(*x, *min, *max))?)
+        }
+        (Kind::Name { .. }, DialogValue::Choice { text, .. }) if !text.is_empty() => json!(text),
+        (Kind::Index { .. }, DialogValue::Choice { index, .. }) => json!(index),
         (Kind::Integer { .. }, DialogValue::Number(n)) if n.is_finite() => json!(n.round() as i64),
         (Kind::Bool, DialogValue::Bool(b)) => json!(b),
         (Kind::Choice { .. }, DialogValue::Choice { index, .. }) => json!(index),
         (Kind::Text | Kind::Path { .. }, DialogValue::Text(s) | DialogValue::FilePath(s)) => json!(s),
-        (Kind::Table { .. }, DialogValue::Table(rows)) => json!(rows),
+        (Kind::Table { codec, .. }, DialogValue::Table(rows)) => json_of(codec, rows)?,
         _ => return None,
     })
 }
 
-fn control(p: &Param, ptr: &str, v: &Value, l: ops::Lang) -> DialogControl {
+fn control(p: &Param, ptr: &str, v: &Value, cfg: &ProjectConfig, lists: &Lists, l: ops::Lang) -> DialogControl {
     let id = control_id(ptr);
     let label = p.label.get(l).to_string();
     match p.kind {
@@ -127,17 +279,34 @@ fn control(p: &Param, ptr: &str, v: &Value, l: ops::Lang) -> DialogControl {
             extensions: extensions.iter().map(|e| e.to_string()).collect(),
             save: false,
         },
-        Kind::Table { columns } => DialogControl::Table {
+        Kind::Table { columns, codec } => DialogControl::Table {
             id,
             label: Some(label),
             headers: columns.iter().map(|c| c.get(l).to_string()).collect(),
-            rows: match to_dialog(p, v) {
-                DialogValue::Table(r) => r,
-                _ => Vec::new(),
-            },
+            rows: rows_of(codec, cfg),
             allow_add: true,
             allow_delete: true,
         },
+        Kind::Name { source } => {
+            let list = lists.get(source).to_vec();
+            let cur = v.as_str().unwrap_or("");
+            DialogControl::Choice {
+                id,
+                label,
+                default_index: list.iter().position(|a| a == cur).unwrap_or(0),
+                options: list,
+            }
+        }
+        Kind::Index { source, all } => {
+            let list = lists.index_options(source, all, l);
+            let i = (v.as_u64().unwrap_or(0) as usize).min(list.len().saturating_sub(1));
+            DialogControl::Choice {
+                id,
+                label,
+                options: list,
+                default_index: i,
+            }
+        }
         _ => DialogControl::Text {
             id,
             label,
@@ -146,14 +315,23 @@ fn control(p: &Param, ptr: &str, v: &Value, l: ops::Lang) -> DialogControl {
     }
 }
 
-fn build(items: &[Item], root: &Value, charts: &[(&str, &str)], l: ops::Lang) -> Vec<DialogControl> {
+struct Ctx<'a> {
+    root: &'a Value,
+    cfg: &'a ProjectConfig,
+    lists: &'a Lists,
+    charts: &'a [(&'a str, &'a str)],
+    l: ops::Lang,
+}
+
+fn build(items: &[Item], c: &Ctx) -> Vec<DialogControl> {
+    let l = c.l;
     items
         .iter()
         .map(|it| match it {
             Item::Param(op, key) => {
                 let p = param(op, key);
                 let ptr = p.setting.expect("panel params are settings");
-                control(p, ptr, root.pointer(ptr).unwrap_or(&Value::Null), l)
+                control(p, ptr, c.root.pointer(ptr).unwrap_or(&Value::Null), c.cfg, c.lists, l)
             }
             Item::Button(op) => {
                 let d = ops::find(op).expect("checked by tests");
@@ -173,11 +351,11 @@ fn build(items: &[Item], root: &Value, charts: &[(&str, &str)], l: ops::Lang) ->
             } => DialogControl::Fields {
                 id: id.to_string(),
                 title: Some(title.get(l).to_string()),
-                controls: build(items, root, charts, l),
+                controls: build(items, c),
                 collapsed: *collapsed,
             },
             Item::Row(items) => DialogControl::Row {
-                controls: build(items, root, charts, l),
+                controls: build(items, c),
                 align_h: None,
                 align_v: None,
             },
@@ -192,7 +370,12 @@ fn build(items: &[Item], root: &Value, charts: &[(&str, &str)], l: ops::Lang) ->
             },
             Item::Chart(id) => DialogControl::Svg {
                 id: id.to_string(),
-                svg: charts.iter().find(|(c, _)| c == id).map_or("", |(_, s)| s).to_string(),
+                svg: c
+                    .charts
+                    .iter()
+                    .find(|(k, _)| k == id)
+                    .map_or("", |(_, s)| s)
+                    .to_string(),
                 height: Some(230.0),
             },
         })
@@ -201,26 +384,54 @@ fn build(items: &[Item], root: &Value, charts: &[(&str, &str)], l: ops::Lang) ->
 
 /// The panel `id` with the values of `cfg`; `charts` fills chart controls.
 pub fn panel(id: &str, cfg: &ProjectConfig, charts: &[(&str, &str)]) -> PanelDef {
+    panel_with(
+        id,
+        cfg,
+        &Lists {
+            domains: cfg.rs.domain_names(),
+            ..Default::default()
+        },
+        charts,
+    )
+}
+
+pub fn panel_with(id: &str, cfg: &ProjectConfig, lists: &Lists, charts: &[(&str, &str)]) -> PanelDef {
     let s = spec(id).unwrap_or_else(|| panic!("no panel spec {id}"));
     let l = lang();
     let mut p = PanelDef::new(s.id, s.title.get(l));
     p.command = Some(s.command.into());
     p.width = Some(340.0);
-    p.controls = build(s.items, &settings_json(cfg), charts, l);
+    let root = settings_json(cfg);
+    p.controls = build(
+        s.items,
+        &Ctx {
+            root: &root,
+            cfg,
+            lists,
+            charts,
+            l,
+        },
+    );
     p
 }
 
-/// Values to push into the panel `id`.
-pub fn values(id: &str, cfg: &ProjectConfig) -> HashMap<String, DialogValue> {
+/// Values to push into the panel `id`. Run-time lists that are empty are
+/// not pushed (the choice keeps what it shows).
+pub fn values(id: &str, cfg: &ProjectConfig, lists: &Lists) -> HashMap<String, DialogValue> {
     let root = settings_json(cfg);
+    let l = lang();
     let mut out = HashMap::new();
     if let Some(s) = spec(id) {
         s.visit(&mut |it| {
             if let Item::Param(op, key) = it {
                 let p = param(op, key);
                 let ptr = p.setting.expect("settings");
-                if let Some(v) = root.pointer(ptr) {
-                    out.insert(control_id(ptr), to_dialog(p, v));
+                let empty_list = match p.kind {
+                    Kind::Name { source } | Kind::Index { source, all: None } => lists.get(source).is_empty(),
+                    _ => false,
+                };
+                if let (Some(v), false) = (root.pointer(ptr), empty_list) {
+                    out.insert(control_id(ptr), to_dialog(p, v, cfg, lists, l));
                 }
             }
         });
@@ -230,9 +441,20 @@ pub fn values(id: &str, cfg: &ProjectConfig) -> HashMap<String, DialogValue> {
 
 /// Pushes the values of every generated panel.
 pub fn push_all(host: &mut dyn HostApi, cfg: &ProjectConfig) {
+    let lists = Lists::of(host.tab_id(), cfg);
     for id in panel_ids() {
-        host.update_panel_for_plugin(MANIFEST.id, id, values(id, cfg));
+        host.update_panel_for_plugin(MANIFEST.id, id, values(id, cfg, &lists));
     }
+}
+
+/// Pushes one panel, optionally with a status label.
+pub fn push_one(host: &mut dyn HostApi, cfg: &ProjectConfig, id: &str, status: Option<(&str, String)>) {
+    let lists = Lists::of(host.tab_id(), cfg);
+    let mut v = values(id, cfg, &lists);
+    if let Some((k, text)) = status {
+        v.insert(k.to_string(), DialogValue::Text(text));
+    }
+    host.update_panel_for_plugin(MANIFEST.id, id, v);
 }
 
 /// Applies flattened panel values of the generated panels to the settings.
@@ -295,7 +517,7 @@ mod tests {
         for id in panel_ids() {
             let p = panel(id, &c, &[]);
             let ids = declared(&p);
-            let v = values(id, &c);
+            let v = values(id, &c, &Lists::default());
             for k in v.keys() {
                 assert!(ids.contains(k), "{k} not declared in {id}");
             }
@@ -311,5 +533,111 @@ mod tests {
         let mut c2 = ProjectConfig::default();
         apply(&mut c2, &fp);
         assert_eq!((c2.gt.lab.as_str(), c2.gt.hb_gsi), ("/x/lab.csv", 50.0));
+    }
+
+    #[test]
+    fn tables_and_lists_roundtrip_through_the_panels() {
+        use crate::rsconfig::{ContactRow, DomainCfg};
+        let mut c = ProjectConfig::default();
+        c.dh.custom_ranges = vec![(0.0, 1.5, "Verde".into()), (1.5, 9.0, "1".into())];
+        c.dh.geo_colors = [("OXIDO".to_string(), "Rojo".to_string())].into();
+        c.dh.assay_attr = "AU".into();
+        c.rs.domains = vec![
+            DomainCfg {
+                name: "Óxidos".into(),
+                values: "OX;OXIDO".into(),
+                density: 2.4,
+                cap: 30.0,
+                side: 0,
+                surface: "Encima C1".into(),
+            },
+            DomainCfg {
+                name: "Sulfuros".into(),
+                values: "SU".into(),
+                ..Default::default()
+            },
+        ];
+        c.rs.contacts = vec![ContactRow {
+            name: "C1".into(),
+            above: "OX".into(),
+            below: "SU".into(),
+        }];
+        c.rs.vario.domain = 1;
+        c.rs.bm.view_domain = 2;
+        let lists = Lists {
+            assay: vec!["CU".into(), "AU".into()],
+            geo: vec![],
+            domains: c.rs.domain_names(),
+        };
+        let mut flat = HashMap::new();
+        for id in panel_ids() {
+            let mut v = values(id, &c, &lists);
+            // The host answers a run-time choice with its index and text.
+            for val in v.values_mut() {
+                if let DialogValue::ChoiceOptions {
+                    options,
+                    selected_index,
+                } = val
+                {
+                    *val = DialogValue::Choice {
+                        index: *selected_index,
+                        text: options.get(*selected_index).cloned().unwrap_or_default(),
+                    };
+                }
+            }
+            flat.extend(v);
+        }
+        assert!(
+            matches!(&flat["rs.bm.view_domain"], DialogValue::Choice { index: 2, text } if text == "Sulfuros"),
+            "index 0 is 'all'"
+        );
+        let mut back = ProjectConfig::default();
+        apply(&mut back, &flat);
+        assert_eq!(back.dh.custom_ranges, c.dh.custom_ranges);
+        assert_eq!(back.dh.geo_colors, c.dh.geo_colors);
+        assert_eq!(back.dh.assay_attr, "AU");
+        assert_eq!(back.rs.domains, c.rs.domains);
+        assert_eq!(back.rs.contacts, c.rs.contacts);
+        assert_eq!((back.rs.vario.domain, back.rs.bm.view_domain), (1, 2));
+        // Unreadable range rows are dropped, empty domain names too.
+        let mut bad = HashMap::new();
+        bad.insert(
+            "dh.custom_ranges".to_string(),
+            DialogValue::Table(vec![
+                vec!["x".into(), "1".into(), "Rojo".into()],
+                vec!["0".into(), "2".into(), "Azul".into()],
+            ]),
+        );
+        bad.insert(
+            "rs.domains".to_string(),
+            DialogValue::Table(vec![vec!["".into(), "OX".into()], vec!["D".into()]]),
+        );
+        let mut c2 = ProjectConfig::default();
+        apply(&mut c2, &bad);
+        assert_eq!(c2.dh.custom_ranges, vec![(0.0, 2.0, "Azul".to_string())]);
+        assert_eq!((c2.rs.domains.len(), c2.rs.domains[0].density), (1, 2.7));
+    }
+
+    #[test]
+    fn legacy_single_contact_and_domain_side_survive() {
+        let mut c = ProjectConfig::default();
+        c.rs.domains = vec![crate::rsconfig::DomainCfg {
+            name: "Sup".into(),
+            side: 1,
+            ..Default::default()
+        }];
+        c.rs.contact.above = "OX".into();
+        // A settings round trip (any argument or panel change) keeps the v0.4 side.
+        let mut root = settings_json(&c);
+        ops::settings::set(&mut root, "/gt/hb_gsi", serde_json::json!(60.0));
+        let mut back = c.clone();
+        from_json(&mut back, root);
+        assert_eq!(back.rs.domains[0].conditions(), vec![(String::new(), true)]);
+        assert_eq!(back.gt.hb_gsi, 60.0);
+        // The single v0.4 contact is shown as C1.
+        assert_eq!(
+            rows_of("contacts", &c),
+            vec![vec!["C1".to_string(), "OX".into(), String::new()]]
+        );
     }
 }
