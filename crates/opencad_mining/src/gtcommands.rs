@@ -437,18 +437,28 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
         }
         "gt_estimate" => estimate(host, tab, cfg),
         "gt_view" => {
-            // Same view as Resources, on the geotechnical column; pushed into the
-            // resource panel so a pick-based view (re-read after the pick) keeps it.
-            let attr = cfg.gt.md_attr.min(3);
-            cfg.rs.bm.view_attr = crate::resources::GT_VIEW_ATTR + attr;
+            // The block model view of Resources, on the geotechnical column with the
+            // geotechnical view settings. They are copied into the resource settings
+            // (shown in its panel) so a pick-based view, re-read after the pick,
+            // keeps them. Every block with a value is shown (no cut-off, any domain).
+            let (g, attr) = (cfg.gt.clone(), cfg.gt.md_attr.min(3));
+            let b = &mut cfg.rs.bm;
+            b.view_attr = crate::resources::GT_VIEW_ATTR + attr;
+            b.view_mode = g.view_mode.min(3);
+            (b.view_z_from, b.view_z_to, b.view_z_step) = (g.view_z_from, g.view_z_to, g.view_z_step);
+            (b.view_spacing, b.view_count, b.view_interval, b.view_limit) =
+                (g.view_spacing, g.view_count, g.view_interval, g.view_limit);
+            b.view_domain = 0;
             state::with_tab(tab, |t| t.config = cfg.clone());
             session::push_rs(host, cfg);
-            crate::rscommands::run(host, "rs_bmview", &Args::new(), tab, cfg)?;
-            let key = ["rmr", "gsi", "logq", "class"][attr];
-            Ok(OpResult::data(json!({
-                "attribute": key,
-                "column": gt::COLUMNS[attr],
-            })))
+            let r = crate::rscommands::run(host, "rs_bmview", args, tab, cfg)?;
+            let attribute = ["rmr", "gsi", "logq", "class"][attr];
+            let mode = ["levels", "two_points", "axis", "cubes"][g.view_mode.min(3)];
+            let mut data = json!({ "attribute": attribute, "column": gt::COLUMNS[attr], "mode": mode });
+            if let (Some(d), Some(extra)) = (data.as_object_mut(), r.data.as_object()) {
+                d.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+            Ok(OpResult { data, ..r })
         }
         other => Err(OpError::new(
             ErrorCode::UnknownCommand,

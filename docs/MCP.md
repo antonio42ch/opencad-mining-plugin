@@ -806,15 +806,26 @@ Result `data`: `estimated`, `blocks` (in a domain), `no_domain` (records skipped
 
 ### `gt_view` — `MIN_GT_VIEW`
 
-Draw the block model coloured by a geotechnical column, with the view settings of the resource Model panel (levels, sections, cubes).
+Draw the block model coloured by a geotechnical column as level plans, vertical sections (2 points or along an axis) or cubes (mode=cubes: one cube per block with a value, grouped by colour, at most `limit`). Replaces the previous model view.
 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
+| `mode` | one of `levels`, `two_points`, `axis`, `cubes` | yes | levels = horizontal plans; two_points / axis = vertical sections; cubes = every block with a value as a cube (coloured meshes, one per colour). |
 | `attribute` | one of `rmr`, `gsi`, `logq`, `class` | yes | Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red). |
+| `z_from` | number | yes | Lowest level (mode levels; from = to = every block level). |
+| `z_to` | number | yes | Highest level (mode levels). |
+| `z_step` | number ≥ 0.1 | yes | Level spacing (mode levels, m). |
+| `spacing` | number ≥ 0.1 | yes | Spacing of parallel sections (mode two_points, m). |
+| `count` | number ≥ 1 | yes | Number of parallel sections (mode two_points). |
+| `interval` | number ≥ 0.1 | yes | Section spacing along the axis (mode axis, m). |
+| `limit` | number ≥ 1 | yes | Maximum polygons or cubes drawn; above it cubes are an even sample of the blocks. |
+| `axis` | entity handle (hex) |  | Axis polyline (mode axis). Without it a pick is started. |
+| `p1` | point `x,y[,z]` |  | First point of the section line (mode two_points). |
+| `p2` | point `x,y[,z]` |  | Second point of the section line. |
 
 Positional form: `MIN_GT_VIEW attribute` (`-` skips one).
 
-Result `data`: `attribute`, `column`; the drawing itself is reported by the resource view.
+Result `data`: `attribute`, `column`, `mode`, and the view result: `planes`, `polygons`, `limited`, `cubes` (`[drawn, total]` in cubes mode).
 
 ### `st_stereonet` — `MIN_ST_STEREONET`
 

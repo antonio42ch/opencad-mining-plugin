@@ -47,6 +47,15 @@ pub struct GeotechConfig {
     pub md_domains: bool,
     /// 0 RMR, 1 GSI, 2 log Q, 3 class.
     pub md_attr: usize,
+    /// View: 0 levels, 1 sections by 2 points, 2 sections along an axis, 3 cubes.
+    pub view_mode: usize,
+    pub view_z_from: f64,
+    pub view_z_to: f64,
+    pub view_z_step: f64,
+    pub view_spacing: f64,
+    pub view_count: f64,
+    pub view_interval: f64,
+    pub view_limit: f64,
 }
 
 impl Default for GeotechConfig {
@@ -82,6 +91,14 @@ impl Default for GeotechConfig {
             md_hole: 0.0,
             md_domains: false,
             md_attr: 0,
+            view_mode: 0,
+            view_z_from: 0.0,
+            view_z_to: 0.0,
+            view_z_step: 12.0,
+            view_spacing: 20.0,
+            view_count: 1.0,
+            view_interval: 20.0,
+            view_limit: 20_000.0,
         }
     }
 }

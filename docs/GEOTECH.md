@@ -124,10 +124,15 @@ log10 Q because it spans orders of magnitude) and `gt_class` (from `gt_rmr`).
 Density and tonnage of the resource model are not touched. The model is saved
 to `<drawing>.ombm`.
 
-`MIN_GT_VIEW` draws with the Resources view settings (levels, sections along
-two points or an axis, cubes). Class uses the class colours; RMR, GSI and
-log Q use a blue-to-red scale with **poor rock in red**. The cubes view keeps
-an even sample when there are more blocks than the limit.
+`MIN_GT_VIEW` has its own view settings in the *Modelo* panel: **mode** (level
+plans, sections by two points, sections along an axis, or **cubes**), levels
+(from / to / step), section spacing, count and interval, and the maximum number
+of polygons or cubes. Cubes draw one mesh per colour with every block that has a
+value (any domain, no cut-off); above the limit they are an even sample and the
+message says how many were drawn. Class uses the class colours; RMR, GSI and
+log Q use a blue-to-red scale with **poor rock in red**. Sections need
+`p1=`/`p2=` (two points) or `axis=` (a polyline handle); without them the pick
+starts. The settings are also copied into the Resources view settings.
 
 ## Drawing
 

@@ -149,3 +149,7 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     equilibrium and FS (or "the support reaches its capacity"); squeezing class.
 36. Pilares 8 × 8 × 5 m, rooms 6 m → load, four strengths and FS; pilar corona with a critical
     Sc → Sc / Cs. **Dibujar gráfico** draws the last chart.
+37. Geotecnia → Modelo → **Estimar geotecnia**, then *Tipo de vista* = **Cubos**, *Atributo* =
+    Clase de macizo, **Ver modelo** → one cube per block coloured by class (blue to red), one mesh per
+    colour on `MIN_RS_VISTA`. Set *Máximo de polígonos / cubos* to 20 → the command line says how many
+    of how many blocks were drawn. Switch back to *Niveles (planta)* → plans again.

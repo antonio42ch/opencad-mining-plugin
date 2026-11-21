@@ -253,8 +253,47 @@ const ATTRS: &[Opt] = &[
     ),
 ];
 
-const VIEW: &[Param] = &[setting("attribute", Kind::Choice { options: ATTRS }, "/gt/md_attr", L::new("Atributo", "Attribute", "Atributo"),
-    "Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red).")];
+const VIEW_MODES: &[Opt] = &[
+    opt("levels", L::new("Niveles (planta)", "Levels (plan)", "Níveis (planta)")),
+    opt(
+        "two_points",
+        L::new("Secciones por 2 puntos", "Sections by 2 points", "Seções por 2 pontos"),
+    ),
+    opt(
+        "axis",
+        L::new(
+            "Secciones perpendiculares a un eje",
+            "Sections perpendicular to an axis",
+            "Seções perpendiculares a um eixo",
+        ),
+    ),
+    opt(
+        "cubes",
+        L::new(
+            "Cubos (un cubo por bloque)",
+            "Cubes (one cube per block)",
+            "Cubos (um cubo por bloco)",
+        ),
+    ),
+];
+
+const VIEW: &[Param] = &[
+    setting("mode", Kind::Choice { options: VIEW_MODES }, "/gt/view_mode", L::new("Tipo de vista", "View type", "Tipo de vista"),
+        "levels = horizontal plans; two_points / axis = vertical sections; cubes = every block with a value as a cube (coloured meshes, one per colour)."),
+    setting("attribute", Kind::Choice { options: ATTRS }, "/gt/md_attr", L::new("Atributo", "Attribute", "Atributo"),
+        "Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red)."),
+    setting("z_from", Kind::num(None, None, 12.0), "/gt/view_z_from", L::new("Nivel inicial", "Lowest level", "Nível inicial"), "Lowest level (mode levels; from = to = every block level)."),
+    setting("z_to", Kind::num(None, None, 12.0), "/gt/view_z_to", L::new("Nivel final", "Highest level", "Nível final"), "Highest level (mode levels)."),
+    setting("z_step", Kind::num(Some(0.1), None, 1.0), "/gt/view_z_step", L::new("Paso entre niveles", "Level spacing", "Passo entre níveis"), "Level spacing (mode levels, m)."),
+    setting("spacing", Kind::num(Some(0.1), None, 5.0), "/gt/view_spacing", L::new("Separación de secciones", "Section spacing", "Espaçamento das seções"), "Spacing of parallel sections (mode two_points, m)."),
+    setting("count", Kind::num(Some(1.0), None, 1.0), "/gt/view_count", L::new("Número de secciones", "Number of sections", "Número de seções"), "Number of parallel sections (mode two_points)."),
+    setting("interval", Kind::num(Some(0.1), None, 5.0), "/gt/view_interval", L::new("Intervalo a lo largo del eje", "Interval along the axis", "Intervalo ao longo do eixo"), "Section spacing along the axis (mode axis, m)."),
+    setting("limit", Kind::num(Some(1.0), None, 1000.0), "/gt/view_limit", L::new("Máximo de polígonos / cubos", "Maximum polygons / cubes", "Máximo de polígonos / cubos"),
+        "Maximum polygons or cubes drawn; above it cubes are an even sample of the blocks."),
+    input("axis", Kind::Handle, false, L::new("Eje", "Axis", "Eixo"), "Axis polyline (mode axis). Without it a pick is started."),
+    input("p1", Kind::Point, false, L::new("Punto 1", "Point 1", "Ponto 1"), "First point of the section line (mode two_points)."),
+    input("p2", Kind::Point, false, L::new("Punto 2", "Point 2", "Ponto 2"), "Second point of the section line."),
+];
 
 pub static OPS: &[OpDef] = &[
     OpDef {
@@ -336,10 +375,10 @@ pub static OPS: &[OpDef] = &[
         label: L::new("Ver modelo", "View model", "Ver modelo"),
         group: Group::Geotechnics,
         kind: OpKind::Action,
-        summary: "Draw the block model coloured by a geotechnical column, with the view settings of the resource Model panel (levels, sections, cubes).",
+        summary: "Draw the block model coloured by a geotechnical column as level plans, vertical sections (2 points or along an axis) or cubes (mode=cubes: one cube per block with a value, grouped by colour, at most `limit`). Replaces the previous model view.",
         params: VIEW,
         positional: &["attribute"],
-        result: "`attribute`, `column`; the drawing itself is reported by the resource view.",
+        result: "`attribute`, `column`, `mode`, and the view result: `planes`, `polygons`, `limited`, `cubes` (`[drawn, total]` in cubes mode).",
     },
 ];
 
@@ -414,9 +453,9 @@ const HB_ITEMS: &[Item] = &[
 
 const MODEL_ITEMS: &[Item] = &[
     Item::Info(L::new(
-        "Usa el modelo de bloques de Recursos (o crea uno con su geometría). Q se interpola en escala logarítmica. La vista usa el modo y los planos del panel Modelo de Recursos.",
-        "Uses the resource block model (or creates one with its geometry). Q is interpolated in log scale. The view uses the mode and planes of the resource Model panel.",
-        "Usa o modelo de blocos de Recursos (ou cria um com sua geometria). Q é interpolado em escala logarítmica. A vista usa o modo e os planos do painel Modelo de Recursos.",
+        "Usa el modelo de bloques de Recursos (o crea uno con su geometría). Q se interpola en escala logarítmica. La vista puede ser por niveles, secciones o cubos.",
+        "Uses the resource block model (or creates one with its geometry). Q is interpolated in log scale. The view can be level plans, sections or cubes.",
+        "Usa o modelo de blocos de Recursos (ou cria um com sua geometria). Q é interpolado em escala logarítmica. A vista pode ser por níveis, seções ou cubos.",
     )),
     Item::Section {
         id: "gt_f_search",
@@ -440,7 +479,18 @@ const MODEL_ITEMS: &[Item] = &[
     Item::Section {
         id: "gt_f_view",
         title: L::new("Vista", "View", "Vista"),
-        items: &[Item::Param("gt_view", "attribute"), Item::Button("gt_view")],
+        items: &[
+            Item::Param("gt_view", "mode"),
+            Item::Param("gt_view", "attribute"),
+            Item::Param("gt_view", "z_from"),
+            Item::Param("gt_view", "z_to"),
+            Item::Param("gt_view", "z_step"),
+            Item::Param("gt_view", "spacing"),
+            Item::Param("gt_view", "count"),
+            Item::Param("gt_view", "interval"),
+            Item::Param("gt_view", "limit"),
+            Item::Button("gt_view"),
+        ],
         collapsed: false,
     },
 ];
