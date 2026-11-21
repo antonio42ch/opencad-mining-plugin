@@ -6,6 +6,7 @@ use ocs_plugin_api::ribbon::{CadModule, IconKind, ModuleEvent, RibbonGroup, Ribb
 
 use crate::gti18n::g;
 use crate::i18n::s;
+use crate::rmi18n::m;
 use crate::rsi18n::r;
 
 macro_rules! icon {
@@ -47,6 +48,7 @@ impl CadModule for MiningModule {
             let t = s();
             let rs = r();
             let gt = g();
+            let rm = m();
             vec![
                 RibbonGroup {
                     title: t.grp_drillholes,
@@ -101,6 +103,15 @@ impl CadModule for MiningModule {
                         small("MIN_GT_LOAD", gt.tool_load, icon!("load")),
                         small("MIN_GT_CLASSIFY", gt.tool_classify, icon!("geotech")),
                         small("MIN_GT_ESTIMATE", gt.tool_estimate, icon!("estimate")),
+                    ],
+                },
+                RibbonGroup {
+                    title: rm.grp,
+                    tools: vec![
+                        large("MIN_RM_STRUCT_PANEL", rm.tool_struct, icon!("stereonet")),
+                        large("MIN_RM_DESIGN_PANEL", rm.tool_design, icon!("hoekbrown")),
+                        small("MIN_ST_STEREONET", rm.tool_stereo, icon!("stereonet")),
+                        small("MIN_ST_WEDGES", rm.tool_wedges, icon!("geotech")),
                     ],
                 },
                 RibbonGroup {

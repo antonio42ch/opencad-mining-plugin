@@ -35,6 +35,21 @@ jobs:
       # Benchmarks must keep compiling; they are run manually.
       - run: cargo bench -p drillhole_engine -p blockmodel_engine --no-run --locked
 
+  # Native AI tools (plugin API 25+) compile against the host's main branch.
+  # Informative: the published host is still API 23, so this never blocks.
+  api-next:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Point ocs_plugin_api at the host's main branch
+        run: |
+          sed -i 's#rev = "[0-9a-f]*", features = \["host"\]#branch = "main", features = ["host"]#' crates/opencad_mining/Cargo.toml
+          grep ocs_plugin_api crates/opencad_mining/Cargo.toml
+          cargo update -p ocs_plugin_api
+      - run: cargo build -p opencad_mining --features api25
+
   # End-to-end test against the official Open CAD Studio release: the plugin is
   # loaded by the real host and every module is driven over `--serve`.
   host-smoke:

@@ -8,6 +8,12 @@ description = "Open Mining: mining & geology add-on for Open CAD Studio (drillho
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Native AI tools (`BuiltinPlugin::tools` / `call_tool`, host plugin API 25+).
+# Needs an `ocs_plugin_api` rev that has them; CI checks it against the host's
+# main branch. Not part of the releases while the published host is API 23.
+api25 = []
+
 [dependencies]
 # Host contract pinned to the commit of the latest host RELEASE (v2026.46, plugin API 23). Bump `rev` to follow a newer API,
 # then `cargo update -p ocs_plugin_api` and raise `api_version` in plugin.toml.
@@ -19,5 +25,6 @@ geostat_engine = { path = "../geostat_engine" }
 blockmodel_engine = { path = "../blockmodel_engine" }
 geomap_engine = { path = "../geomap_engine" }
 geotech_engine = { path = "../geotech_engine" }
+openmining_ops = { path = "../openmining_ops" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

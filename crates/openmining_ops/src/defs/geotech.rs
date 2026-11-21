@@ -1,0 +1,479 @@
+//! Geotechnics (phase 1): tables, RMR89 / Q / GSI, Hoek-Brown, block model.
+
+use crate::{input, opt, setting, Group, Item, Kind, OpDef, OpKind, Opt, PanelSpec, Param, L, TABLE_FILES};
+
+const FILES: Kind = Kind::Path {
+    extensions: TABLE_FILES,
+};
+
+const LOAD: &[Param] = &[
+    setting("logging", FILES, "/gt/logging", L::new("Logueo de sondajes", "Drillhole logging", "Descrição de furos"),
+        "Drillhole logging table by interval (hole, from, to + RQD, UCS, spacing, condition, water, Jn, Jr, Ja, Jw, SRF, ratings...). Located on the holes loaded with dh_load. Empty string = none."),
+    setting("mapping", FILES, "/gt/mapping", L::new("Mapeo de frentes / celdas", "Face / cell mapping", "Mapeamento de frentes / células"),
+        "Face or cell mapping table: X/Y[/Z] coordinates, or chainage (PK) along a working axis, + the same rating parameters. Empty string = none."),
+    setting("lab", FILES, "/gt/lab", L::new("Ensayos de laboratorio", "Laboratory tests", "Ensaios de laboratório"),
+        "Laboratory table by lithology: UCS, Is50, mi, Ei, Poisson, density. Supplies UCS when a record lacks it. Empty string = none."),
+    setting("joints", FILES, "/gt/joints", L::new("Discontinuidades orientadas", "Oriented discontinuities", "Descontinuidades orientadas"),
+        "Oriented discontinuities (dip, dip direction...). Loaded and counted; analysed in a later phase. Empty string = none."),
+];
+
+const RMR_VERSIONS: &[Opt] = &[opt("rmr89", L::same("RMR89 (Bieniawski 1989)"))];
+const CORRELATIONS: &[Opt] = &[
+    opt(
+        "bieniawski",
+        L::new(
+            "Bieniawski: RMR = 9 ln Q + 44",
+            "Bieniawski: RMR = 9 ln Q + 44",
+            "Bieniawski: RMR = 9 ln Q + 44",
+        ),
+    ),
+    opt(
+        "rutledge_preston",
+        L::new(
+            "Rutledge-Preston: RMR = 5,9 ln Q + 43",
+            "Rutledge-Preston: RMR = 5.9 ln Q + 43",
+            "Rutledge-Preston: RMR = 5,9 ln Q + 43",
+        ),
+    ),
+    opt("barton", L::same("Barton: RMR = 15 log Q + 50")),
+];
+const COLOR_BY: &[Opt] = &[
+    opt(
+        "rmr_class",
+        L::new("Clase RMR (I–V)", "RMR class (I–V)", "Classe RMR (I–V)"),
+    ),
+    opt("q_class", L::new("Clase Q", "Q class", "Classe Q")),
+    opt(
+        "gsi",
+        L::new("GSI (tramos de 20)", "GSI (20-point bins)", "GSI (faixas de 20)"),
+    ),
+];
+
+const CLASSIFY: &[Param] = &[
+    setting("rmr_version", Kind::Choice { options: RMR_VERSIONS }, "/gt/rmr_version", L::new("Versión de RMR", "RMR version", "Versão do RMR"),
+        "RMR system. Only RMR89 (official tables) for now."),
+    setting("correlation", Kind::Choice { options: CORRELATIONS }, "/gt/correlation", L::new("Correlación RMR ↔ Q", "RMR ↔ Q correlation", "Correlação RMR ↔ Q"),
+        "Correlation used by cross_fill."),
+    setting("cross_fill", Kind::Bool, "/gt/cross_fill", L::new("Completar RMR o Q con la correlación cuando falte uno", "Fill RMR or Q with the correlation when one is missing", "Completar RMR ou Q com a correlação quando faltar um"),
+        "When a record has only RMR or only Q, derive the other with the correlation (reported as derived). Off = never invent values."),
+    setting("rqd_from_ff", Kind::Bool, "/gt/rqd_from_ff", L::new("Estimar RQD desde fracturas/m (Priest-Hudson)", "Estimate RQD from fractures/m (Priest-Hudson)", "Estimar RQD a partir de fraturas/m (Priest-Hudson)"),
+        "Estimate RQD from the fracture frequency (Priest & Hudson 1976) when RQD is not logged."),
+    setting("color_by", Kind::Choice { options: COLOR_BY }, "/gt/color_by", L::new("Colorear por", "Colour by", "Colorir por"),
+        "Colour of the drawn records."),
+    setting("labels", Kind::Bool, "/gt/labels", L::new("Etiquetas en el mapeo", "Labels on mapping", "Rótulos no mapeamento"),
+        "Draw an 'RMR · Q · GSI' label at each mapped record."),
+    setting("label_height", Kind::num(Some(0.01), None, 0.5), "/gt/label_height", L::new("Altura de etiqueta", "Label height", "Altura do rótulo"),
+        "Text height of the labels (drawing units)."),
+    input("axes", Kind::Handles, false, L::new("Ejes", "Axes", "Eixos"),
+        "Axis polylines of the workings, for mapping records located by chainage. With several axes the table's Axis column is matched to each polyline's layer. Without it a pick is started (status waiting_input)."),
+];
+
+const APPLICATIONS: &[Opt] = &[
+    opt("tunnel", L::new("Túnel / labor", "Tunnel / drift", "Túnel / galeria")),
+    opt("slope", L::new("Talud", "Slope", "Talude")),
+];
+
+const HB: &[Param] = &[
+    setting(
+        "sigci",
+        Kind::num(Some(0.1), None, 10.0),
+        "/gt/hb_sigci",
+        L::new(
+            "σci roca intacta (MPa)",
+            "σci intact rock (MPa)",
+            "σci rocha intacta (MPa)",
+        ),
+        "Uniaxial compressive strength of the intact rock (MPa).",
+    ),
+    setting(
+        "gsi",
+        Kind::num(Some(0.0), Some(100.0), 5.0),
+        "/gt/hb_gsi",
+        L::same("GSI"),
+        "Geological Strength Index of the rock mass.",
+    ),
+    setting(
+        "mi",
+        Kind::num(Some(0.1), None, 1.0),
+        "/gt/hb_mi",
+        L::same("mi"),
+        "Hoek-Brown constant of the intact rock.",
+    ),
+    setting(
+        "d",
+        Kind::num(Some(0.0), Some(1.0), 0.1),
+        "/gt/hb_d",
+        L::new("Perturbación D (0–1)", "Disturbance D (0–1)", "Perturbação D (0–1)"),
+        "Disturbance factor (blast damage, stress relaxation).",
+    ),
+    setting(
+        "ei",
+        Kind::num(Some(0.0), None, 1000.0),
+        "/gt/hb_ei",
+        L::new(
+            "Ei roca intacta (MPa, 0 = simplificado)",
+            "Ei intact rock (MPa, 0 = simplified)",
+            "Ei rocha intacta (MPa, 0 = simplificado)",
+        ),
+        "Intact rock modulus (MPa) for the generalised Hoek-Diederichs modulus; 0 uses the simplified equation.",
+    ),
+    setting(
+        "application",
+        Kind::Choice { options: APPLICATIONS },
+        "/gt/hb_app",
+        L::new("Aplicación", "Application", "Aplicação"),
+        "Range of the Mohr-Coulomb fit: tunnels or slopes (Hoek et al. 2002).",
+    ),
+    setting(
+        "gamma",
+        Kind::num(Some(1.0), None, 1.0),
+        "/gt/hb_gamma",
+        L::new(
+            "Peso unitario (kN/m³)",
+            "Unit weight (kN/m³)",
+            "Peso específico (kN/m³)",
+        ),
+        "Unit weight of the rock mass (kN/m3).",
+    ),
+    setting(
+        "depth",
+        Kind::num(Some(1.0), None, 50.0),
+        "/gt/hb_depth",
+        L::new(
+            "Profundidad / altura (m)",
+            "Depth / height (m)",
+            "Profundidade / altura (m)",
+        ),
+        "Depth of the tunnel or height of the slope (m).",
+    ),
+];
+
+const HB_DATA: &[Param] = &[setting("lithology", Kind::Text, "/gt/hb_lith", L::new("Litología (laboratorio)", "Lithology (laboratory)", "Litologia (laboratório)"),
+    "Lithology whose classified records give the median GSI and whose laboratory row gives σci, mi and Ei. Empty = all records, no laboratory.")];
+
+const METHODS: &[Opt] = &[
+    opt(
+        "idw",
+        L::new("Inverso de la distancia", "Inverse distance", "Inverso da distância"),
+    ),
+    opt(
+        "nn",
+        L::new("Vecino más cercano", "Nearest neighbour", "Vizinho mais próximo"),
+    ),
+];
+
+const ESTIMATE: &[Param] = &[
+    setting(
+        "method",
+        Kind::Choice { options: METHODS },
+        "/gt/md_method",
+        L::new("Método", "Method", "Método"),
+        "Interpolation method.",
+    ),
+    setting(
+        "power",
+        Kind::num(Some(0.1), None, 0.5),
+        "/gt/md_power",
+        L::new("Potencia IDW", "IDW power", "Potência IDW"),
+        "Inverse distance power.",
+    ),
+    setting(
+        "radius1",
+        Kind::num(Some(0.1), None, 10.0),
+        "/gt/md_radii/0",
+        L::new("Radio 1", "Radius 1", "Raio 1"),
+        "Search radius along the azimuth (m).",
+    ),
+    setting(
+        "radius2",
+        Kind::num(Some(0.1), None, 10.0),
+        "/gt/md_radii/1",
+        L::new("Radio 2", "Radius 2", "Raio 2"),
+        "Horizontal search radius across the azimuth (m).",
+    ),
+    setting(
+        "radius3",
+        Kind::num(Some(0.1), None, 10.0),
+        "/gt/md_radii/2",
+        L::new("Radio 3", "Radius 3", "Raio 3"),
+        "Vertical search radius (m).",
+    ),
+    setting(
+        "azimuth",
+        Kind::num(None, None, 5.0),
+        "/gt/md_az",
+        L::new("Azimut del radio 1", "Azimuth of radius 1", "Azimute do raio 1"),
+        "Azimuth of radius 1 (degrees from north).",
+    ),
+    setting(
+        "min_samples",
+        Kind::num(Some(1.0), None, 1.0),
+        "/gt/md_min",
+        L::new("Mínimo de muestras", "Minimum samples", "Mínimo de amostras"),
+        "Minimum records to estimate a block.",
+    ),
+    setting(
+        "max_samples",
+        Kind::num(Some(1.0), None, 1.0),
+        "/gt/md_max",
+        L::new("Máximo de muestras", "Maximum samples", "Máximo de amostras"),
+        "Maximum records used per block.",
+    ),
+    setting(
+        "max_per_hole",
+        Kind::num(Some(0.0), None, 1.0),
+        "/gt/md_hole",
+        L::new(
+            "Máximo por sondaje (0 = sin límite)",
+            "Maximum per hole (0 = no limit)",
+            "Máximo por furo (0 = sem limite)",
+        ),
+        "Maximum records per drillhole (0 = no limit).",
+    ),
+    setting(
+        "honour_domains",
+        Kind::Bool,
+        "/gt/md_domains",
+        L::new(
+            "Respetar dominios de Recursos (por litología)",
+            "Honour resource domains (by lithology)",
+            "Respeitar domínios de Recursos (por litologia)",
+        ),
+        "Each record only informs the resource domain whose values list its lithology.",
+    ),
+];
+
+const ATTRS: &[Opt] = &[
+    opt("rmr", L::same("RMR")),
+    opt("gsi", L::same("GSI")),
+    opt("logq", L::same("log Q")),
+    opt(
+        "class",
+        L::new("Clase de macizo", "Rock mass class", "Classe do maciço"),
+    ),
+];
+
+const VIEW: &[Param] = &[setting("attribute", Kind::Choice { options: ATTRS }, "/gt/md_attr", L::new("Atributo", "Attribute", "Atributo"),
+    "Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red).")];
+
+pub static OPS: &[OpDef] = &[
+    OpDef {
+        name: "gt_load",
+        command: "MIN_GT_LOAD",
+        aliases: &[],
+        label: L::new("Cargar", "Load", "Carregar"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Read the geotechnical tables (logging, face mapping, laboratory, discontinuities; CSV/TXT/TSV/XLSX/XLS/ODS). Columns are recognised by name in es/en/pt; a missing required column opens a column chooser once (remembered). Replaces the tables loaded before.",
+        params: LOAD,
+        positional: &["logging", "mapping", "lab", "joints"],
+        result: "`tables`: per table (`logging`, `mapping`, `lab`, `joints`) `records`, `columns` (recognised fields), `unused` (headers); `lab_lithologies`; `errors` (messages of tables that could not be read).",
+    },
+    OpDef {
+        name: "gt_classify",
+        command: "MIN_GT_CLASSIFY",
+        aliases: &[],
+        label: L::new("Clasificar y dibujar", "Classify and draw", "Classificar e desenhar"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Classify every logging and mapping record (RMR89, Q, Q', GSI, class I-V), locate it (drillholes from dh_load, mapping by coordinates or chainage) and draw it coloured, replacing the previous drawing. Missing parameters are reported, never invented.",
+        params: CLASSIFY,
+        positional: &[],
+        result: "`records`, `with_rmr`, `with_q`, `with_gsi`, `unclassified`, `classes` ([I..V] counts), `missing` (parameter -> records), `invalid` (list of `{table,row,field,value}`), `derived` (kind -> records), `unlocated` (count) and `unlocated_examples`, `drawn`.",
+    },
+    OpDef {
+        name: "gt_clear",
+        command: "MIN_GT_CLEAR",
+        aliases: &[],
+        label: L::new("Borrar dibujo", "Clear drawing", "Apagar desenho"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Remove the drawn geotechnical records.",
+        params: &[],
+        positional: &[],
+        result: "`removed`.",
+    },
+    OpDef {
+        name: "gt_hb",
+        command: "MIN_GT_HB",
+        aliases: &[],
+        label: L::new("Calcular", "Compute", "Calcular"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Generalised Hoek-Brown 2002: mb, s, a, rock mass strengths, equivalent Mohr-Coulomb c' and phi' (tunnel or slope range) and rock mass modulus (Hoek-Diederichs 2006); shows the envelope chart in the panel.",
+        params: HB,
+        positional: &[],
+        result: "`mb`, `s`, `a`, `sigma_c`, `sigma_t`, `sigma_cm`, `erm` (MPa), `sigma3_max`, `c` (MPa), `phi` (degrees).",
+    },
+    OpDef {
+        name: "gt_hb_data",
+        command: "MIN_GT_HB_DATA",
+        aliases: &[],
+        label: L::new("Usar datos clasificados", "Use classified data", "Usar dados classificados"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Set the Hoek-Brown GSI to the median of the classified records (of the lithology, if given) and sigci / mi / Ei from its laboratory row, then compute like gt_hb. Needs gt_classify first.",
+        params: HB_DATA,
+        positional: &[],
+        result: "`gsi`, `records` (used for the median), `lab` (true when the lithology had a laboratory row), `sigci`, `mi`, `ei`, and the gt_hb fields under `hoek_brown`.",
+    },
+    OpDef {
+        name: "gt_estimate",
+        command: "MIN_GT_ESTIMATE",
+        aliases: &[],
+        label: L::new("Estimar geotecnia", "Estimate geotechnics", "Estimar geotecnia"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class. Density and tonnage are not touched. Needs gt_classify first.",
+        params: ESTIMATE,
+        positional: &[],
+        result: "`estimated`, `blocks` (in a domain), `no_domain` (records skipped by honour_domains), `columns`, `model_created`, `saved` (file path or null).",
+    },
+    OpDef {
+        name: "gt_view",
+        command: "MIN_GT_VIEW",
+        aliases: &[],
+        label: L::new("Ver modelo", "View model", "Ver modelo"),
+        group: Group::Geotechnics,
+        kind: OpKind::Action,
+        summary: "Draw the block model coloured by a geotechnical column, with the view settings of the resource Model panel (levels, sections, cubes).",
+        params: VIEW,
+        positional: &["attribute"],
+        result: "`attribute`, `column`; the drawing itself is reported by the resource view.",
+    },
+];
+
+const DATA_ITEMS: &[Item] = &[
+    Item::Section {
+        id: "gt_f_files",
+        title: L::new(
+            "Archivos (CSV / Excel)",
+            "Files (CSV / Excel)",
+            "Arquivos (CSV / Excel)",
+        ),
+        items: &[
+            Item::Param("gt_load", "logging"),
+            Item::Param("gt_load", "mapping"),
+            Item::Param("gt_load", "lab"),
+            Item::Param("gt_load", "joints"),
+        ],
+        collapsed: false,
+    },
+    Item::Button("gt_load"),
+    Item::Section {
+        id: "gt_f_opts",
+        title: L::new("Clasificación", "Classification", "Classificação"),
+        items: &[
+            Item::Param("gt_classify", "rmr_version"),
+            Item::Info(L::new(
+                "RMR14 se agregará cuando se verifiquen sus tablas oficiales.",
+                "RMR14 will be added once its official tables are verified.",
+                "O RMR14 será adicionado quando suas tabelas oficiais forem verificadas.",
+            )),
+            Item::Param("gt_classify", "correlation"),
+            Item::Param("gt_classify", "cross_fill"),
+            Item::Param("gt_classify", "rqd_from_ff"),
+        ],
+        collapsed: false,
+    },
+    Item::Section {
+        id: "gt_f_draw",
+        title: L::new("Dibujo", "Drawing", "Desenho"),
+        items: &[
+            Item::Param("gt_classify", "color_by"),
+            Item::Param("gt_classify", "labels"),
+            Item::Param("gt_classify", "label_height"),
+        ],
+        collapsed: false,
+    },
+    Item::Row(&[Item::Button("gt_classify"), Item::Button("gt_clear")]),
+    Item::Status("gt_status"),
+];
+
+const HB_ITEMS: &[Item] = &[
+    Item::Section {
+        id: "gt_f_hb",
+        title: L::new("Macizo rocoso", "Rock mass", "Maciço rochoso"),
+        items: &[
+            Item::Param("gt_hb", "sigci"),
+            Item::Param("gt_hb", "gsi"),
+            Item::Param("gt_hb", "mi"),
+            Item::Param("gt_hb", "d"),
+            Item::Param("gt_hb", "ei"),
+            Item::Param("gt_hb", "application"),
+            Item::Param("gt_hb", "gamma"),
+            Item::Param("gt_hb", "depth"),
+            Item::Param("gt_hb_data", "lithology"),
+        ],
+        collapsed: false,
+    },
+    Item::Row(&[Item::Button("gt_hb"), Item::Button("gt_hb_data")]),
+    Item::Status("gt_hb_out"),
+    Item::Chart("gt_hb_chart"),
+];
+
+const MODEL_ITEMS: &[Item] = &[
+    Item::Info(L::new(
+        "Usa el modelo de bloques de Recursos (o crea uno con su geometría). Q se interpola en escala logarítmica. La vista usa el modo y los planos del panel Modelo de Recursos.",
+        "Uses the resource block model (or creates one with its geometry). Q is interpolated in log scale. The view uses the mode and planes of the resource Model panel.",
+        "Usa o modelo de blocos de Recursos (ou cria um com sua geometria). Q é interpolado em escala logarítmica. A vista usa o modo e os planos do painel Modelo de Recursos.",
+    )),
+    Item::Section {
+        id: "gt_f_search",
+        title: L::new("Búsqueda", "Search", "Busca"),
+        items: &[
+            Item::Param("gt_estimate", "method"),
+            Item::Param("gt_estimate", "power"),
+            Item::Param("gt_estimate", "radius1"),
+            Item::Param("gt_estimate", "radius2"),
+            Item::Param("gt_estimate", "radius3"),
+            Item::Param("gt_estimate", "azimuth"),
+            Item::Param("gt_estimate", "min_samples"),
+            Item::Param("gt_estimate", "max_samples"),
+            Item::Param("gt_estimate", "max_per_hole"),
+            Item::Param("gt_estimate", "honour_domains"),
+        ],
+        collapsed: false,
+    },
+    Item::Button("gt_estimate"),
+    Item::Status("gt_md_status"),
+    Item::Section {
+        id: "gt_f_view",
+        title: L::new("Vista", "View", "Vista"),
+        items: &[Item::Param("gt_view", "attribute"), Item::Button("gt_view")],
+        collapsed: false,
+    },
+];
+
+pub static PANELS: &[PanelSpec] = &[
+    PanelSpec {
+        id: "min_gt_data",
+        title: L::new(
+            "Geotecnia: datos y clasificación",
+            "Geotechnics: data and classification",
+            "Geotecnia: dados e classificação",
+        ),
+        command: "MIN_GT_DATA_PANEL",
+        items: DATA_ITEMS,
+    },
+    PanelSpec {
+        id: "min_gt_hb",
+        title: L::new(
+            "Geotecnia: Hoek-Brown",
+            "Geotechnics: Hoek-Brown",
+            "Geotecnia: Hoek-Brown",
+        ),
+        command: "MIN_GT_HB_PANEL",
+        items: HB_ITEMS,
+    },
+    PanelSpec {
+        id: "min_gt_model",
+        title: L::new(
+            "Geotecnia: modelo de bloques",
+            "Geotechnics: block model",
+            "Geotecnia: modelo de blocos",
+        ),
+        command: "MIN_GT_MODEL_PANEL",
+        items: MODEL_ITEMS,
+    },
+];

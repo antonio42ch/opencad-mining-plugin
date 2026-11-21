@@ -412,6 +412,10 @@ pub fn clear(sink: &mut dyn CadSink, g: &GtStrings) -> usize {
 
 pub struct HbOutcome {
     pub hb: HoekBrown,
+    pub erm: f64,
+    pub s3max: f64,
+    pub c: f64,
+    pub phi: f64,
     pub text: String,
     pub svg: String,
 }
@@ -471,12 +475,27 @@ pub fn hoek_brown(g: &GtStrings, cfg: &GeotechConfig) -> Result<HbOutcome, Strin
         height: 230.0,
         y_from_zero: true,
     });
-    Ok(HbOutcome { hb, text, svg })
+    Ok(HbOutcome {
+        hb,
+        erm,
+        s3max,
+        c,
+        phi,
+        text,
+        svg,
+    })
 }
 
 /// Fills GSI (median of the classified records, of `hb_lith` when given)
 /// and σci / mi from the laboratory row of `hb_lith`.
-pub fn hb_from_data(g: &GtStrings, cfg: &mut GeotechConfig, st: &GtState) -> Result<String, String> {
+/// What `hb_from_data` used: message, records of the median, laboratory row found.
+pub struct HbData {
+    pub message: String,
+    pub records: usize,
+    pub lab: bool,
+}
+
+pub fn hb_from_data(g: &GtStrings, cfg: &mut GeotechConfig, st: &GtState) -> Result<HbData, String> {
     let lith = cfg.hb_lith.trim().to_lowercase();
     let pick = |filter: bool| -> Vec<f64> {
         st.results
@@ -500,11 +519,13 @@ pub fn hb_from_data(g: &GtStrings, cfg: &mut GeotechConfig, st: &GtState) -> Res
         (gsis[n / 2 - 1] + gsis[n / 2]) / 2.0
     };
     cfg.hb_gsi = (median * 10.0).round() / 10.0;
+    let mut lab = false;
     let lab_msg = if lith.is_empty() {
         String::new()
     } else {
         match st.lab.get(Some(&lith)) {
             Some(row) => {
+                lab = true;
                 if let Some(u) = row.ucs {
                     cfg.hb_sigci = u;
                 }
@@ -519,7 +540,11 @@ pub fn hb_from_data(g: &GtStrings, cfg: &mut GeotechConfig, st: &GtState) -> Res
             None => fmt(g.m_hb_no_lab, &[&cfg.hb_lith]),
         }
     };
-    Ok(fmt(g.m_hb_data, &[&num(cfg.hb_gsi), &n, &lab_msg]))
+    Ok(HbData {
+        message: fmt(g.m_hb_data, &[&num(cfg.hb_gsi), &n, &lab_msg]),
+        records: n,
+        lab,
+    })
 }
 
 // ─────────────────────────── Block model ───────────────────────────
@@ -867,7 +892,7 @@ mod tests {
         assert!(hb_from_data(&ES, &mut cfg, &st).is_err(), "nothing classified yet");
         st.results = classify_all(&st, &holes(), &[], &cfg);
         cfg.hb_lith = "andesita".into();
-        let msg = hb_from_data(&ES, &mut cfg, &st).unwrap();
+        let msg = hb_from_data(&ES, &mut cfg, &st).unwrap().message;
         assert_eq!((cfg.hb_sigci, cfg.hb_mi), (120.0, 25.0));
         assert!(
             cfg.hb_gsi > 0.0 && cfg.hb_gsi <= 100.0 && msg.contains("Laboratorio"),

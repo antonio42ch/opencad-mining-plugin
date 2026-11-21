@@ -3,7 +3,7 @@
 [plugin]
 id = "opencad.mining"
 name = "Open Mining"
-version = "0.6.0"
+version = "0.8.0"
 description = "Mining & geology: drillholes, underground workings and geological mapping"
 author = "Open Mining contributors"
 license = "GPL-3.0-only"

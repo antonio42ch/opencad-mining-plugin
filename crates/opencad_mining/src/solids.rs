@@ -131,12 +131,13 @@ fn fingerprint(m: &ClosedMesh) -> u64 {
     h.finish()
 }
 
-pub fn create(sink: &mut dyn CadSink, s: &Strings, cfg: &WorkingsConfig, m: Method) -> bool {
+/// Builds and draws the solid; `(volume m3, sections)` when it was created.
+pub fn create(sink: &mut dyn CadSink, s: &Strings, cfg: &WorkingsConfig, m: Method) -> Option<(f64, usize)> {
     let built = match build(cfg, m) {
         Ok(b) => b,
         Err(e) => {
             sink.error(&e.to_string());
-            return false;
+            return None;
         }
     };
     for w in &built.warnings {
@@ -151,7 +152,7 @@ pub fn create(sink: &mut dyn CadSink, s: &Strings, cfg: &WorkingsConfig, m: Meth
         s.m_solid_done,
         &[&built.rings.len(), &format!("{:.2}", built.mesh.volume())],
     ));
-    true
+    Some((built.mesh.volume(), built.rings.len()))
 }
 
 #[cfg(test)]
@@ -159,6 +160,10 @@ mod tests {
     use super::*;
     use crate::cad::mock::MockSink;
     use crate::i18n::{for_lang, Lang};
+
+    fn create_ok(sink: &mut dyn CadSink, s: &Strings, cfg: &WorkingsConfig, m: Method) -> bool {
+        create(sink, s, cfg, m).is_some()
+    }
 
     #[test]
     fn axis_solid_with_sections() {
@@ -171,7 +176,7 @@ mod tests {
         cfg.height = 3.0;
         let axis = [[0.0, 0.0, 0.0], [0.0, 20.0, 0.0]];
         let mut sink = MockSink::default();
-        assert!(create(
+        assert!(create_ok(
             &mut sink,
             for_lang(Lang::Es),
             &cfg,
@@ -197,7 +202,7 @@ mod tests {
         };
         let axis = [[0.0; 3], [0.0, 10.0, 0.0]];
         let mut sink = MockSink::default();
-        assert!(!create(
+        assert!(!create_ok(
             &mut sink,
             for_lang(Lang::Es),
             &cfg,
@@ -208,7 +213,7 @@ mod tests {
         ));
         assert_eq!(sink.errors.len(), 1);
         let tri = [[0.0, 0.0], [2.0, 0.0], [1.0, 2.0]];
-        assert!(create(
+        assert!(create_ok(
             &mut sink,
             for_lang(Lang::Es),
             &cfg,

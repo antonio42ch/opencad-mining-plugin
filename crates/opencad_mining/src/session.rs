@@ -23,7 +23,7 @@ pub fn config(host: &mut dyn HostApi, s: &Strings) -> ProjectConfig {
             .load_settings()
             .and_then(|j| ProjectConfig::from_json(&j));
         if let Some(cfg) = stored {
-            push_panels(host, &cfg, &[], &[]);
+            push_panels(host, &cfg);
             host.push_info(s.m_config_restored);
             state::with_tab(tab, |t| t.config = cfg.clone());
             return cfg;
@@ -62,23 +62,17 @@ pub fn commit(sink: &mut dyn CadSink, s: &Strings, tab: u64, cfg: &ProjectConfig
     }
 }
 
-/// Pushes the resource panels' values (domain lists included).
+/// Pushes the panels' values (domain and attribute lists included).
 pub fn push_rs(host: &mut dyn HostApi, cfg: &ProjectConfig) {
-    for (panel, values) in crate::rspanels::values_for(cfg, crate::rsi18n::r()) {
-        host.update_panel_for_plugin(MANIFEST.id, panel, values);
-    }
+    crate::opsbind::push_all(host, cfg);
 }
 
 /// Replaces the chart of a resource panel. The host rebuilds a panel whose
 /// definition changed (it comes back hidden and with default values), so the
 /// panel is shown again and every value restored from `cfg`.
 pub fn refresh_chart(host: &mut dyn HostApi, cfg: &ProjectConfig, panel: &'static str, svg: &str) {
-    let r = crate::rsi18n::r();
-    let def = match panel {
-        crate::rspanels::COMP => crate::rspanels::comp(r, cfg, svg),
-        crate::rspanels::VARIO => crate::rspanels::vario(r, cfg, svg),
-        _ => crate::rspanels::blocks(r, cfg, svg),
-    };
+    let lists = crate::opsbind::Lists::of(host.tab_id(), cfg);
+    let def = crate::rspanels::build(panel, cfg, &lists, svg);
     if host.register_panel_for_plugin(MANIFEST.id, def) {
         host.toggle_panel_for_plugin(MANIFEST.id, panel, Some(true));
     }
@@ -104,21 +98,13 @@ pub fn panel_value(host: &mut dyn HostApi, panel: &str, id: &str) -> Option<Dial
     state::tracked_values().remove(id)
 }
 
-pub fn push_panels(host: &mut dyn HostApi, cfg: &ProjectConfig, assay_attrs: &[String], geo_attrs: &[String]) {
-    push_rs(host, cfg);
-    crate::gtcommands::push_all(host, cfg);
-    for (panel, values) in panels::values_for(cfg, assay_attrs, geo_attrs) {
-        host.update_panel_for_plugin(MANIFEST.id, panel, values);
-    }
+pub fn push_panels(host: &mut dyn HostApi, cfg: &ProjectConfig) {
+    crate::opsbind::push_all(host, cfg);
 }
 
 /// Pushes one panel's values (and optionally a status label).
 pub fn push_panel(host: &mut dyn HostApi, cfg: &ProjectConfig, panel: &'static str, status: Option<(&str, String)>) {
-    let mut values = panels::values_for(cfg, &[], &[]).remove(panel).unwrap_or_default();
-    if let Some((id, text)) = status {
-        values.insert(id.to_string(), DialogValue::Text(text));
-    }
-    host.update_panel_for_plugin(MANIFEST.id, panel, values);
+    crate::opsbind::push_one(host, cfg, panel, status);
 }
 
 pub fn set_status(host: &mut dyn HostApi, text: String) {

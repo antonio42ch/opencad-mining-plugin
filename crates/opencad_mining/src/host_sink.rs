@@ -26,6 +26,8 @@ pub struct HostSink<'a> {
     /// Nested `begin`s join the outermost undo group: a command and the
     /// settings it saves are one undo step.
     depth: u32,
+    /// Handles (hex) of every entity created through this sink.
+    pub created: Vec<String>,
 }
 
 impl<'a> HostSink<'a> {
@@ -34,6 +36,7 @@ impl<'a> HostSink<'a> {
             host,
             appid_registered: false,
             depth: 0,
+            created: Vec::new(),
         }
     }
 }
@@ -126,6 +129,12 @@ impl CadSink for HostSink<'_> {
             let first_tag = chunk.first().map(|p| p.tag.clone());
             let handles = self.host.add_entities(chunk.into_iter().map(to_entity).collect());
             created += handles.iter().filter(|h| !h.is_null()).count();
+            self.created.extend(
+                handles
+                    .iter()
+                    .filter(|h| !h.is_null())
+                    .map(|h| format!("{:X}", h.value())),
+            );
             // Embedded XDATA travels with the entity; one `write_record`
             // registers the APPID so it survives DWG/DXF save.
             if !self.appid_registered {
@@ -209,5 +218,52 @@ impl CadSink for HostSink<'_> {
                 .create_xrecord(SETTINGS_DICT, SETTINGS_NAME, entries)
                 .map(|_| ()),
         }
+    }
+}
+
+/// Sink of an operation: like [`HostSink`], but errors reported by the
+/// drawing code are collected instead of printed, so the operation can turn
+/// them into its typed error (printed once by `opsrun::emit`).
+pub struct OpSink<'a> {
+    pub inner: HostSink<'a>,
+    pub errors: Vec<String>,
+}
+
+impl<'a> OpSink<'a> {
+    pub fn new(host: &'a mut dyn HostApi) -> Self {
+        OpSink {
+            inner: HostSink::new(host),
+            errors: Vec::new(),
+        }
+    }
+}
+
+impl CadSink for OpSink<'_> {
+    fn ensure_layers(&mut self, layers: &[LayerDef]) {
+        self.inner.ensure_layers(layers)
+    }
+    fn add(&mut self, prims: Vec<Prim>) -> usize {
+        self.inner.add(prims)
+    }
+    fn remove_where(&mut self, pred: &dyn Fn(&Tag) -> bool) -> usize {
+        self.inner.remove_where(pred)
+    }
+    fn begin(&mut self, label: &str) {
+        self.inner.begin(label)
+    }
+    fn end(&mut self) {
+        self.inner.end()
+    }
+    fn info(&mut self, msg: &str) {
+        self.inner.info(msg)
+    }
+    fn error(&mut self, msg: &str) {
+        self.errors.push(msg.to_string());
+    }
+    fn load_settings(&mut self) -> Option<String> {
+        self.inner.load_settings()
+    }
+    fn save_settings(&mut self, json: &str) -> Result<(), String> {
+        self.inner.save_settings(json)
     }
 }

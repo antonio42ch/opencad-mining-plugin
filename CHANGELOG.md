@@ -3,6 +3,55 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-11-21
+
+### Added
+- **Geotechnics phase 3 — structures** (panel *Geotecnia: estructuras*): equal-area
+  stereonet with density contours (`st_stereonet`), automatic discontinuity sets with
+  Fisher statistics written to an editable table (`st_sets`), Markland kinematic analysis
+  for planar, wedge and flexural toppling (`st_kinematic`), wedges of three sets in the
+  roof and walls of a working with failure mode and FS, drawn on the working
+  (`st_wedges`), stereonet drawn in the DWG (`st_draw`).
+- **Geotechnics phase 4 — stresses and design** (panel *Geotecnia: esfuerzos y diseño*):
+  in situ stress by depth gradient and in the section of a working (`sm_stress`), Kirsch
+  around the opening with strength factor and overstressed zone (`sm_kirsch`),
+  convergence-confinement with Duncan Fama, Vlachopoulos-Diederichs LDP, shotcrete and
+  bolts and the Hoek-Marinos squeezing class (`sm_convergence`), pillars by tributary area
+  with four strength formulas (`sm_pillar`), crown pillar scaled span of Carter
+  (`sm_span`), design charts drawn in the DWG (`sm_draw`).
+- Sample discontinuities with three sets (`examples/geotechnics/discontinuidades.csv`).
+
+### Not included (on purpose)
+- Direct toppling, the critical scaled span (Sc–Q, Lang's chart) and Kirsch for
+  non-circular shapes beyond an equivalent radius: their criteria are empirical or need a
+  verified reference.
+
+## [0.7.0] — 2026-11-21
+
+### Added
+- **Operations for AI clients (MCP).** Every action is a typed operation (new crate
+  `openmining_ops`): `key=value` arguments validated against the definition (types,
+  limits, choices by key or label, domains and attributes by name), one
+  `OPENMINING_RESULT {json}` line per command with the data, the created handles and coded
+  errors (`no_data`, `out_of_range`, `not_found`, `unknown_argument`...). Guide generated
+  from the definitions: `docs/MCP.md`, with typical workflows.
+- Inputs that were clicked can be passed as arguments: `axis=`, `solids=`, `traces=`,
+  `lines=`, `axes=`, `p1=`/`p2=`/`p3=`, `point=`/`toward=`, `at=`.
+- **Read-only operations:** `MIN_STATUS` (what is loaded and the next steps),
+  `MIN_DH_LIST`, `MIN_RS_STATS`, `MIN_RS_VARIOGRAM`, `MIN_BM_INFO`, `MIN_BM_SAMPLE`
+  (point or line), `MIN_BM_RESOURCES` (several cut-offs), `MIN_GT_SUMMARY`, `MIN_ENTITIES`.
+- `openmining_cli mcp-doc` and `ops-schema`; `api25` feature with native tools for the
+  next host plugin API (checked in CI, not released).
+
+### Changed
+- Panels are generated from the operation definitions (same layout); panel control ids
+  are now the settings path (`gt.md_power`, `dh.collar`...).
+- An argument given to a command is kept as the project setting, like the panel.
+
+### Compatibility
+- Drawings and settings of 0.4–0.6 open unchanged (the v0.4 single contact and domain side
+  are kept). Old command forms still work.
+
 ## [0.6.0] — 2026-11-20
 
 ### Added

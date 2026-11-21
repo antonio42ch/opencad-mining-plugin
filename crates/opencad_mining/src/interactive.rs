@@ -185,6 +185,13 @@ impl SectionPick {
         }
     }
 
+    /// Inputs already known (command arguments); only the rest is picked.
+    pub fn with_inputs(mut self, axis: Option<Handle>, points: Vec<Vec3>) -> Self {
+        self.axis = axis;
+        self.points = points;
+        self
+    }
+
     fn points_needed(&self) -> usize {
         match self.mode {
             1 => 2,

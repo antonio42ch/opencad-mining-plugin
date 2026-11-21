@@ -12,7 +12,14 @@ PST_SolidMine and GeoMapper.
 | Sections | `MIN_SC_PANEL` `MIN_SC_RUN` | Cut solids (meshes) with planes perpendicular to an axis, vertical through 2 points (+ parallels), horizontal levels or 3 points; 3D polylines in place and 2D sheets with grid, title and area |
 | Resources | `MIN_RS_COMP_PANEL` `MIN_RS_VARIO_PANEL` `MIN_RS_BM_PANEL` `MIN_RS_COMPOSITE` `MIN_RS_ESTIMATE` `MIN_RS_BMVIEW` … | Composites, domains (attribute, solids, contact surface), declustering, variography with auto-fit, ordinary/simple kriging, IDW and nearest neighbour on a rotated block model, validation (swath, grade-tonnage, cross-validation) and views — see [docs/RESOURCES.md](docs/RESOURCES.md) |
 | Geotechnics | `MIN_GT_DATA_PANEL` `MIN_GT_HB_PANEL` `MIN_GT_MODEL_PANEL` `MIN_GT_LOAD` `MIN_GT_CLASSIFY` `MIN_GT_HB` `MIN_GT_ESTIMATE` `MIN_GT_VIEW` | Logging, face mapping and laboratory tables, RMR89 / Q / GSI classification, Hoek-Brown strength and modulus, geotechnical block model and views — see [docs/GEOTECH.md](docs/GEOTECH.md) |
+| Structures & design | `MIN_RM_STRUCT_PANEL` `MIN_RM_DESIGN_PANEL` `MIN_ST_*` `MIN_SM_*` | Stereonets, discontinuity sets, kinematic analysis and wedges in workings; in situ stress, Kirsch, convergence-confinement with support, pillars and crown pillars — see [docs/GEOTECH.md](docs/GEOTECH.md) |
 | Geology | `MIN_GM_PANEL` `MIN_GM_TRACE` `MIN_GM_TRACE_PICK` `MIN_GM_PROJECT` | Structure/vein/contact traces from coordinates + bearing/azimuth + length, and projection of mapped traces to another height along their dip |
+
+**AI clients (MCP).** Every action is a typed operation with `key=value` arguments and a
+machine-readable result line, so an assistant connected to `OpenCADStudio --mcp` can drive
+the whole plugin with the `run` tool and read the outcome — see [docs/MCP.md](docs/MCP.md)
+(generated from the definitions, with typical workflows). Read-only operations report the
+project status, drillholes, statistics, block-model values and the plugin's entities.
 
 UI in Spanish, English and Portuguese (`OPENMINING_LANG=es|en|pt`, else the
 system locale).
@@ -32,6 +39,8 @@ cargo build -p opencad_mining --release      # target/release/libopencad_mining.
 cargo bench -p drillhole_engine              # 1 000 holes: validate ≈ 45 ms, desurvey+map ≈ 80 ms
 cargo bench -p blockmodel_engine             # 165 k-block OK estimation ≈ 0.4 s
 cargo run -p openmining_cli -- desurvey --collar collar.csv --survey survey.csv
+cargo run -p openmining_cli -- mcp-doc > docs/MCP.md   # regenerate the operations guide
+cargo run -p openmining_cli -- ops-schema gt_hb      # JSON Schema of an operation
 ```
 
 Release: bump `version` in `Cargo.toml` and `plugin.toml`, add a
@@ -41,6 +50,7 @@ Release: bump `version` in `Cargo.toml` and `plugin.toml`, add a
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers, crates, data flow, design rules
 - [docs/RESOURCES.md](docs/RESOURCES.md) — resource estimation: methods, conventions, file format
+- [docs/MCP.md](docs/MCP.md) — every operation for AI clients: arguments, results, error codes, workflows
 - [docs/GEOTECH.md](docs/GEOTECH.md) — geotechnics: tables, RMR89 / Q / GSI, Hoek-Brown, block model
 - [docs/PLUGIN.md](docs/PLUGIN.md) — commands, panels, layers, **XDATA schema**, settings storage
 - [docs/MIGRATION.md](docs/MIGRATION.md) — mapping from the legacy C# (AutoCAD) tools

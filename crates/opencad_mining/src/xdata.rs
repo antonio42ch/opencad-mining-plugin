@@ -33,10 +33,14 @@ pub enum Class {
     DomainSolid,
     /// A classified geotechnical record (interval, mapped stretch or point).
     GtRec,
+    /// Stereonet or design chart drawn in the DWG (`kind`).
+    RmDraw,
+    /// A wedge of three discontinuity sets on a working.
+    RmWedge,
 }
 
 impl Class {
-    pub const ALL: [Class; 17] = [
+    pub const ALL: [Class; 19] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -54,6 +58,8 @@ impl Class {
         Class::View,
         Class::DomainSolid,
         Class::GtRec,
+        Class::RmDraw,
+        Class::RmWedge,
     ];
 
     pub fn key(self) -> &'static str {
@@ -75,6 +81,8 @@ impl Class {
             Self::View => "RS_VIEW",
             Self::DomainSolid => "RS_DOMAIN",
             Self::GtRec => "GT_REC",
+            Self::RmDraw => "RM_DRAW",
+            Self::RmWedge => "RM_WEDGE",
         }
     }
 

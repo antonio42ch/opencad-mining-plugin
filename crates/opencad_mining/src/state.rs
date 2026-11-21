@@ -23,6 +23,7 @@ pub struct TabState {
     pub axis: Option<AxisState>,
     pub rs: crate::resources::RsState,
     pub gt: crate::geotech::GtState,
+    pub rm: crate::rmcommands::RmState,
 }
 
 /// What an interactive pick hands over to the follow-up command.
@@ -89,6 +90,11 @@ pub fn tracked_values() -> HashMap<String, DialogValue> {
 
 pub fn set_pending(p: Pending) {
     *lock(&PENDING) = Some(p);
+}
+
+/// The pending action without taking it.
+pub fn peek_pending() -> Option<Pending> {
+    lock(&PENDING).clone()
 }
 
 pub fn take_pending() -> Option<Pending> {

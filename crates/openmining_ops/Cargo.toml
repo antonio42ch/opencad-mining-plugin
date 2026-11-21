@@ -1,0 +1,9 @@
+[package]
+name = "openmining_ops"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Open Mining operations: one typed definition per action (parameters, settings binding, help) that yields the command-line parser, the JSON Schema for AI tools, the panels and the MCP guide. Host-agnostic."
+
+[dependencies]
+serde_json = "1"
