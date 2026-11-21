@@ -168,6 +168,14 @@ def main():
             c.need(good, f"{what} ({json.dumps(r.get('data') if r.get('ok') else r.get('error'))[:240]})")
             return r
 
+        # 1a. The operations describe themselves (no guide needed).
+        run("MIN_HELP")
+        r = ok("help", "help lists the operations", lambda d: len(d.get("operations", [])) > 50 and "geotechnics" in d.get("groups", []))
+        run("MIN_HELP op=gt_view")
+        ok("help", "help op=gt_view gives its parameters and options", lambda d: any(p["key"] == "mode" and "cubes" in (p["options"] or []) for p in d.get("parameters", [])))
+        run("MIN_HELP op=nada")
+        c.need(result("help").get("error", {}).get("code") == "not_found", "help of an unknown operation is not_found")
+
         # 1b. Status of an empty project points at loading drillholes.
         run("MIN_STATUS")
         ok("status", "status of an empty project suggests dh_load", lambda d: (d.get("next") or [{}])[0].get("op") == "dh_load")
@@ -272,7 +280,19 @@ def main():
         run("MIN_GT_VIEW mode=cubes attribute=rmr limit=1000")
         r = ok("gt_view", "gt_view mode=cubes draws one cube mesh per colour", lambda d: d.get("mode") == "cubes" and d.get("cubes") and d["cubes"][0] == d["cubes"][1] > 0)
         c.need(count(layer("MIN_RS_VISTA")) >= 1, "the cube meshes are on MIN_RS_VISTA")
-        run("MIN_GT_VIEW mode=levels attribute=class")
+        run("MIN_BM_INFO")
+        ok("bm_info", "the model has the confidence columns gt_dist and gt_n", lambda d: "gt_dist" in d.get("columns", {}) and "gt_n" in d.get("columns", {}))
+        run("MIN_GT_VIEW mode=cubes attribute=dist")
+        ok("gt_view", "gt_view attribute=dist colours by the distance to the records", lambda d: d.get("column") == "gt_dist" and d.get("cubes", [0, 0])[0] > 0)
+        run("MIN_GT_VIEW mode=cubes attribute=rmr show=above threshold=1000")
+        r = result("gt_view")
+        c.need(r.get("ok") is False and r["error"]["code"] == "no_data", "a filter that leaves no block is reported as no_data")
+        run("MIN_GT_VIEW mode=cubes attribute=rmr show=all cut=true cut_dip=0 cut_z=-100000 cut_side=front")
+        ok("gt_view", "a horizontal cut below the model keeps every block", lambda d: d.get("cubes", [0, 0])[0] > 0)
+        run("MIN_GT_VIEW mode=cubes attribute=rmr cut=true cut_dip=0 cut_z=100000 cut_side=front")
+        r = result("gt_view")
+        c.need(r.get("ok") is False and r["error"]["code"] == "no_data", "a cut above the model leaves nothing")
+        run("MIN_GT_VIEW mode=levels attribute=class show=all cut=false")
         ok("gt_view", "gt_view mode=levels still draws plans", lambda d: d.get("mode") == "levels" and d.get("polygons", 0) > 0)
         run("MIN_GT_SUMMARY")
         ok("gt_summary", "gt_summary repeats the classification", lambda d: d.get("with_rmr") == 5)

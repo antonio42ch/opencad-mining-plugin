@@ -545,6 +545,12 @@ mod tests {
         c.gt.view_mode = 3;
         c.gt.view_limit = 500.0;
         c.gt.view_z_step = 6.0;
+        c.gt.view_filter = 2;
+        c.gt.view_threshold = 2.5;
+        c.gt.view_cut = true;
+        c.gt.view_cut_e = 500_100.0;
+        c.gt.view_cut_dip = 45.0;
+        c.gt.view_cut_side = 1;
         let mut flat = HashMap::new();
         for id in panel_ids() {
             let p = panel(id, &c, &[]);

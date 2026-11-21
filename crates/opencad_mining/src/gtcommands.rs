@@ -441,7 +441,7 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
             // geotechnical view settings. They are copied into the resource settings
             // (shown in its panel) so a pick-based view, re-read after the pick,
             // keeps them. Every block with a value is shown (no cut-off, any domain).
-            let (g, attr) = (cfg.gt.clone(), cfg.gt.md_attr.min(3));
+            let (g, attr) = (cfg.gt.clone(), cfg.gt.md_attr.min(5));
             let b = &mut cfg.rs.bm;
             b.view_attr = crate::resources::GT_VIEW_ATTR + attr;
             b.view_mode = g.view_mode.min(3);
@@ -449,10 +449,14 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
             (b.view_spacing, b.view_count, b.view_interval, b.view_limit) =
                 (g.view_spacing, g.view_count, g.view_interval, g.view_limit);
             b.view_domain = 0;
+            (b.view_filter, b.view_threshold) = (g.view_filter.min(2), g.view_threshold);
+            (b.view_cut, b.view_cut_point) = (g.view_cut, [g.view_cut_e, g.view_cut_n, g.view_cut_z]);
+            (b.view_cut_dip, b.view_cut_dipdir, b.view_cut_side) =
+                (g.view_cut_dip, g.view_cut_dipdir, g.view_cut_side.min(1));
             state::with_tab(tab, |t| t.config = cfg.clone());
             session::push_rs(host, cfg);
             let r = crate::rscommands::run(host, "rs_bmview", args, tab, cfg)?;
-            let attribute = ["rmr", "gsi", "logq", "class"][attr];
+            let attribute = ["rmr", "gsi", "logq", "class", "dist", "n"][attr];
             let mode = ["levels", "two_points", "axis", "cubes"][g.view_mode.min(3)];
             let mut data = json!({ "attribute": attribute, "column": gt::COLUMNS[attr], "mode": mode });
             if let (Some(d), Some(extra)) = (data.as_object_mut(), r.data.as_object()) {

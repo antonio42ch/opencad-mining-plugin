@@ -5,7 +5,7 @@ use std::fmt::Write;
 use crate::result::{ErrorCode, PREFIX};
 use crate::{Group, Kind, OpDef, OpKind};
 
-const WORKFLOWS: &str = r#"## Typical workflows
+pub const WORKFLOWS: &str = r#"## Typical workflows
 
 Start with `MIN_STATUS`: it says what is loaded and lists the next operations (`next`). After an error
 with code `no_data`, call it again. Entity handles come from the `created` list of a result, from

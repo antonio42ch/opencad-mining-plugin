@@ -959,6 +959,22 @@ const RS_BMVIEW: &[Param] = &[
                         "Classe do maciço (geotecnia)",
                     ),
                 ),
+                opt(
+                    "gt_dist",
+                    L::new(
+                        "Distancia media a los registros (geotecnia)",
+                        "Mean distance to records (geotechnics)",
+                        "Distância média aos registros (geotecnia)",
+                    ),
+                ),
+                opt(
+                    "gt_n",
+                    L::new(
+                        "N° de registros (geotecnia)",
+                        "Number of records (geotechnics)",
+                        "N.º de registros (geotecnia)",
+                    ),
+                ),
             ],
         },
         "/rs/bm/view_attr",
