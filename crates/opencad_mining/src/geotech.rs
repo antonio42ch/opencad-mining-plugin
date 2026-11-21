@@ -900,6 +900,60 @@ mod tests {
         );
     }
 
+    /// The geotechnical model drawn as cubes, levels and by class colours.
+    #[test]
+    fn model_views_as_levels_and_cubes() {
+        use crate::resources::{view, ViewInput, GT_VIEW_ATTR};
+        let (cfg, mut st) = loaded("v");
+        st.results = classify_all(&st, &holes(), &[], &cfg);
+        let mut pc = ProjectConfig {
+            gt: cfg,
+            ..Default::default()
+        };
+        pc.rs.bm.size = [10.0, 10.0, 10.0];
+        let mut model = model_for(&st.results, &pc).unwrap();
+        estimate(&mut model, &st.results, &pc).unwrap();
+        let with_values = model.column("gt_rmr").unwrap().iter().filter(|v| v.is_finite()).count();
+        assert!(with_values > 3);
+        let r = crate::rsi18n::r();
+        let input = ViewInput {
+            axis: None,
+            points: &[],
+        };
+        // Cubes: one mesh per colour, every block with a value is drawn.
+        for attr in 0..4 {
+            pc.rs.bm.view_attr = GT_VIEW_ATTR + attr;
+            pc.rs.bm.view_mode = 3;
+            let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+            assert_eq!(out.cubes, Some((with_values, with_values)), "attribute {attr}");
+            assert!(!out.limited && !out.prims.is_empty());
+            assert!(out.prims.iter().all(|p| matches!(p.geom, Geom::Mesh { .. })));
+            let drawn: usize = out
+                .prims
+                .iter()
+                .map(|p| p.tag.get("blocks").and_then(|b| b.parse::<usize>().ok()).unwrap())
+                .sum();
+            assert_eq!(drawn, with_values);
+        }
+        // The class view uses the class colours.
+        pc.rs.bm.view_attr = GT_VIEW_ATTR + 3;
+        let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+        assert!(out
+            .prims
+            .iter()
+            .all(|p| (1..=5).any(|k| p.color == Some(class_color(k)))));
+        // A limit below the block count keeps an even sample and says so.
+        pc.rs.bm.view_limit = 2.0;
+        let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+        assert_eq!(out.cubes, Some((2, with_values)));
+        assert!(out.limited);
+        // Levels still draw polygons.
+        pc.rs.bm.view_mode = 0;
+        pc.rs.bm.view_limit = 20_000.0;
+        let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+        assert!(out.polygons > 0 && out.cubes.is_none());
+    }
+
     #[test]
     fn block_model_columns() {
         let (cfg, mut st) = loaded("e");

@@ -3,6 +3,16 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] — unreleased
+
+### Added
+- **Geotechnical block model view as cubes** (and sections): `MIN_GT_VIEW` has its own
+  mode in the *Modelo* panel — level plans, sections by two points, sections along an
+  axis or cubes — with levels, section spacing and the maximum of polygons / cubes.
+  Before, it used the view mode of the Resources panel (levels by default) and the
+  geotechnical panel could not change it. Arguments: `mode=`, `z_from=`, `z_to=`,
+  `z_step=`, `spacing=`, `count=`, `interval=`, `limit=`, `axis=`, `p1=`, `p2=`.
+
 ## [0.8.0] — 2026-11-21
 
 ### Added

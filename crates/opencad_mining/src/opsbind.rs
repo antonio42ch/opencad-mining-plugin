@@ -542,6 +542,9 @@ mod tests {
         c.gt.md_radii = [80.0, 60.0, 15.0];
         c.gt.md_domains = true;
         c.gt.md_attr = 3;
+        c.gt.view_mode = 3;
+        c.gt.view_limit = 500.0;
+        c.gt.view_z_step = 6.0;
         let mut flat = HashMap::new();
         for id in panel_ids() {
             let p = panel(id, &c, &[]);

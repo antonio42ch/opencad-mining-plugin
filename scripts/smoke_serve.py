@@ -269,6 +269,11 @@ def main():
         run("MIN_GT_VIEW attribute=class")
         c.need(result("gt_view").get("data", {}).get("column") == "gt_class" and count(layer("MIN_RS_VISTA")) >= 1,
                "gt_view draws the model coloured by rock mass class")
+        run("MIN_GT_VIEW mode=cubes attribute=rmr limit=1000")
+        r = ok("gt_view", "gt_view mode=cubes draws one cube mesh per colour", lambda d: d.get("mode") == "cubes" and d.get("cubes") and d["cubes"][0] == d["cubes"][1] > 0)
+        c.need(count(layer("MIN_RS_VISTA")) >= 1, "the cube meshes are on MIN_RS_VISTA")
+        run("MIN_GT_VIEW mode=levels attribute=class")
+        ok("gt_view", "gt_view mode=levels still draws plans", lambda d: d.get("mode") == "levels" and d.get("polygons", 0) > 0)
         run("MIN_GT_SUMMARY")
         ok("gt_summary", "gt_summary repeats the classification", lambda d: d.get("with_rmr") == 5)
 
