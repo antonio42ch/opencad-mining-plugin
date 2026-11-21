@@ -45,6 +45,7 @@ pub mod solids;
 pub mod state;
 pub mod veincommands;
 pub mod veinconfig;
+pub mod veinmodel;
 pub mod xdata;
 
 use ocs_plugin_api::host::acadrust::EntityType;
@@ -67,7 +68,7 @@ pub static MANIFEST: PluginManifest = PluginManifest {
 };
 
 macro_rules! classes {
-    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr, $v:expr) => {
+    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr, $v:expr, $w:expr) => {
         static $name: EntityClasses = EntityClasses {
             app_id: xdata::APP,
             class_prefix: xdata::CLASS_PREFIX,
@@ -91,6 +92,8 @@ macro_rules! classes {
                 ("RM_DRAW", $m.cls_draw),
                 ("RM_WEDGE", $m.cls_wedge),
                 ("VN_SURFACE", $v.cls_surface),
+                ("VN_PRISM", $w.cls_prism),
+                ("VN_LONG", $w.cls_long),
             ],
         };
     };
@@ -101,7 +104,8 @@ classes!(
     rsi18n::ES,
     gti18n::ES,
     rmi18n::ES,
-    veincommands::ES
+    veincommands::ES,
+    veinmodel::ES
 );
 classes!(
     CLASSES_EN,
@@ -109,7 +113,8 @@ classes!(
     rsi18n::EN,
     gti18n::EN,
     rmi18n::EN,
-    veincommands::EN
+    veincommands::EN,
+    veinmodel::EN
 );
 classes!(
     CLASSES_PT,
@@ -117,7 +122,8 @@ classes!(
     rsi18n::PT,
     gti18n::PT,
     rmi18n::PT,
-    veincommands::PT
+    veincommands::PT,
+    veinmodel::PT
 );
 
 pub struct MiningPlugin;
@@ -204,6 +210,7 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_GT_DATA_PANEL" => Some(gtpanels::DATA),
             "MIN_CH_PANEL" => Some(chcommands::PANEL),
             "MIN_VN_PANEL" => Some(veincommands::PANEL),
+            "MIN_VN_MODEL_PANEL" => Some(veinmodel::PANEL),
             "MIN_GT_HB_PANEL" => Some(gtpanels::HB),
             "MIN_GT_MODEL_PANEL" => Some(gtpanels::MODEL),
             "MIN_RM_STRUCT_PANEL" => Some(rmcommands::STRUCT),
@@ -223,6 +230,7 @@ impl BuiltinPlugin for MiningPlugin {
         // Follow-ups of interactive picks write the result of their operation.
         let follow = commands::follow_up(host, &name, tab, &mut cfg)
             .or_else(|| chcommands::follow_up(host, &name, tab, &mut cfg))
+            .or_else(|| veinmodel::follow_up(host, &name, tab, &mut cfg))
             .or_else(|| rscommands::follow_up(host, &name, tab, &mut cfg))
             .or_else(|| {
                 (name == "MIN_GT_CLASSIFY_EXEC")

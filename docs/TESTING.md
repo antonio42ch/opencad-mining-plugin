@@ -181,3 +181,14 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     first "worst" contact. Reduce the radius → nodes with one wall only are reported.
 46. With channels converted (step 41), tick *Usar intersecciones* (attribute `tipo`, value `VETA`) → the
     contact counts include the intercepts.
+
+## Vein prism model (v0.10)
+
+47. With the surfaces of step 44 and channels with `tipo = VETA` and `au`, Vetas → **Modelo** →
+    *Variografía en el plano* → composites count, model in the settings and the chart.
+48. **Estimar prismas** → coloured prisms between the walls on `MIN_VN_PRISMAS`, totals, validation lines,
+    and `<dwg>_veta_V1_prismas.csv`. Change *Colorear por* to *Potencia* and estimate again.
+49. **Longitudinal** → long section beside the model with the channel labels. Draw a closed polyline over part
+    of it, *Edición* = *Excluir prismas*, **Editar en la longitudinal**, pick it → those prisms disappear in 3D and on
+    the long section (magenta outline). *Polígono límite* with another polyline → only the prisms inside remain.
+50. *Deshacer la última*, then *Borrar ediciones y límite* → the model returns to step 48.

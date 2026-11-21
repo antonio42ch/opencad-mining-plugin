@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
 RESULT = "OPENMINING_RESULT "
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels", "min_vein"]
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels", "min_vein", "min_vein_model"]
 
 
 class Server:
@@ -354,6 +354,29 @@ def main():
         c.need(count(layer("MIN_VN_TECHO")) >= 1 and count(layer("MIN_VN_PISO")) >= 1, "both vein surfaces are drawn")
         run("MIN_VN_SURFACES vein=V1 hw_layer=NO_EXISTE fw_layer=NO_EXISTE intercepts=false")
         c.need(result("vn_surfaces").get("error", {}).get("code") == "no_data", "no contacts is reported as no_data")
+
+        # 11. Vein prism model from the three channels (vein intercepts tipo=VETA, au).
+        run("MIN_VN_VARIOGRAM vein=V1 grade=au thickness_col=potencia lag=5 nlags=4")
+        ok("vn_variogram", "vn_variogram composites the 3 channel intercepts and fits a model", lambda d: d["composites"] == 3 and d["model"]["range_strike"] > 0)
+        run("MIN_VN_ESTIMATE vein=V1 nugget=0 sill=1 range_strike=30 range_dip=30 block_u=5 block_v=5 max_distance=0 search_radius=60 min_samples=2 draw_prisms=true")
+        ok("vn_estimate", "vn_estimate builds prisms with grades inside the channel range", lambda d: d["summary"]["prisms"] > 0 and 3.0 <= d["summary"]["grade"] <= 9.5 and d["validation"]["n"] == 3)
+        prisms = result("vn_estimate").get("data", {}).get("summary", {}).get("prisms", 0)
+        c.need(count(layer("MIN_VN_PRISMAS")) == prisms, f"the {prisms} prisms are drawn")
+        run("MIN_VN_LONG vein=V1 at=1000,1000,0")
+        ok("vn_long", "vn_long draws the long section at the base point", lambda d: d["at"][0] == 1000 and d["width"] > 0 and d["height"] > 0)
+        lg = result("vn_long").get("data", {})
+        c.need(count(layer("MIN_VN_LONG")) > prisms, "long section entities drawn")
+        w2, ht = lg.get("width", 0) / 2, lg.get("height", 0)
+        before = set(handles(s.send({"op": "query", "type": "Polyline3D"})))
+        run(f"3DPOLY 999,999,0 {1000 + w2},999,0 {1000 + w2},{1001 + ht},0 999,{1001 + ht},0 999,999,0")
+        poly_h = [h for h in handles(s.send({"op": "query", "type": "Polyline3D"})) if h not in before]
+        run(f"MIN_VN_EDIT action=exclude polygon={poly_h[0] if poly_h else '0'}")
+        ok("vn_edit", "vn_edit excludes the left half of the long section and estimates again", lambda d: len(d["edits"]) == 1 and d["estimate"]["summary"]["out_edits"] > 0 and d["estimate"]["summary"]["prisms"] < prisms)
+        run("MIN_VN_EDIT action=clear")
+        ok("vn_edit", "vn_edit clear restores the model", lambda d: len(d["edits"]) == 0 and d["estimate"]["summary"]["prisms"] == prisms)
+        run("MIN_VN_ESTIMATE vein=NOPE")
+        c.need(result("vn_estimate").get("error", {}).get("code") == "no_data", "a vein without surfaces is reported as no_data")
+        run("MIN_VN_ESTIMATE vein=V1")
 
         run("MIN_CH_CONVERT sheet=nothing.csv")
         c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")

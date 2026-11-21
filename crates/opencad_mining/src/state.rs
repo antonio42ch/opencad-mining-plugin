@@ -25,6 +25,7 @@ pub struct TabState {
     pub gt: crate::geotech::GtState,
     pub rm: crate::rmcommands::RmState,
     pub vein: crate::veincommands::VeinState,
+    pub vein_model: crate::veinmodel::ModelState,
 }
 
 /// What an interactive pick hands over to the follow-up command.
@@ -55,6 +56,8 @@ pub enum Pending {
     GtAxes(Vec<Handle>),
     /// Two points picked for the orientation of a channel.
     TwoPoints(Vec3, Vec3),
+    /// Polygon drawn on a vein long section, for `vn_edit`.
+    VnPolygon(Vec<Handle>),
     /// Inputs of a block-model section view.
     BmView {
         axis: Option<Handle>,

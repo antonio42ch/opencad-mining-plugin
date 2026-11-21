@@ -37,6 +37,19 @@ MIN_VN_SURFACES vein=V1 hw_layer=VETA_TECHO fw_layer=VETA_PISO vein_attr=tipo ve
 Read `diagnostics` and `worst`: fix the contacts it names, or change `radius`, `step` or
 `method`, and run it again.
 
+**Narrow vein prism model** (after the surfaces; edits are polygons drawn on the long section)
+
+```
+MIN_VN_VARIOGRAM vein=V1 grade=au thickness_col=potencia lag=10 nlags=10
+MIN_VN_ESTIMATE vein=V1 block_u=5 block_v=5 max_distance=40 density=2.7
+MIN_VN_LONG vein=V1
+MIN_VN_EDIT action=boundary polygon=<handle>
+MIN_VN_EDIT action=exclude polygon=<handle>
+```
+
+Check `validation` (cross-validation bias and correlation, composites against their
+prism) and the `out_*` counts of `summary` before accepting the model.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```

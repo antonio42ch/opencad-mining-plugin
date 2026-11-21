@@ -274,3 +274,412 @@ pub static PANELS: &[PanelSpec] = &[PanelSpec {
         Item::Status("vn_status"),
     ],
 }];
+
+// ---- Stage B2: prism model ------------------------------------------------
+
+const KINDS: &[Opt] = &[
+    opt("spherical", L::new("Esférico", "Spherical", "Esférico")),
+    opt("exponential", L::new("Exponencial", "Exponential", "Exponencial")),
+    opt("gaussian", L::new("Gaussiano", "Gaussian", "Gaussiano")),
+];
+
+const COLOR_BY: &[Opt] = &[
+    opt("grade", L::new("Ley", "Grade", "Teor")),
+    opt("thickness", L::new("Potencia", "Thickness", "Espessura")),
+    opt("accumulation", L::new("Acumulación", "Accumulation", "Acumulação")),
+    opt(
+        "distance",
+        L::new("Distancia a la muestra", "Distance to sample", "Distância à amostra"),
+    ),
+    opt(
+        "variance",
+        L::new("Varianza de krigeado", "Kriging variance", "Variância de krigagem"),
+    ),
+];
+
+const EDIT_ACTIONS: &[Opt] = &[
+    opt(
+        "exclude",
+        L::new("Excluir prismas", "Exclude prisms", "Excluir prismas"),
+    ),
+    opt("grade", L::new("Fijar ley", "Set grade", "Fixar teor")),
+    opt(
+        "thickness",
+        L::new("Fijar potencia", "Set thickness", "Fixar espessura"),
+    ),
+    opt(
+        "boundary",
+        L::new("Polígono límite", "Boundary polygon", "Polígono limite"),
+    ),
+    opt(
+        "undo",
+        L::new("Deshacer la última", "Undo the last one", "Desfazer a última"),
+    ),
+    opt(
+        "clear",
+        L::new(
+            "Borrar ediciones y límite",
+            "Clear edits and boundary",
+            "Apagar edições e limite",
+        ),
+    ),
+    opt("list", L::new("Listar", "List", "Listar")),
+];
+
+const VEIN: Param = setting(
+    "vein",
+    Kind::Text,
+    "/vn/name",
+    L::new("Veta", "Vein", "Veio"),
+    "Name of the vein (its surfaces must be built first).",
+);
+const GRADE: Param = setting(
+    "grade",
+    Kind::Text,
+    "/vn/grade",
+    L::new("Ley (columna)", "Grade (column)", "Teor (coluna)"),
+    "Assay column estimated (e.g. au, ag, cu%).",
+);
+const THICK: Param = setting("thickness_col", Kind::Text, "/vn/thick_col", L::new("Columna de potencia", "Thickness column", "Coluna de espessura"),
+    "Assay column with the true vein thickness (channels: potencia). Empty or missing = length of the intercept along the vein normal.");
+
+const VARIO: &[Param] = &[
+    VEIN,
+    GRADE,
+    THICK,
+    setting(
+        "lag",
+        Kind::num(Some(0.1), None, 1.0),
+        "/vn/lag",
+        L::new("Paso (m)", "Lag (m)", "Passo (m)"),
+        "Lag of the experimental variograms on the vein plane.",
+    ),
+    setting(
+        "nlags",
+        Kind::Integer {
+            min: Some(2),
+            max: Some(50),
+        },
+        "/vn/nlags",
+        L::new("Número de pasos", "Number of lags", "Número de passos"),
+        "Number of lags.",
+    ),
+    setting(
+        "kind",
+        Kind::Choice { options: KINDS },
+        "/vn/model_kind",
+        L::new("Modelo", "Model", "Modelo"),
+        "Variogram model type.",
+    ),
+];
+
+const ESTIMATE: &[Param] = &[
+    VEIN,
+    GRADE,
+    THICK,
+    setting(
+        "kind",
+        Kind::Choice { options: KINDS },
+        "/vn/model_kind",
+        L::new("Modelo", "Model", "Modelo"),
+        "Variogram model type.",
+    ),
+    setting(
+        "nugget",
+        Kind::num(Some(0.0), None, 0.1),
+        "/vn/nugget",
+        L::new("Efecto pepita", "Nugget", "Efeito pepita"),
+        "Nugget of the accumulation variogram (vn_variogram fills it).",
+    ),
+    setting(
+        "sill",
+        Kind::num(Some(0.0), None, 0.1),
+        "/vn/sill",
+        L::new("Meseta", "Sill", "Patamar"),
+        "Partial sill of the accumulation variogram.",
+    ),
+    setting(
+        "range_strike",
+        Kind::num(Some(0.01), None, 5.0),
+        "/vn/range_strike",
+        L::new(
+            "Alcance en rumbo (m)",
+            "Range along strike (m)",
+            "Alcance na direção (m)",
+        ),
+        "Range along strike.",
+    ),
+    setting(
+        "range_dip",
+        Kind::num(Some(0.01), None, 5.0),
+        "/vn/range_dip",
+        L::new(
+            "Alcance en buzamiento (m)",
+            "Range down dip (m)",
+            "Alcance no mergulho (m)",
+        ),
+        "Range down dip.",
+    ),
+    setting(
+        "block_u",
+        Kind::num(Some(0.1), None, 1.0),
+        "/vn/block_u",
+        L::new("Prisma en rumbo (m)", "Prism along strike (m)", "Prisma na direção (m)"),
+        "Prism size along strike.",
+    ),
+    setting(
+        "block_v",
+        Kind::num(Some(0.1), None, 1.0),
+        "/vn/block_v",
+        L::new(
+            "Prisma en buzamiento (m)",
+            "Prism down dip (m)",
+            "Prisma no mergulho (m)",
+        ),
+        "Prism size down dip.",
+    ),
+    setting(
+        "search_radius",
+        Kind::num(Some(0.1), None, 5.0),
+        "/vn/est_radius",
+        L::new("Radio de búsqueda (m)", "Search radius (m)", "Raio de busca (m)"),
+        "Search radius on the vein plane.",
+    ),
+    setting(
+        "min_samples",
+        Kind::Integer {
+            min: Some(1),
+            max: Some(50),
+        },
+        "/vn/est_min",
+        L::new("Mínimo de muestras", "Minimum samples", "Mínimo de amostras"),
+        "Minimum composites to estimate a prism.",
+    ),
+    setting(
+        "max_samples",
+        Kind::Integer {
+            min: Some(1),
+            max: Some(200),
+        },
+        "/vn/est_max",
+        L::new("Máximo de muestras", "Maximum samples", "Máximo de amostras"),
+        "Maximum composites per prism.",
+    ),
+    setting(
+        "max_distance",
+        Kind::num(Some(0.0), None, 5.0),
+        "/vn/max_dist",
+        L::new(
+            "Distancia máxima (m, 0 = sin límite)",
+            "Maximum distance (m, 0 = none)",
+            "Distância máxima (m, 0 = sem limite)",
+        ),
+        "Prisms farther than this from every composite are left out.",
+    ),
+    setting(
+        "disc",
+        Kind::Integer {
+            min: Some(1),
+            max: Some(10),
+        },
+        "/vn/disc",
+        L::new(
+            "Discretización por lado",
+            "Discretisation per side",
+            "Discretização por lado",
+        ),
+        "Points per side used for block kriging.",
+    ),
+    setting(
+        "density",
+        Kind::num(Some(0.1), None, 0.1),
+        "/vn/density",
+        L::new("Densidad (t/m³)", "Density (t/m³)", "Densidade (t/m³)"),
+        "Density of the vein.",
+    ),
+    setting(
+        "color_by",
+        Kind::Choice { options: COLOR_BY },
+        "/vn/color_by",
+        L::new("Colorear por", "Colour by", "Colorir por"),
+        "Attribute that colours the prisms and the long section.",
+    ),
+    setting(
+        "draw_prisms",
+        Kind::Bool,
+        "/vn/draw_prisms",
+        L::new("Dibujar prismas 3D", "Draw 3D prisms", "Desenhar prismas 3D"),
+        "Draw the prisms between the walls.",
+    ),
+];
+
+const LONG: &[Param] = &[
+    VEIN,
+    setting(
+        "color_by",
+        Kind::Choice { options: COLOR_BY },
+        "/vn/color_by",
+        L::new("Colorear por", "Colour by", "Colorir por"),
+        "Attribute that colours the long section.",
+    ),
+    setting(
+        "labels",
+        Kind::Bool,
+        "/vn/long_labels",
+        L::new("Rótulos de muestras", "Sample labels", "Rótulos das amostras"),
+        "Write hole and grade beside each composite.",
+    ),
+    input(
+        "at",
+        Kind::Point,
+        false,
+        L::new("Punto base", "Base point", "Ponto base"),
+        "Lower-left corner of the long section in the drawing. Default: the last one, or beside the model.",
+    ),
+];
+
+const EDIT: &[Param] = &[
+    VEIN,
+    setting(
+        "action",
+        Kind::Choice { options: EDIT_ACTIONS },
+        "/vn/edit_action",
+        L::new("Edición", "Edit", "Edição"),
+        "What to do with the polygon drawn on the long section.",
+    ),
+    input(
+        "polygon",
+        Kind::Handle,
+        false,
+        L::new("Polígono", "Polygon", "Polígono"),
+        "Closed polyline drawn on the long section (exclude, grade, thickness, boundary).",
+    ),
+    setting(
+        "value",
+        Kind::num(None, None, 0.1),
+        "/vn/edit_value",
+        L::new("Valor", "Value", "Valor"),
+        "Grade or thickness for action=grade / thickness.",
+    ),
+];
+
+pub static MODEL_OPS: &[OpDef] = &[
+    OpDef {
+        name: "vn_variogram",
+        command: "MIN_VN_VARIOGRAM",
+        aliases: &[],
+        label: L::new("Variografía en el plano", "In-plane variography", "Variografia no plano"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Composites the vein intercepts of the loaded drillholes and channels (grade weighted by length, true thickness from the thickness column), computes the variograms of the accumulation (grade × thickness) on the vein plane (omnidirectional, along strike, down dip), fits a model and stores nugget, sill and both ranges for vn_estimate.",
+        params: VARIO,
+        positional: &["vein"],
+        result: "`vein`, `composites`, `missing_grade`, `stats` (`{grade_mean, thickness_mean, acc_mean, acc_variance}`), `experimental` (`{omni, strike, dip}`: lists of `{lag, gamma, pairs}`), `model` (`{kind, nugget, sill, range_strike, range_dip}`).",
+    },
+    OpDef {
+        name: "vn_estimate",
+        command: "MIN_VN_ESTIMATE",
+        aliases: &[],
+        label: L::new("Estimar prismas", "Estimate prisms", "Estimar prismas"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Builds the prism model of the vein: a grid of prisms on the vein plane between the hanging-wall and footwall surfaces; accumulation and thickness are block-kriged with the same weights and grade = accumulation / thickness. The boundary polygon, the maximum distance and the long-section edits limit or override the prisms. Draws the prisms, saves them as CSV, redraws the long section if drawn, and validates against the composites (cross-validation and composite vs prism grade).",
+        params: ESTIMATE,
+        positional: &["vein"],
+        result: "`vein`, `summary` (`{prisms, area, volume, tonnes, grade, thickness, edited, out_boundary, out_distance, out_walls, out_edits, not_estimated}`), `validation` (`{cv_n, cv_mean_error, cv_correlation, n, mean_composite, mean_prism, correlation, worst: [{hole, composite, prism}]}`), `composites`, `file`.",
+    },
+    OpDef {
+        name: "vn_long",
+        command: "MIN_VN_LONG",
+        aliases: &[],
+        label: L::new("Longitudinal", "Long section", "Longitudinal"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Draws the long section of the vein model flat in the drawing (along strike × up dip): prisms coloured by the chosen attribute, composites with labels, the boundary and the edit polygons. Polygons drawn on it are used by vn_edit.",
+        params: LONG,
+        positional: &["vein"],
+        result: "`vein`, `at` (base point), `u0`, `v0`, `width`, `height`, `prisms`, `composites`.",
+    },
+    OpDef {
+        name: "vn_edit",
+        command: "MIN_VN_EDIT",
+        aliases: &[],
+        label: L::new("Editar en la longitudinal", "Edit on the long section", "Editar na longitudinal"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Edits the prism model with a polygon drawn on the long section (polygon=handle, else the selection, else it asks to pick it): exclude prisms, set their grade or thickness, or set the boundary polygon; undo the last edit, clear all, or list them. The model is estimated again after each change.",
+        params: EDIT,
+        positional: &["action"],
+        result: "`vein`, `edits` (list of `{action, value, vertices}`), `boundary` (vertex count), and the vn_estimate result in `estimate` (null for list).",
+    },
+];
+
+pub static MODEL_PANELS: &[PanelSpec] = &[PanelSpec {
+    id: "min_vein_model",
+    title: L::new(
+        "Veta: modelo de prismas",
+        "Vein: prism model",
+        "Veio: modelo de prismas",
+    ),
+    command: "MIN_VN_MODEL_PANEL",
+    items: &[
+        Item::Param("vn_estimate", "vein"),
+        Item::Param("vn_estimate", "grade"),
+        Item::Param("vn_estimate", "thickness_col"),
+        Item::Section {
+            id: "vn_f_vario",
+            title: L::new(
+                "Variografía en el plano",
+                "In-plane variography",
+                "Variografia no plano",
+            ),
+            items: &[
+                Item::Param("vn_variogram", "lag"),
+                Item::Param("vn_variogram", "nlags"),
+                Item::Param("vn_estimate", "kind"),
+                Item::Button("vn_variogram"),
+                Item::Chart("vn_vario_chart"),
+                Item::Param("vn_estimate", "nugget"),
+                Item::Param("vn_estimate", "sill"),
+                Item::Param("vn_estimate", "range_strike"),
+                Item::Param("vn_estimate", "range_dip"),
+            ],
+            collapsed: false,
+        },
+        Item::Section {
+            id: "vn_f_prisms",
+            title: L::new("Prismas", "Prisms", "Prismas"),
+            items: &[
+                Item::Param("vn_estimate", "block_u"),
+                Item::Param("vn_estimate", "block_v"),
+                Item::Param("vn_estimate", "search_radius"),
+                Item::Param("vn_estimate", "min_samples"),
+                Item::Param("vn_estimate", "max_samples"),
+                Item::Param("vn_estimate", "max_distance"),
+                Item::Param("vn_estimate", "disc"),
+                Item::Param("vn_estimate", "density"),
+                Item::Param("vn_estimate", "color_by"),
+                Item::Param("vn_estimate", "draw_prisms"),
+            ],
+            collapsed: false,
+        },
+        Item::Button("vn_estimate"),
+        Item::Section {
+            id: "vn_f_long",
+            title: L::new(
+                "Longitudinal y ediciones",
+                "Long section and edits",
+                "Longitudinal e edições",
+            ),
+            items: &[
+                Item::Param("vn_long", "labels"),
+                Item::Button("vn_long"),
+                Item::Param("vn_edit", "action"),
+                Item::Param("vn_edit", "value"),
+                Item::Button("vn_edit"),
+            ],
+            collapsed: true,
+        },
+        Item::Status("vn_model_status"),
+    ],
+}];

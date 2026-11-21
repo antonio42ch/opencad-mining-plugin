@@ -120,6 +120,11 @@ impl CadModule for MiningModule {
                     tools: vec![
                         large("MIN_VN_PANEL", crate::veincommands::v().tool_panel, icon!("vein")),
                         small("MIN_VN_SURFACES", crate::veincommands::v().tool_surfaces, icon!("vein")),
+                        large(
+                            "MIN_VN_MODEL_PANEL",
+                            crate::veinmodel::m().tool_panel,
+                            icon!("vein_model"),
+                        ),
                     ],
                 },
                 RibbonGroup {

@@ -145,6 +145,8 @@ offsets/elevations as labels), title, area and the axis marker. With
 | `MIN_GT_MAPEO` | classified face mapping and labels | per class |
 | `MIN_ST_ESTEREO` | stereonet drawn in the DWG | 7 |
 | `MIN_VN_TECHO` / `MIN_VN_PISO` | vein hanging-wall / footwall surfaces | 30 / 4 |
+| `MIN_VN_PRISMAS` | vein prism model (coloured by attribute) | 7 |
+| `MIN_VN_LONG` | vein long section, samples and edit polygons | 7 |
 | `MIN_ST_CUNAS` | wedges on workings | by FS |
 | `MIN_SM_GRAFICO` | design charts | 7 |
 | `MIN_SC_LAMINA` | sheet frames, titles, areas, sections, markers | 7 |
@@ -177,6 +179,8 @@ bump. A breaking change increments `schema`.
 | `AX_AXIS` | Eje de labor | `id`, `e`, `n`, `z`, `az` (start), `length`, `elements`, `e1`…`eN` (see below) |
 | `SC_CUT` | Sección 3D | `set` (run id), `plane` (title), `area` |
 | `VN_SURFACE` | Superficie de veta | `vein`, `side` (`hanging_wall`, `footwall`) |
+| `VN_PRISM` | Prisma de veta | `vein`, `i`, `j`, grade, `thickness`, `tonnes` |
+| `VN_LONG` | Longitudinal de veta | `vein`, `i`/`j`/`value`, `hole` or `edit` |
 | `RM_WEDGE` | Cuña | `face`, `mode`, `fs`?, `volume`, `weight`, `sets` |
 | `RM_DRAW` | Dibujo geomecánico | `kind`, `series`? |
 | `GT_REC` | Registro geotécnico | `src`, `row`, `id`, `rmr`?, `q`?, `qp`?, `gsi`?, `class`?, `lith`?, `label`? — see GEOTECH.md |

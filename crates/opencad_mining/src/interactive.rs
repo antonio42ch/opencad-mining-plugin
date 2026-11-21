@@ -284,6 +284,8 @@ pub enum SelectionKind {
     Projection,
     /// Axes of a geotechnical mapping by chainage.
     GtAxes,
+    /// Polygon on a vein long section.
+    VnPolygon,
 }
 
 /// Gathers a selection (pick or window) and hands it to a follow-up command.
@@ -319,6 +321,7 @@ impl InteractiveCommand for PickSelection {
             SelectionKind::DomainSolids => (Pending::DomainSolids(handles), "MIN_RS_SETSOLID_EXEC"),
             SelectionKind::Projection => (Pending::Projection(handles), "MIN_GM_PROJECT_EXEC"),
             SelectionKind::GtAxes => (Pending::GtAxes(handles), "MIN_GT_CLASSIFY_EXEC"),
+            SelectionKind::VnPolygon => (Pending::VnPolygon(handles), "MIN_VN_EDIT_EXEC"),
         };
         set_pending(pending);
         CommandStep::Dispatch(next.into())

@@ -60,6 +60,19 @@ MIN_VN_SURFACES vein=V1 hw_layer=VETA_TECHO fw_layer=VETA_PISO vein_attr=tipo ve
 Read `diagnostics` and `worst`: fix the contacts it names, or change `radius`, `step` or
 `method`, and run it again.
 
+**Narrow vein prism model** (after the surfaces; edits are polygons drawn on the long section)
+
+```
+MIN_VN_VARIOGRAM vein=V1 grade=au thickness_col=potencia lag=10 nlags=10
+MIN_VN_ESTIMATE vein=V1 block_u=5 block_v=5 max_distance=40 density=2.7
+MIN_VN_LONG vein=V1
+MIN_VN_EDIT action=boundary polygon=<handle>
+MIN_VN_EDIT action=exclude polygon=<handle>
+```
+
+Check `validation` (cross-validation bias and correlation, composites against their
+prism) and the `out_*` counts of `summary` before accepting the model.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -1096,4 +1109,80 @@ Build the hanging-wall and footwall surfaces of a narrow vein from the mapped co
 Positional form: `MIN_VN_SURFACES vein` (`-` skips one).
 
 Result `data`: `vein`, `plane` (`{dip, dipdir, origin}`), `contacts` (`{hanging_wall, footwall, from_layers, from_handles, from_intercepts}`), `grid` (`{nx, ny, step, nodes}`), `diagnostics` (`{both, one_side, crossings, thin, thickness_min, thickness_mean, thickness_max, rms_hw, rms_fw, unchecked}`), `worst` (list of `{source, side, residual, point}`), `file` (saved surfaces or null).
+
+### `vn_variogram` — `MIN_VN_VARIOGRAM`
+
+Composites the vein intercepts of the loaded drillholes and channels (grade weighted by length, true thickness from the thickness column), computes the variograms of the accumulation (grade × thickness) on the vein plane (omnidirectional, along strike, down dip), fits a model and stores nugget, sill and both ranges for vn_estimate.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `grade` | text | yes | Assay column estimated (e.g. au, ag, cu%). |
+| `thickness_col` | text | yes | Assay column with the true vein thickness (channels: potencia). Empty or missing = length of the intercept along the vein normal. |
+| `lag` | number ≥ 0.1 | yes | Lag of the experimental variograms on the vein plane. |
+| `nlags` | integer 2..50 | yes | Number of lags. |
+| `kind` | one of `spherical`, `exponential`, `gaussian` | yes | Variogram model type. |
+
+Positional form: `MIN_VN_VARIOGRAM vein` (`-` skips one).
+
+Result `data`: `vein`, `composites`, `missing_grade`, `stats` (`{grade_mean, thickness_mean, acc_mean, acc_variance}`), `experimental` (`{omni, strike, dip}`: lists of `{lag, gamma, pairs}`), `model` (`{kind, nugget, sill, range_strike, range_dip}`).
+
+### `vn_estimate` — `MIN_VN_ESTIMATE`
+
+Builds the prism model of the vein: a grid of prisms on the vein plane between the hanging-wall and footwall surfaces; accumulation and thickness are block-kriged with the same weights and grade = accumulation / thickness. The boundary polygon, the maximum distance and the long-section edits limit or override the prisms. Draws the prisms, saves them as CSV, redraws the long section if drawn, and validates against the composites (cross-validation and composite vs prism grade).
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `grade` | text | yes | Assay column estimated (e.g. au, ag, cu%). |
+| `thickness_col` | text | yes | Assay column with the true vein thickness (channels: potencia). Empty or missing = length of the intercept along the vein normal. |
+| `kind` | one of `spherical`, `exponential`, `gaussian` | yes | Variogram model type. |
+| `nugget` | number ≥ 0 | yes | Nugget of the accumulation variogram (vn_variogram fills it). |
+| `sill` | number ≥ 0 | yes | Partial sill of the accumulation variogram. |
+| `range_strike` | number ≥ 0.01 | yes | Range along strike. |
+| `range_dip` | number ≥ 0.01 | yes | Range down dip. |
+| `block_u` | number ≥ 0.1 | yes | Prism size along strike. |
+| `block_v` | number ≥ 0.1 | yes | Prism size down dip. |
+| `search_radius` | number ≥ 0.1 | yes | Search radius on the vein plane. |
+| `min_samples` | integer 1..50 | yes | Minimum composites to estimate a prism. |
+| `max_samples` | integer 1..200 | yes | Maximum composites per prism. |
+| `max_distance` | number ≥ 0 | yes | Prisms farther than this from every composite are left out. |
+| `disc` | integer 1..10 | yes | Points per side used for block kriging. |
+| `density` | number ≥ 0.1 | yes | Density of the vein. |
+| `color_by` | one of `grade`, `thickness`, `accumulation`, `distance`, `variance` | yes | Attribute that colours the prisms and the long section. |
+| `draw_prisms` | boolean | yes | Draw the prisms between the walls. |
+
+Positional form: `MIN_VN_ESTIMATE vein` (`-` skips one).
+
+Result `data`: `vein`, `summary` (`{prisms, area, volume, tonnes, grade, thickness, edited, out_boundary, out_distance, out_walls, out_edits, not_estimated}`), `validation` (`{cv_n, cv_mean_error, cv_correlation, n, mean_composite, mean_prism, correlation, worst: [{hole, composite, prism}]}`), `composites`, `file`.
+
+### `vn_long` — `MIN_VN_LONG`
+
+Draws the long section of the vein model flat in the drawing (along strike × up dip): prisms coloured by the chosen attribute, composites with labels, the boundary and the edit polygons. Polygons drawn on it are used by vn_edit.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `color_by` | one of `grade`, `thickness`, `accumulation`, `distance`, `variance` | yes | Attribute that colours the long section. |
+| `labels` | boolean | yes | Write hole and grade beside each composite. |
+| `at` | point `x,y[,z]` |  | Lower-left corner of the long section in the drawing. Default: the last one, or beside the model. |
+
+Positional form: `MIN_VN_LONG vein` (`-` skips one).
+
+Result `data`: `vein`, `at` (base point), `u0`, `v0`, `width`, `height`, `prisms`, `composites`.
+
+### `vn_edit` — `MIN_VN_EDIT`
+
+Edits the prism model with a polygon drawn on the long section (polygon=handle, else the selection, else it asks to pick it): exclude prisms, set their grade or thickness, or set the boundary polygon; undo the last edit, clear all, or list them. The model is estimated again after each change.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `action` | one of `exclude`, `grade`, `thickness`, `boundary`, `undo`, `clear`, `list` | yes | What to do with the polygon drawn on the long section. |
+| `polygon` | entity handle (hex) |  | Closed polyline drawn on the long section (exclude, grade, thickness, boundary). |
+| `value` | number | yes | Grade or thickness for action=grade / thickness. |
+
+Positional form: `MIN_VN_EDIT action` (`-` skips one).
+
+Result `data`: `vein`, `edits` (list of `{action, value, vertices}`), `boundary` (vertex count), and the vn_estimate result in `estimate` (null for list).
 

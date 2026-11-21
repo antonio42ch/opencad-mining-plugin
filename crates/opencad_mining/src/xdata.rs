@@ -39,10 +39,14 @@ pub enum Class {
     RmWedge,
     /// Hanging-wall or footwall surface of a vein.
     VnSurface,
+    /// Prism of a vein model.
+    VnPrism,
+    /// Long section of a vein model.
+    VnLong,
 }
 
 impl Class {
-    pub const ALL: [Class; 20] = [
+    pub const ALL: [Class; 22] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -63,6 +67,8 @@ impl Class {
         Class::RmDraw,
         Class::RmWedge,
         Class::VnSurface,
+        Class::VnPrism,
+        Class::VnLong,
     ];
 
     pub fn key(self) -> &'static str {
@@ -87,6 +93,8 @@ impl Class {
             Self::RmDraw => "RM_DRAW",
             Self::RmWedge => "RM_WEDGE",
             Self::VnSurface => "VN_SURFACE",
+            Self::VnPrism => "VN_PRISM",
+            Self::VnLong => "VN_LONG",
         }
     }
 

@@ -205,7 +205,7 @@ pub fn surfaces_from(v: &Value) -> Option<Surfaces> {
     })
 }
 
-fn surface_file(host: &dyn HostApi, name: &str) -> Option<std::path::PathBuf> {
+pub fn surface_file(host: &dyn HostApi, name: &str) -> Option<std::path::PathBuf> {
     let safe: String = name
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
@@ -417,6 +417,7 @@ fn surfaces_op(host: &mut dyn HostApi, args: &Args, tab: u64, cfg: &ProjectConfi
 pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     match name {
         "vn_surfaces" => surfaces_op(host, args, tab, cfg),
+        "vn_variogram" | "vn_estimate" | "vn_long" | "vn_edit" => crate::veinmodel::run(host, name, args, tab, cfg),
         other => Err(OpError::new(
             ErrorCode::UnknownCommand,
             format!("unknown vein operation {other}"),

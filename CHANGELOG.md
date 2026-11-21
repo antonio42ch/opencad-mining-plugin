@@ -20,6 +20,13 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
   and from the vein intercepts of drillholes and channels, interpolated in the vein frame
   (kriging or IDW, search radius = maximum extrapolation), drawn, saved next to the drawing
   and diagnosed (fit to each contact, crossings, one-sided nodes, thickness range).
+- **Narrow-vein prism model** (stage B2, panel *Veta: modelo de prismas*): composites of the
+  vein intercepts (true thickness from `potencia`), in-plane variography of the accumulation
+  with a fitted model (`MIN_VN_VARIOGRAM`), prisms between the walls with accumulation and
+  thickness block-kriged with the same weights (`MIN_VN_ESTIMATE`), boundary polygon and
+  maximum distance, validation against the samples, CSV export, long section
+  (`MIN_VN_LONG`) and polygon edits on it — exclude, set grade, set thickness, boundary
+  (`MIN_VN_EDIT`).
 
 ### Fixed
 - A file path given as a command argument was wiped by the next command: file pickers

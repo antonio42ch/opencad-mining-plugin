@@ -30,6 +30,7 @@ pub fn all() -> Vec<&'static OpDef> {
         geotech::OPS,
         rockmech::OPS,
         vein::OPS,
+        vein::MODEL_OPS,
     ] {
         v.extend(m);
     }
@@ -49,6 +50,7 @@ pub fn panels() -> Vec<&'static PanelSpec> {
         geotech::PANELS,
         rockmech::PANELS,
         vein::PANELS,
+        vein::MODEL_PANELS,
     ] {
         v.extend(m);
     }
