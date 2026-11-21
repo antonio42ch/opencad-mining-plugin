@@ -39,3 +39,41 @@ fn sample_logging_with_lab() {
         "{c:#?}"
     );
 }
+
+#[test]
+fn sample_joints_hold_three_sets() {
+    use geotech_engine::sets::find_sets;
+    use geotech_engine::stereonet::Plane;
+    let t = table("joints.csv", GtKind::Joints);
+    let poles: Vec<_> = t
+        .records
+        .iter()
+        .filter_map(|r| {
+            Some(
+                Plane::new(
+                    r.num(geotech_engine::data::GtField::Dip)?,
+                    r.num(geotech_engine::data::GtField::DipDir)?,
+                )
+                .pole()
+                .vector(),
+            )
+        })
+        .collect();
+    assert_eq!(poles.len(), 135);
+    let sets = find_sets(&poles, 0, 20.0, 30.0);
+    assert_eq!(
+        sets.len(),
+        3,
+        "{:?}",
+        sets.iter().map(|s| (s.plane, s.count)).collect::<Vec<_>>()
+    );
+    let near = |dip: f64, dd: f64| {
+        sets.iter()
+            .any(|s| (s.plane.dip - dip).abs() < 6.0 && geotech_engine::stereonet::az_diff(s.plane.dipdir, dd) < 12.0)
+    };
+    assert!(
+        near(78.0, 40.0) && near(62.0, 150.0) && near(14.0, 265.0),
+        "{:?}",
+        sets.iter().map(|s| s.plane).collect::<Vec<_>>()
+    );
+}

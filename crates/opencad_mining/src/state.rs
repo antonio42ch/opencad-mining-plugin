@@ -23,6 +23,7 @@ pub struct TabState {
     pub axis: Option<AxisState>,
     pub rs: crate::resources::RsState,
     pub gt: crate::geotech::GtState,
+    pub rm: crate::rmcommands::RmState,
 }
 
 /// What an interactive pick hands over to the follow-up command.

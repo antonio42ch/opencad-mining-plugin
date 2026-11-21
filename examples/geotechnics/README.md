@@ -11,7 +11,8 @@ Los archivos usan `;` y coma decimal (como Excel en español) salvo `survey`, `a
 | `lab.csv` | UCS, mi, Ei, Poisson y densidad de las 3 litologías |
 | `mapping_chainage.csv` | 5 tramos de la galería por **progresiva** (PK 10, 30, 50, 70, 90) |
 | `mapping_coords.csv` | 3 puntos por **coordenadas** con RMR y Q ya calculados |
-| `joints.csv` | 3 discontinuidades (se cargan; se analizan en la fase de estructuras) |
+| `joints.csv` | 3 discontinuidades (mínimo) |
+| `discontinuidades.csv` | 135 discontinuidades en tres familias (≈ 78/040, 62/150, 14/265) para estereogramas, familias, cinemática y cuñas |
 
 Casos intencionales dentro de `logging.csv`:
 - **GT-01 60–80**: sin RQD ni espaciado → queda **sin clasificar** (gris).
@@ -81,3 +82,19 @@ MIN_GT_ESTIMATE
 MIN_GT_VIEW
 ```
 (`-` conserva el valor del panel; sin mapeo por progresiva no pide el eje.)
+
+## Estructuras, esfuerzos y diseño (v0.8)
+
+```
+MIN_GT_LOAD joints="<carpeta>/discontinuidades.csv"
+MIN_ST_STEREONET
+MIN_ST_SETS
+MIN_ST_KINEMATIC face_dip=70 face_dipdir=40 friction=30
+MIN_ST_WEDGES set_a=1 set_b=2 set_c=3 width=4 height=4 at=500000,8500000,3000
+MIN_SM_STRESS depth=500 k_h=1.5 k_hmin=1 az_h=90 axis_trend=90
+MIN_SM_KIRSCH radius=2.5
+MIN_SM_CONVERGENCE shotcrete=true sc_thickness=0.1
+MIN_SM_PILLAR width=8 height=5 room=6
+```
+Esperado: 135 polos, tres familias cerca de 78/040, 62/150 y 14/265, cuñas en techo y paredes
+con su FS, σv = 13,5 MPa a 500 m.

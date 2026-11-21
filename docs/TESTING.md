@@ -131,3 +131,21 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
 29. Modelo: **Estimar geotecnia** (with or without a resource model) → `gt_rmr`, `gt_gsi`, `gt_logq`,
     `gt_class` reported; **Ver modelo** with *Clase de macizo* → blocks in the class colours.
     The resource tonnage report is unchanged afterwards.
+
+## Structures, stresses and design (v0.8)
+
+30. Geotecnia → Datos: discontinuidades `examples/geotechnics/discontinuidades.csv` → **Cargar**
+    (135 records). Estructuras → **Estereograma** → poles and contours in the panel.
+31. **Calcular familias** → three sets near 78/040, 62/150 and 14/265 in the table; edit φ of
+    one row, run again: φ is kept.
+32. Cinemática: cara 70 / 040, φ 30 → planar, wedge and toppling percentages and the critical
+    sets; the face appears dashed on the stereonet.
+33. Cuñas: sets 1, 2, 3, width 4, height 4, draw an axis and run `MIN_ST_WEDGES axis=<handle>
+    chainage=10` → coloured wedges on the roof and walls at chainage 10, with mode, FS and volume.
+    Raise the support pressure: the falling wedge's FS grows (support / weight).
+34. Esfuerzos y diseño: depth 500, K 1.5 / 1.0, σH azimuth 90, axis trend 0 → σv 13.5 MPa and
+    σ1 20.25 MPa across the working; Kirsch with radius 2.5 → σθ max 47.25 MPa and the chart.
+35. Convergencia with shotcrete 0.1 m installed 2 m from the face → ground and support curves,
+    equilibrium and FS (or "the support reaches its capacity"); squeezing class.
+36. Pilares 8 × 8 × 5 m, rooms 6 m → load, four strengths and FS; pilar corona with a critical
+    Sc → Sc / Cs. **Dibujar gráfico** draws the last chart.

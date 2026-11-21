@@ -8,6 +8,7 @@ mod geology;
 mod geotech;
 mod queries;
 mod resources;
+mod rockmech;
 mod sections;
 mod workings;
 
@@ -24,6 +25,7 @@ pub fn all() -> Vec<&'static OpDef> {
         geology::OPS,
         resources::OPS,
         geotech::OPS,
+        rockmech::OPS,
     ] {
         v.extend(m);
     }
@@ -40,6 +42,7 @@ pub fn panels() -> Vec<&'static PanelSpec> {
         geology::PANELS,
         resources::PANELS,
         geotech::PANELS,
+        rockmech::PANELS,
     ] {
         v.extend(m);
     }

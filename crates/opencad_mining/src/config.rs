@@ -25,6 +25,7 @@ pub struct ProjectConfig {
     pub sc: SectionsConfig,
     pub rs: crate::rsconfig::ResourcesConfig,
     pub gt: crate::gtconfig::GeotechConfig,
+    pub rm: crate::rmconfig::RockMechConfig,
 }
 
 impl Default for ProjectConfig {
@@ -39,6 +40,7 @@ impl Default for ProjectConfig {
             sc: Default::default(),
             rs: Default::default(),
             gt: Default::default(),
+            rm: Default::default(),
         }
     }
 }

@@ -29,6 +29,10 @@ pub mod panels;
 pub mod queries;
 pub mod resources;
 pub mod ribbon;
+pub mod rmcommands;
+pub mod rmconfig;
+pub mod rmi18n;
+pub mod rockmech;
 pub mod rscommands;
 pub mod rsconfig;
 pub mod rsi18n;
@@ -59,7 +63,7 @@ pub static MANIFEST: PluginManifest = PluginManifest {
 };
 
 macro_rules! classes {
-    ($name:ident, $s:expr, $r:expr, $g:expr) => {
+    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr) => {
         static $name: EntityClasses = EntityClasses {
             app_id: xdata::APP,
             class_prefix: xdata::CLASS_PREFIX,
@@ -80,13 +84,15 @@ macro_rules! classes {
                 ("SC_CUT", $s.cls_cut),
                 ("SC_SHEET", $s.cls_sheet),
                 ("GT_REC", $g.cls_rec),
+                ("RM_DRAW", $m.cls_draw),
+                ("RM_WEDGE", $m.cls_wedge),
             ],
         };
     };
 }
-classes!(CLASSES_ES, i18n::ES, rsi18n::ES, gti18n::ES);
-classes!(CLASSES_EN, i18n::EN, rsi18n::EN, gti18n::EN);
-classes!(CLASSES_PT, i18n::PT, rsi18n::PT, gti18n::PT);
+classes!(CLASSES_ES, i18n::ES, rsi18n::ES, gti18n::ES, rmi18n::ES);
+classes!(CLASSES_EN, i18n::EN, rsi18n::EN, gti18n::EN, rmi18n::EN);
+classes!(CLASSES_PT, i18n::PT, rsi18n::PT, gti18n::PT, rmi18n::PT);
 
 pub struct MiningPlugin;
 
@@ -172,6 +178,8 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_GT_DATA_PANEL" => Some(gtpanels::DATA),
             "MIN_GT_HB_PANEL" => Some(gtpanels::HB),
             "MIN_GT_MODEL_PANEL" => Some(gtpanels::MODEL),
+            "MIN_RM_STRUCT_PANEL" => Some(rmcommands::STRUCT),
+            "MIN_RM_DESIGN_PANEL" => Some(rmcommands::DESIGN),
             _ => None,
         };
         if let Some(p) = panel {
