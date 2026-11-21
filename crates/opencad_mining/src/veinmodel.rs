@@ -696,6 +696,15 @@ fn long_op(host: &mut dyn HostApi, at: Option<mining_core::Vec3>, tab: u64, cfg:
     })
 }
 
+/// A single handle argument: a hex string (`Handle` parameter) or a list of them.
+fn handle_arg(args: &Args, key: &str) -> Option<Handle> {
+    match args.get(key)? {
+        Value::String(t) => u64::from_str_radix(t.trim(), 16).ok().map(Handle::new),
+        Value::Array(_) => crate::gtcommands::handles_arg(args, key)?.first().copied(),
+        _ => None,
+    }
+}
+
 fn polygon_of(host: &dyn HostApi, h: Handle, place: &LongPlacement) -> Option<Vec<[f64; 2]>> {
     let e = host.entities_batch(&[h]).ok()?.into_iter().next()??;
     let mut pts = crate::polyline_points(&e)?;
@@ -776,7 +785,7 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
                 ACTION_KEYS[cfg.vn.edit_action.min(6)],
                 "exclude" | "grade" | "thickness" | "boundary"
             );
-            let given = crate::gtcommands::handles_arg(args, "polygon").and_then(|h| h.first().copied());
+            let given = handle_arg(args, "polygon");
             if !needs || given.is_some() {
                 return edit_with(host, tab, cfg, given);
             }
@@ -817,6 +826,17 @@ pub fn follow_up(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_handle_argument_is_a_string_or_a_list() {
+        let one: Args = serde_json::from_value(json!({"polygon": "1F4"})).unwrap();
+        let list: Args = serde_json::from_value(json!({"polygon": ["1F4"]})).unwrap();
+        let none: Args = serde_json::from_value(json!({"polygon": "zz"})).unwrap();
+        assert_eq!(handle_arg(&one, "polygon"), Some(Handle::new(0x1F4)));
+        assert_eq!(handle_arg(&list, "polygon"), Some(Handle::new(0x1F4)));
+        assert_eq!(handle_arg(&none, "polygon"), None);
+        assert_eq!(handle_arg(&one, "other"), None);
+    }
 
     #[test]
     fn long_placement_round_trip_and_csv() {
