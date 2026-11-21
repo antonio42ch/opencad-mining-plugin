@@ -20,6 +20,14 @@ MIN_DH_LIST
 MIN_DH_DRAW assay_attr=cu% scheme=rainbow
 ```
 
+**Channel samples of the workings** (converted into holes `CH-…` appended to the drillholes)
+
+```
+MIN_CH_CONVERT points="C:\data\topo_points.csv" sheet="C:\data\channels.csv"
+MIN_DH_DRAW assay_attr=au
+MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=1,1,0
+```
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```

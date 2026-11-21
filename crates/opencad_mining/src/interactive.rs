@@ -365,3 +365,48 @@ impl InteractiveCommand for PickViewPoints {
         })
     }
 }
+
+/// Two points (with a rubber line) handed to a follow-up command as
+/// `Pending::TwoPoints`.
+pub struct PickTwoPoints {
+    prompts: [String; 2],
+    first: Option<Vec3>,
+    next: &'static str,
+}
+
+impl PickTwoPoints {
+    pub fn new(prompts: [String; 2], next: &'static str) -> Self {
+        PickTwoPoints {
+            prompts,
+            first: None,
+            next,
+        }
+    }
+}
+
+impl InteractiveCommand for PickTwoPoints {
+    fn prompt(&self) -> String {
+        self.prompts[usize::from(self.first.is_some())].clone()
+    }
+    fn on_point(&mut self, pt: [f64; 3]) -> CommandStep {
+        match self.first {
+            None => {
+                self.first = Some(pt);
+                CommandStep::NeedPoint
+            }
+            Some(a) => {
+                set_pending(Pending::TwoPoints(a, pt));
+                CommandStep::Dispatch(self.next.into())
+            }
+        }
+    }
+    fn on_cursor_move(&mut self, pt: [f64; 3]) -> Vec<PreviewWire> {
+        match self.first {
+            Some(a) => vec![PreviewWire::Polyline {
+                points: vec![a, pt],
+                color: Some([0.3, 0.8, 1.0, 1.0]),
+            }],
+            None => Vec::new(),
+        }
+    }
+}

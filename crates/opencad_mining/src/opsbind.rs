@@ -117,6 +117,18 @@ fn rows_of(codec: &str, cfg: &ProjectConfig) -> Vec<Vec<String>> {
             .into_iter()
             .map(|c| vec![c.name, c.above, c.below])
             .collect(),
+        "ch_orient" => cfg
+            .ch
+            .orient
+            .iter()
+            .map(|o| {
+                vec![
+                    o.channel.clone(),
+                    crate::resources::num(o.azimuth),
+                    crate::resources::num(o.inclination),
+                ]
+            })
+            .collect(),
         "joint_sets" => cfg
             .rm
             .sets
@@ -166,6 +178,15 @@ fn json_of(codec: &str, rows: &[Vec<String>]) -> Option<Value> {
             .map(|(i, r)| {
                 let name = cell(r, 0);
                 json!({"name": if name.is_empty() { format!("C{}", i + 1) } else { name }, "above": cell(r, 1), "below": cell(r, 2)})
+            })
+            .collect::<Vec<_>>()),
+        "ch_orient" => json!(rows
+            .iter()
+            .filter_map(|r| {
+                let ch = cell(r, 0);
+                let az = r.get(1).and_then(|s| parse_num(s))?;
+                let inc = r.get(2).and_then(|s| parse_num(s)).unwrap_or(0.0);
+                (!ch.is_empty() && (-90.0..=90.0).contains(&inc)).then(|| json!({"channel": ch, "azimuth": az.rem_euclid(360.0), "inclination": inc}))
             })
             .collect::<Vec<_>>()),
         "joint_sets" => json!(rows

@@ -110,6 +110,7 @@ fn handler(host: &mut dyn HostApi, def: &OpDef, args: &Args, tab: u64, cfg: &mut
         }
         ops::Group::Geotechnics => crate::gtcommands::run(host, def.name, args, tab, cfg),
         ops::Group::Resources => crate::rscommands::run(host, def.name, args, tab, cfg),
+        ops::Group::Drillholes if def.name.starts_with("ch_") => crate::chcommands::run(host, def.name, args, tab, cfg),
         _ => crate::commands::run(host, def.name, args, tab, cfg),
     }
 }

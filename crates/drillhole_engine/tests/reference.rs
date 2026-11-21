@@ -57,3 +57,26 @@ fn reference_holes_match_closed_form() {
     assert!(vert.assays[2].is_synthetic);
     assert_eq!(vert.assays[0].attributes["au"], Some(0.005));
 }
+
+/// The channel example of `examples/canales` converts completely.
+#[test]
+fn channel_example_converts() {
+    use drillhole_engine::channels::{convert, parse_points, parse_sheet, Options};
+    use drillhole_engine::table::RawTable;
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/canales");
+    let read = |f: &str| RawTable::from_csv_bytes(&std::fs::read(dir.join(f)).unwrap());
+    let pts = parse_points(&read("puntos_topograficos.csv")).unwrap();
+    let sheet = parse_sheet(&read("muestreo_canales.csv"), &Default::default()).unwrap();
+    assert_eq!(sheet.grade_columns, vec!["AU".to_string(), "AG".to_string()]);
+    let c = convert(&sheet, &pts, &Options::default());
+    assert!(c.issues.is_empty(), "{:?}", c.issues);
+    assert_eq!((c.collars.len(), c.samples), (24, 72));
+    // Every channel is horizontal and perpendicular to its N30E gallery (azimuth 120).
+    assert!(
+        c.collars
+            .iter()
+            .all(|k| (k.azimuth.unwrap() - 120.0).abs() < 0.2 && k.dip == Some(0.0)),
+        "{:?}",
+        c.collars[0]
+    );
+}

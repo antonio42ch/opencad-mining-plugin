@@ -4,6 +4,7 @@
 //! with automatic or manual column mapping) -> [`validate`] (R01..R06) ->
 //! [`pipeline`] (desurvey + interval mapping per hole, R07) -> [`color`].
 
+pub mod channels;
 pub mod color;
 pub mod desurvey;
 pub mod error;

@@ -14,6 +14,8 @@ forms below (positional paths, picks) keep working.
 | `MIN_DH_PANEL` / `MIN_UG_PANEL` / `MIN_GM_PANEL` | Show/hide the module panel |
 | `MIN_DH_LOAD [collar [survey [assays [geo]]]]` | Read collar/survey/assays/geology (CSV, TXT, TSV, XLSX, XLS, ODS), map columns, validate. Paths given as arguments (quoted when they contain spaces, `-` to skip one) replace the panel's; scripts and automation use this form |
 | `MIN_DH_DRAW` | Draw (replacing any previous drawing of the same holes) |
+| `MIN_CH_CONVERT [points [sheet]]` | Convert a channel sampling sheet (topographic point + distance along the working, sample widths, potencia, grades) into drillhole data `CH-…` appended to the loaded drillholes; writes `<drawing>_canales_*.csv`. With *Reconvertir al cargar sondajes* the channels are appended again after every `MIN_DH_LOAD` |
+| `MIN_CH_ORIENT` | Orientation of one channel from two clicks (or `p1=`/`p2=`), kept in the orientations table |
 | `MIN_DH_CLEAR` | Remove every drillhole entity created by the plugin |
 | `MIN_DH_GEOCOLORS` | Fill the geology colour table with the values of the selected attribute |
 | `MIN_UG_AXIS` | Solid along a 3D polyline (uses the selection if one entity is selected) |

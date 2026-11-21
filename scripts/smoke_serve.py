@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
 RESULT = "OPENMINING_RESULT "
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design"]
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels"]
 
 
 class Server:
@@ -115,6 +115,8 @@ def main():
     data = work / "data"
     data.mkdir()
     for f in ("collar.csv", "survey.csv", "assays.csv"):
+        shutil.copy(DATA / f, data / f)
+    for f in ("ch_points.csv", "ch_sheet.csv"):
         shutil.copy(DATA / f, data / f)
     for f in ("logging.csv", "lab.csv", "joints.csv"):
         shutil.copy(GT_DATA / f, data / ("gt_" + f))
@@ -325,6 +327,18 @@ def main():
         ok("sm_span", "sm_span computes Carter's scaled span", lambda d: d.get("scaled_span", 0) > 0 and d.get("ratio") is not None)
         run("MIN_SM_DRAW chart=convergence at=200,0,0 size=100")
         ok("sm_draw", "sm_draw draws the convergence chart", lambda d: d.get("entities", 0) >= 3)
+        # 9. Channel samples converted into drillholes and appended to them.
+        run(f'MIN_CH_CONVERT points="{data / "ch_points.csv"}" sheet="{data / "ch_sheet.csv"}"')
+        ok("ch_convert", "ch_convert turns 3 channels (5 samples) into holes added to the 3 drillholes", lambda d: d.get("channels") == 3 and d.get("samples") == 5 and d.get("holes") == 6 and d.get("issues") == [])
+        run("MIN_DH_LIST hole=CH-C1")
+        ok("dh_list", "the channel CH-C1 is a hole with its 2 samples, potencia and grades", lambda d: len(d.get("assays", [])) == 2 and d["assays"][1]["values"].get("au") == 6.2 and d["assays"][1]["values"].get("potencia") == 0.6)
+        run("MIN_DH_DRAW assay_attr=au")
+        ok("dh_draw", "dh_draw draws the 6 holes (drillholes + channels)", lambda d: d.get("holes") == 6)
+        run("MIN_CH_ORIENT channel=C2 p1=0,0,0 p2=0,10,0")
+        ok("ch_orient", "ch_orient sets channel C2 to azimuth 0 and converts again", lambda d: abs(d.get("azimuth", -1)) < 1e-9 and d["converted"]["channels"] == 3)
+        run("MIN_CH_CONVERT sheet=nothing.csv")
+        c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")
+
     finally:
         hist = s.control("history", quiet=True)
         entries = hist.get("entries", hist.get("result", {}).get("entries", []))

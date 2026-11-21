@@ -160,3 +160,14 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     *El lado hacia el que apunta el plano* → half the model; the other side → the rest; together every block.
 40. `MIN_HELP` lists the operations; `MIN_HELP op=gt_view` gives the parameters, the options of `mode` and the schema;
     `MIN_HELP workflows=true` adds the command sequences and the error codes.
+
+## Channel samples (v0.10)
+
+41. Load the reference drillholes, then Sondajes → **Canales**: `examples/canales/puntos_topograficos.csv` and
+    `muestreo_canales.csv` → **Convertir canales** → "24 convertidos (72 muestras)". **Dibujar** with
+    attribute `au`: short coloured channels on the backs of the two galleries, across the N30E vein.
+42. Type channel `3950-101-03` → **Orientar canal en pantalla**, two clicks → that channel turns to the
+    clicked direction and appears in the orientations table. Reload the drillholes (`MIN_DH_LOAD`): the
+    channels come back by themselves ("Canales agregados de nuevo").
+43. Delete the HACIA value of one row and the azimut column is absent → that channel is reported (no
+    direction) and the rest are converted.

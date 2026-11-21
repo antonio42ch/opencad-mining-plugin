@@ -43,6 +43,14 @@ MIN_DH_LIST
 MIN_DH_DRAW assay_attr=cu% scheme=rainbow
 ```
 
+**Channel samples of the workings** (converted into holes `CH-…` appended to the drillholes)
+
+```
+MIN_CH_CONVERT points="C:\data\topo_points.csv" sheet="C:\data\channels.csv"
+MIN_DH_DRAW assay_attr=au
+MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=1,1,0
+```
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -190,6 +198,41 @@ Fill the geology colour table (geo_colors) with the distinct values of geo_attr 
 | `geo_attr` | name among the geology attributes | yes | Geology attribute whose values get a colour. |
 
 Result `data`: `values` (number of geology values), `colors` (value -> colour).
+
+### `ch_convert` — `MIN_CH_CONVERT`
+
+Convert a channel sampling sheet into drillhole data: each channel is located from a topographic point and a distance along the working (towards the next point or an azimuth), horizontal and perpendicular to the working by default, and becomes a short hole (id prefix CH-) with its samples, thickness (potencia), grades and sample type. The channels are appended to the loaded drillholes (replacing earlier channels), so dh_draw, rs_composite, gt_* and the vein model use them.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `points` | file path | yes | Topographic points table: id, east (X), north (Y), elevation (Z). |
+| `sheet` | file path | yes | One row per sample: channel, topographic point, distance from it, next point (or azimuth of the working), sample width (or from/to), vein thickness (potencia), grades; optional: position, height, sample type, working, sample id, channel azimuth / inclination. |
+| `prefix` | text | yes | Prefix added to the channel ids to make the hole ids (CH-). |
+| `anchor` | one of `centre`, `start` | yes | The channel is centred on the located position, or starts there. |
+| `height` | number | yes | Added to the point elevation when the sheet has no height column. |
+| `azimuth_offset` | number -360..360 | yes | Default channel azimuth = working direction + this (90 = perpendicular, across the vein when the working follows it). |
+| `inclination` | number -90..90 | yes | Default channel inclination, positive up (0 = horizontal). |
+| `auto` | boolean | yes | Convert the channels again (and append them) every time the drillholes are loaded. |
+| `write_files` | boolean | yes | Write the converted collar / survey / assays / geology CSV next to the drawing. |
+
+Positional form: `MIN_CH_CONVERT points sheet` (`-` skips one).
+
+Result `data`: `channels`, `samples`, `issues` (list of `{channel, row, message}` for skipped channels), `grade_columns`, `text_columns`, `holes` (drillholes + channels loaded), `files` (written CSV or null).
+
+### `ch_orient` — `MIN_CH_ORIENT`
+
+Set the orientation of one channel from two points (picked on screen, or given as p1 and p2): azimuth and inclination of the line p1 -> p2. It is kept in the orientations table and the channels are converted again.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `channel` | text | yes | Channel id (as in the sheet, without prefix) whose orientation is set. |
+| `orientations` | table `Channel | Azimuth | Inclination` | yes | Channel orientations that replace the default: rows of [channel, azimuth, inclination]. |
+| `p1` | point `x,y[,z]` |  | Start of the channel direction (drawing coordinates). With p1 and p2 no pick is needed. |
+| `p2` | point `x,y[,z]` |  | End of the channel direction. |
+
+Positional form: `MIN_CH_ORIENT channel` (`-` skips one).
+
+Result `data`: `channel`, `azimuth`, `inclination`, and the ch_convert result under `converted`.
 
 ## Underground workings
 

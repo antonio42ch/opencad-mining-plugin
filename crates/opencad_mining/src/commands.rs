@@ -107,6 +107,11 @@ fn dh_load(host: &mut dyn HostApi, s: &Strings, tab: u64, cfg: &mut ProjectConfi
         "origin": if cfg.origin.enabled { json!([cfg.origin.x, cfg.origin.y, cfg.origin.z]) } else { Value::Null },
     });
     state::with_tab(tab, |t| t.data = Some(l.data));
+    // Channels converted earlier are appended again to the new drillholes.
+    let mut data = data;
+    if let Some(line) = crate::chcommands::reappend(host, tab, cfg) {
+        data["channels"] = json!(line);
+    }
     session::push_panels(host, cfg);
     session::set_status(host, l.summary.clone());
     Ok(OpResult::data(data))

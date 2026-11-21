@@ -3,6 +3,7 @@
 //! AI clients; edit them like any source file.
 
 mod axes;
+mod channels;
 mod drillholes;
 mod geology;
 mod geotech;
@@ -19,6 +20,7 @@ pub fn all() -> Vec<&'static OpDef> {
     for m in [
         queries::OPS,
         drillholes::OPS,
+        channels::OPS,
         workings::OPS,
         axes::OPS,
         sections::OPS,
@@ -36,6 +38,7 @@ pub fn panels() -> Vec<&'static PanelSpec> {
     let mut v: Vec<&'static PanelSpec> = Vec::new();
     for m in [
         drillholes::PANELS,
+        channels::PANELS,
         workings::PANELS,
         axes::PANELS,
         sections::PANELS,

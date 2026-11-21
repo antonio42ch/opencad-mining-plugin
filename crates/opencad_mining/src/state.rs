@@ -52,6 +52,8 @@ pub enum Pending {
     Projection(Vec<Handle>),
     /// Axis polylines of a geotechnical mapping by chainage.
     GtAxes(Vec<Handle>),
+    /// Two points picked for the orientation of a channel.
+    TwoPoints(Vec3, Vec3),
     /// Inputs of a block-model section view.
     BmView {
         axis: Option<Handle>,

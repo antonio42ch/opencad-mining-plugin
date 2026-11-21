@@ -11,6 +11,8 @@
 pub mod axes;
 pub mod cad;
 pub mod charts;
+pub mod chcommands;
+pub mod chconfig;
 pub mod commands;
 pub mod config;
 pub mod drillholes;
@@ -176,6 +178,7 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_RS_VARIO_PANEL" => Some(rspanels::VARIO),
             "MIN_RS_BM_PANEL" => Some(rspanels::BM),
             "MIN_GT_DATA_PANEL" => Some(gtpanels::DATA),
+            "MIN_CH_PANEL" => Some(chcommands::PANEL),
             "MIN_GT_HB_PANEL" => Some(gtpanels::HB),
             "MIN_GT_MODEL_PANEL" => Some(gtpanels::MODEL),
             "MIN_RM_STRUCT_PANEL" => Some(rmcommands::STRUCT),
@@ -194,6 +197,7 @@ impl BuiltinPlugin for MiningPlugin {
         }
         // Follow-ups of interactive picks write the result of their operation.
         let follow = commands::follow_up(host, &name, tab, &mut cfg)
+            .or_else(|| chcommands::follow_up(host, &name, tab, &mut cfg))
             .or_else(|| rscommands::follow_up(host, &name, tab, &mut cfg))
             .or_else(|| {
                 (name == "MIN_GT_CLASSIFY_EXEC")

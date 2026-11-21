@@ -3,6 +3,19 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — unreleased
+
+### Added
+- **Channel samples** (panel *Canales de muestreo*, `MIN_CH_CONVERT`, `MIN_CH_ORIENT`): the
+  sampling sheet of the workings (channel, topographic point, distance along the working
+  towards the next point or an azimuth, sample widths or from/to, potencia, sample type,
+  grades) is converted into drillhole data — holes `CH-…` appended to the loaded drillholes,
+  so drawing, composites, queries and the coming vein model use them. Channels are
+  horizontal and perpendicular to the working by default, centred on their position; each
+  can carry its own azimuth / inclination or be oriented with two clicks. Converted tables
+  are written next to the drawing and the channels are appended again after each drillhole
+  load. Example in `examples/canales`.
+
 ## [0.9.0] — unreleased
 
 ### Added

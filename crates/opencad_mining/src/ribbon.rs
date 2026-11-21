@@ -57,6 +57,7 @@ impl CadModule for MiningModule {
                         small("MIN_DH_LOAD", t.tool_load, icon!("load")),
                         small("MIN_DH_DRAW", t.tool_draw, icon!("draw")),
                         small("MIN_DH_CLEAR", t.tool_clear, icon!("clear")),
+                        large("MIN_CH_PANEL", crate::chcommands::c().tool, icon!("channels")),
                     ],
                 },
                 RibbonGroup {
