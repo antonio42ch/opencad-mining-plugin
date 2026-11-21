@@ -251,6 +251,54 @@ const ATTRS: &[Opt] = &[
         "class",
         L::new("Clase de macizo", "Rock mass class", "Classe do maciço"),
     ),
+    opt(
+        "dist",
+        L::new(
+            "Distancia media a los registros (confianza)",
+            "Mean distance to the records (confidence)",
+            "Distância média aos registros (confiança)",
+        ),
+    ),
+    opt(
+        "n",
+        L::new(
+            "N° de registros usados (confianza)",
+            "Number of records used (confidence)",
+            "N.º de registros usados (confiança)",
+        ),
+    ),
+];
+
+const SHOW: &[Opt] = &[
+    opt("all", L::new("Todos los bloques", "All blocks", "Todos os blocos")),
+    opt(
+        "below",
+        L::new(
+            "Solo valores menores que el umbral",
+            "Only values below the threshold",
+            "Somente valores abaixo do limiar",
+        ),
+    ),
+    opt(
+        "above",
+        L::new(
+            "Solo valores mayores que el umbral",
+            "Only values above the threshold",
+            "Somente valores acima do limiar",
+        ),
+    ),
+];
+
+const CUT_SIDES: &[Opt] = &[
+    opt(
+        "front",
+        L::new(
+            "El lado hacia el que apunta el plano",
+            "The side the plane faces",
+            "O lado para onde o plano aponta",
+        ),
+    ),
+    opt("back", L::new("El lado opuesto", "The opposite side", "O lado oposto")),
 ];
 
 const VIEW_MODES: &[Opt] = &[
@@ -290,6 +338,20 @@ const VIEW: &[Param] = &[
     setting("interval", Kind::num(Some(0.1), None, 5.0), "/gt/view_interval", L::new("Intervalo a lo largo del eje", "Interval along the axis", "Intervalo ao longo do eixo"), "Section spacing along the axis (mode axis, m)."),
     setting("limit", Kind::num(Some(1.0), None, 1000.0), "/gt/view_limit", L::new("Máximo de polígonos / cubos", "Maximum polygons / cubes", "Máximo de polígonos / cubos"),
         "Maximum polygons or cubes drawn; above it cubes are an even sample of the blocks."),
+    setting("show", Kind::Choice { options: SHOW }, "/gt/view_filter", L::new("Mostrar", "Show", "Mostrar"),
+        "Show every block, or only those whose attribute value is below / above `threshold` (e.g. attribute=class show=above threshold=3 shows classes IV and V; attribute=rmr show=below threshold=40 shows poor rock)."),
+    setting("threshold", Kind::num(None, None, 1.0), "/gt/view_threshold", L::new("Umbral (unidades del atributo)", "Threshold (attribute units)", "Limiar (unidades do atributo)"),
+        "Threshold of `show`, in the units of the attribute (RMR, GSI, log Q, class number, metres, records)."),
+    setting("cut", Kind::Bool, "/gt/view_cut", L::new("Cortar con un plano", "Cut with a plane", "Cortar com um plano"),
+        "Keep only the blocks on one side of a plane, to see inside the model (a vertical plane to see a section, a horizontal one to remove the top)."),
+    setting("cut_e", Kind::num(None, None, 10.0), "/gt/view_cut_e", L::new("Plano: punto E", "Plane: point E", "Plano: ponto E"), "East of a point of the cutting plane (world)."),
+    setting("cut_n", Kind::num(None, None, 10.0), "/gt/view_cut_n", L::new("Plano: punto N", "Plane: point N", "Plano: ponto N"), "North of a point of the cutting plane."),
+    setting("cut_z", Kind::num(None, None, 10.0), "/gt/view_cut_z", L::new("Plano: punto Z", "Plane: point Z", "Plano: ponto Z"), "Elevation of a point of the cutting plane."),
+    setting("cut_dip", Kind::num(Some(0.0), Some(90.0), 5.0), "/gt/view_cut_dip", L::new("Plano: buzamiento (90 = vertical)", "Plane: dip (90 = vertical)", "Plano: mergulho (90 = vertical)"), "Dip of the cutting plane (0 = horizontal, 90 = vertical)."),
+    setting("cut_dipdir", Kind::num(Some(0.0), Some(360.0), 5.0), "/gt/view_cut_dipdir", L::new("Plano: dirección de buzamiento", "Plane: dip direction", "Plano: direção de mergulho"),
+        "Dip direction of the cutting plane (azimuth); for a vertical plane it is the direction its normal points to."),
+    setting("cut_side", Kind::Choice { options: CUT_SIDES }, "/gt/view_cut_side", L::new("Lado que se conserva", "Side kept", "Lado mantido"),
+        "front = the side the plane faces (towards its dip direction, or up for a horizontal plane); back = the other side."),
     input("axis", Kind::Handle, false, L::new("Eje", "Axis", "Eixo"), "Axis polyline (mode axis). Without it a pick is started."),
     input("p1", Kind::Point, false, L::new("Punto 1", "Point 1", "Ponto 1"), "First point of the section line (mode two_points)."),
     input("p2", Kind::Point, false, L::new("Punto 2", "Point 2", "Ponto 2"), "Second point of the section line."),
@@ -363,7 +425,7 @@ pub static OPS: &[OpDef] = &[
         label: L::new("Estimar geotecnia", "Estimate geotechnics", "Estimar geotecnia"),
         group: Group::Geotechnics,
         kind: OpKind::Action,
-        summary: "Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class. Density and tonnage are not touched. Needs gt_classify first.",
+        summary: "Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class and the confidence columns gt_dist (mean distance to the records used, m) and gt_n (number of records used). Density and tonnage are not touched. Needs gt_classify first.",
         params: ESTIMATE,
         positional: &[],
         result: "`estimated`, `blocks` (in a domain), `no_domain` (records skipped by honour_domains), `columns`, `model_created`, `saved` (file path or null).",
@@ -489,6 +551,22 @@ const MODEL_ITEMS: &[Item] = &[
             Item::Param("gt_view", "count"),
             Item::Param("gt_view", "interval"),
             Item::Param("gt_view", "limit"),
+            Item::Section {
+                id: "gt_f_filter",
+                title: L::new("Filtro y corte", "Filter and cut", "Filtro e corte"),
+                items: &[
+                    Item::Param("gt_view", "show"),
+                    Item::Param("gt_view", "threshold"),
+                    Item::Param("gt_view", "cut"),
+                    Item::Param("gt_view", "cut_e"),
+                    Item::Param("gt_view", "cut_n"),
+                    Item::Param("gt_view", "cut_z"),
+                    Item::Param("gt_view", "cut_dip"),
+                    Item::Param("gt_view", "cut_dipdir"),
+                    Item::Param("gt_view", "cut_side"),
+                ],
+                collapsed: true,
+            },
             Item::Button("gt_view"),
         ],
         collapsed: false,

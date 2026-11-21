@@ -83,6 +83,12 @@ const RESOURCES: &[Param] = &[
     ),
 ];
 
+const HELP: &[Param] = &[
+    input("op", Kind::Text, false, L::same("op"), "Operation name or command (gt_view, MIN_GT_VIEW): return its parameters, JSON Schema and result. Without it the list of operations."),
+    input("group", Kind::Text, false, L::same("group"), "List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics."),
+    input("workflows", Kind::Bool, false, L::same("workflows"), "Also return the typical workflows (sequences of commands) and the error codes."),
+];
+
 const ENTITIES: &[Param] = &[
     input("class", Kind::Text, false, L::same("class"), "Class key filter (DH_TRACE, DH_ASSAY, UG_SOLID, UG_SECTION, GM_TRACE, GM_PROJ, AX_AXIS, SC_CUT, SC_SHEET, RS_COMP, RS_SURFACE, RS_VIEW, GT_REC; comma-separated)."),
     input("layer", Kind::Text, false, L::same("layer"), "Layer filter (exact name)."),
@@ -113,6 +119,14 @@ const fn q(
 }
 
 pub static OPS: &[OpDef] = &[
+    q(
+        "help",
+        "MIN_HELP",
+        Group::Project,
+        "Describe the Open Mining operations: the list (name, command, group, summary), or with `op` its parameters, JSON Schema and result; `workflows=true` adds the typical command sequences and the error codes. Use it to discover what can be done without the guide.",
+        HELP,
+        "`groups`, `operations` (list of `{name, command, group, kind, summary}`); with `op`: the same plus `aliases`, `positional`, `parameters` (`{key, type, setting, required, help, options}`), `input_schema`, `result`; with `workflows`: `workflows` (text) and `error_codes` (code -> meaning).",
+    ),
     q(
         "status",
         "MIN_STATUS",

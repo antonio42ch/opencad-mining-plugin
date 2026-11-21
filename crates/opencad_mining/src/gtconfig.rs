@@ -56,6 +56,17 @@ pub struct GeotechConfig {
     pub view_count: f64,
     pub view_interval: f64,
     pub view_limit: f64,
+    /// 0 show all, 1 only values below the threshold, 2 only above.
+    pub view_filter: usize,
+    pub view_threshold: f64,
+    pub view_cut: bool,
+    pub view_cut_e: f64,
+    pub view_cut_n: f64,
+    pub view_cut_z: f64,
+    pub view_cut_dip: f64,
+    pub view_cut_dipdir: f64,
+    /// 0 keep the side the normal points to, 1 the other.
+    pub view_cut_side: usize,
 }
 
 impl Default for GeotechConfig {
@@ -99,6 +110,15 @@ impl Default for GeotechConfig {
             view_count: 1.0,
             view_interval: 20.0,
             view_limit: 20_000.0,
+            view_filter: 0,
+            view_threshold: 3.0,
+            view_cut: false,
+            view_cut_e: 0.0,
+            view_cut_n: 0.0,
+            view_cut_z: 0.0,
+            view_cut_dip: 90.0,
+            view_cut_dipdir: 0.0,
+            view_cut_side: 0,
         }
     }
 }

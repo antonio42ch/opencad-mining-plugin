@@ -3,6 +3,6 @@ resolver = "2"
 members = ["crates/openmining_ops", "crates/geotech_engine", "crates/geostat_engine", "crates/blockmodel_engine", "crates/mining_core", "crates/drillhole_engine", "crates/solids_engine", "crates/geomap_engine", "crates/openmining_cli", "crates/opencad_mining"]
 
 [workspace.package]
-version = "0.8.1"
+version = "0.9.0"
 edition = "2021"
 license = "GPL-3.0-only"

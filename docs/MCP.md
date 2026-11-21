@@ -87,6 +87,18 @@ MIN_GT_VIEW attribute=class
 
 ## Project
 
+### `help` — `MIN_HELP`
+
+*Read-only.* Describe the Open Mining operations: the list (name, command, group, summary), or with `op` its parameters, JSON Schema and result; `workflows=true` adds the typical command sequences and the error codes. Use it to discover what can be done without the guide.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `op` | text |  | Operation name or command (gt_view, MIN_GT_VIEW): return its parameters, JSON Schema and result. Without it the list of operations. |
+| `group` | text |  | List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics. |
+| `workflows` | boolean |  | Also return the typical workflows (sequences of commands) and the error codes. |
+
+Result `data`: `groups`, `operations` (list of `{name, command, group, kind, summary}`); with `op`: the same plus `aliases`, `positional`, `parameters` (`{key, type, setting, required, help, options}`), `input_schema`, `result`; with `workflows`: `workflows` (text) and `error_codes` (code -> meaning).
+
 ### `status` — `MIN_STATUS`
 
 *Read-only.* What the project holds and what can be done next: drillholes, composites, domains and variogram models, block model, contact surfaces, geotechnical tables, axis being designed, drawing path. Call it first, and after an error with code no_data.
@@ -672,7 +684,7 @@ Draw the block model: level plans, sections through 2 points or along an axis, o
 | Argument | Type | Setting | Description |
 |---|---|---|---|
 | `mode` | one of `levels`, `two_points`, `axis`, `cubes` | yes | View type. |
-| `attribute` | one of `grade_ok`, `ok_variance`, `kriging_efficiency`, `domain`, `pass`, `samples`, `distance`, `nn`, `idw`, `sk`, `tonnage`, `gt_rmr`, `gt_gsi`, `gt_logq`, `gt_class` | yes | Column that colours the blocks. |
+| `attribute` | one of `grade_ok`, `ok_variance`, `kriging_efficiency`, `domain`, `pass`, `samples`, `distance`, `nn`, `idw`, `sk`, `tonnage`, `gt_rmr`, `gt_gsi`, `gt_logq`, `gt_class`, `gt_dist`, `gt_n` | yes | Column that colours the blocks. |
 | `cutoff` | number | yes | Grade cut-off of the grade attributes. |
 | `domain` | name or index among the domains | yes | Domain shown (name or index; 0 = all). |
 | `z_from` | number | yes | Lowest level (mode levels; from = to = every block level). |
@@ -787,7 +799,7 @@ Result `data`: `gsi`, `records` (used for the median), `lab` (true when the lith
 
 ### `gt_estimate` — `MIN_GT_ESTIMATE`
 
-Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class. Density and tonnage are not touched. Needs gt_classify first.
+Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class and the confidence columns gt_dist (mean distance to the records used, m) and gt_n (number of records used). Density and tonnage are not touched. Needs gt_classify first.
 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
@@ -811,7 +823,7 @@ Draw the block model coloured by a geotechnical column as level plans, vertical 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
 | `mode` | one of `levels`, `two_points`, `axis`, `cubes` | yes | levels = horizontal plans; two_points / axis = vertical sections; cubes = every block with a value as a cube (coloured meshes, one per colour). |
-| `attribute` | one of `rmr`, `gsi`, `logq`, `class` | yes | Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red). |
+| `attribute` | one of `rmr`, `gsi`, `logq`, `class`, `dist`, `n` | yes | Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red). |
 | `z_from` | number | yes | Lowest level (mode levels; from = to = every block level). |
 | `z_to` | number | yes | Highest level (mode levels). |
 | `z_step` | number ≥ 0.1 | yes | Level spacing (mode levels, m). |
@@ -819,6 +831,15 @@ Draw the block model coloured by a geotechnical column as level plans, vertical 
 | `count` | number ≥ 1 | yes | Number of parallel sections (mode two_points). |
 | `interval` | number ≥ 0.1 | yes | Section spacing along the axis (mode axis, m). |
 | `limit` | number ≥ 1 | yes | Maximum polygons or cubes drawn; above it cubes are an even sample of the blocks. |
+| `show` | one of `all`, `below`, `above` | yes | Show every block, or only those whose attribute value is below / above `threshold` (e.g. attribute=class show=above threshold=3 shows classes IV and V; attribute=rmr show=below threshold=40 shows poor rock). |
+| `threshold` | number | yes | Threshold of `show`, in the units of the attribute (RMR, GSI, log Q, class number, metres, records). |
+| `cut` | boolean | yes | Keep only the blocks on one side of a plane, to see inside the model (a vertical plane to see a section, a horizontal one to remove the top). |
+| `cut_e` | number | yes | East of a point of the cutting plane (world). |
+| `cut_n` | number | yes | North of a point of the cutting plane. |
+| `cut_z` | number | yes | Elevation of a point of the cutting plane. |
+| `cut_dip` | number 0..90 | yes | Dip of the cutting plane (0 = horizontal, 90 = vertical). |
+| `cut_dipdir` | number 0..360 | yes | Dip direction of the cutting plane (azimuth); for a vertical plane it is the direction its normal points to. |
+| `cut_side` | one of `front`, `back` | yes | front = the side the plane faces (towards its dip direction, or up for a horizontal plane); back = the other side. |
 | `axis` | entity handle (hex) |  | Axis polyline (mode axis). Without it a pick is started. |
 | `p1` | point `x,y[,z]` |  | First point of the section line (mode two_points). |
 | `p2` | point `x,y[,z]` |  | Second point of the section line. |

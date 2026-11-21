@@ -3,6 +3,19 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — unreleased
+
+### Added
+- **Filter and cut in the geotechnical model view:** show only the blocks below or above a
+  threshold of the attribute (e.g. classes IV and V, RMR < 40) and keep one side of a plane
+  (point, dip, dip direction), to see inside a cubes view. The colour scale stays that of
+  the whole model. Geotechnical attributes only.
+- **Confidence columns** `gt_dist` and `gt_n` (mean distance to the records and number of
+  records used by each block) and two view attributes to colour by them.
+- **`MIN_HELP`:** describes the operations (list, or one in full with its parameters,
+  options and JSON Schema; `workflows=true` adds the command sequences and error codes), so
+  an AI client can discover what Open Mining does without the guide.
+
 ## [0.8.1] — unreleased
 
 ### Added

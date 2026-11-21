@@ -153,3 +153,10 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     Clase de macizo, **Ver modelo** → one cube per block coloured by class (blue to red), one mesh per
     colour on `MIN_RS_VISTA`. Set *Máximo de polígonos / cubos* to 20 → the command line says how many
     of how many blocks were drawn. Switch back to *Niveles (planta)* → plans again.
+38. Modelo → **Estimar geotecnia**, then in *Vista* choose *Atributo* = Clase de macizo, *Tipo de vista* = Cubos and open
+    *Filtro y corte*: *Mostrar* = solo mayores que el umbral, umbral 3, **Ver modelo** → only classes IV and V.
+    Choose *Atributo* = Distancia media a los registros → the blocks far from any record are red.
+39. *Cortar con un plano*: a vertical plane (buzamiento 90, dirección 90) through the middle of the model, side
+    *El lado hacia el que apunta el plano* → half the model; the other side → the rest; together every block.
+40. `MIN_HELP` lists the operations; `MIN_HELP op=gt_view` gives the parameters, the options of `mode` and the schema;
+    `MIN_HELP workflows=true` adds the command sequences and the error codes.

@@ -1863,16 +1863,49 @@ pub fn view(
     let is_grade = matches!(b.view_attr, 0 | 7 | 8 | 9);
     let dom = b.view_domain.min(255) as u8;
     // Grade attributes honour the cut-off; the other attributes show every block.
-    let accept = |i: usize| -> bool {
+    let base = |i: usize| -> bool {
         if model.domain[i] == 0 || (dom != 0 && model.domain[i] != dom) || model.fraction[i] <= 0.0 {
             return false;
         }
         values.is_none_or(|v| v[i].is_finite() && (!is_grade || v[i] as f64 >= b.view_cutoff))
     };
+    // Geotechnical views can show only the poor (or good) rock and keep one side of a
+    // plane, to see inside the model. They never apply to the resource attributes.
+    let gt_view = b.view_attr >= GT_VIEW_ATTR;
+    let filter = gt_view
+        .then_some((b.view_filter, b.view_threshold))
+        .filter(|(m, _)| *m != 0);
+    let cut = (gt_view && b.view_cut).then(|| {
+        (
+            b.view_cut_point,
+            geotech_engine::stereonet::Plane::new(b.view_cut_dip, b.view_cut_dipdir).normal(),
+            b.view_cut_side == 1,
+        )
+    });
+    let accept = |i: usize| -> bool {
+        if !base(i) {
+            return false;
+        }
+        if let (Some((m, t)), Some(v)) = (filter, values) {
+            let x = v[i] as f64;
+            if (m == 1 && x >= t) || (m == 2 && x <= t) {
+                return false;
+            }
+        }
+        if let Some((p, n, back)) = &cut {
+            let d = mining_core::dot(mining_core::sub(model.geometry.center(i), *p), *n);
+            // Blocks centred exactly on the plane belong to the front side, so the two
+            // sides never overlap and together hold every block.
+            if (!*back && d < 0.0) || (*back && d >= 0.0) {
+                return false;
+            }
+        }
+        true
+    };
     // Colour scale over the accepted blocks.
     let (lo, hi) = match values {
         Some(v) => (0..model.len())
-            .filter(|&i| accept(i))
+            .filter(|&i| base(i))
             .fold((f64::MAX, f64::MIN), |(a, z), i| {
                 (a.min(v[i] as f64), z.max(v[i] as f64))
             }),
@@ -1897,7 +1930,11 @@ pub fn view(
                     return crate::geotech::class_color(v[i].round().clamp(1.0, 5.0) as u8);
                 }
                 if b.view_attr >= GT_VIEW_ATTR {
-                    return grade_color(ColorScheme::BlueToRed, hi + lo - v[i] as f64, lo, hi, &[]);
+                    // RMR, GSI, log Q and the number of records: low is bad (red). The
+                    // mean distance to the records: far is bad (red).
+                    let far_is_bad = b.view_attr == GT_VIEW_ATTR + 4;
+                    let x = if far_is_bad { v[i] as f64 } else { hi + lo - v[i] as f64 };
+                    return grade_color(ColorScheme::BlueToRed, x, lo, hi, &[]);
                 }
                 if scheme == ColorScheme::Custom && custom.is_empty() {
                     GRAY

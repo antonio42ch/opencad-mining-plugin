@@ -141,6 +141,28 @@ fn status(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig) -> Value {
     })
 }
 
+fn help(args: &Args) -> Outcome {
+    let text = |k: &str| args.get(k).and_then(Value::as_str);
+    let mut v = openmining_ops::help::help(text("op"), text("group")).ok_or_else(|| {
+        let what = text("op")
+            .map(|o| format!("operation '{o}'"))
+            .unwrap_or_else(|| format!("group '{}'", text("group").unwrap_or("")));
+        OpError::new(
+            ErrorCode::NotFound,
+            format!("no {what}: call MIN_HELP without arguments for the list"),
+        )
+        .at(if text("op").is_some() { "op" } else { "group" })
+    })?;
+    if args.get("workflows").and_then(Value::as_bool).unwrap_or(false) {
+        v["workflows"] = json!(openmining_ops::doc::WORKFLOWS);
+        v["error_codes"] = json!(openmining_ops::result::ErrorCode::ALL
+            .iter()
+            .map(|c| (c.as_str().to_string(), json!(c.describe())))
+            .collect::<serde_json::Map<_, _>>());
+    }
+    Ok(OpResult::data(v))
+}
+
 fn dh_list(tab: u64, args: &Args) -> Outcome {
     let data = state::with_tab(tab, |t| t.data.clone()).ok_or_else(|| no_data(crate::i18n::s().m_no_data))?;
     let limit = int(args, "limit", 500) as usize;
@@ -423,6 +445,7 @@ fn entities(host: &mut dyn HostApi, args: &Args) -> Outcome {
 pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     match name {
         "status" => Ok(OpResult::data(status(host, tab, cfg))),
+        "help" => help(args),
         "dh_list" => dh_list(tab, args),
         "rs_stats" => rs_stats(tab),
         "rs_variogram" => rs_variogram(tab, cfg, args),
