@@ -3,6 +3,29 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — unreleased
+
+### Added
+- **Geotechnics phase 3 — structures** (panel *Geotecnia: estructuras*): equal-area
+  stereonet with density contours (`st_stereonet`), automatic discontinuity sets with
+  Fisher statistics written to an editable table (`st_sets`), Markland kinematic analysis
+  for planar, wedge and flexural toppling (`st_kinematic`), wedges of three sets in the
+  roof and walls of a working with failure mode and FS, drawn on the working
+  (`st_wedges`), stereonet drawn in the DWG (`st_draw`).
+- **Geotechnics phase 4 — stresses and design** (panel *Geotecnia: esfuerzos y diseño*):
+  in situ stress by depth gradient and in the section of a working (`sm_stress`), Kirsch
+  around the opening with strength factor and overstressed zone (`sm_kirsch`),
+  convergence-confinement with Duncan Fama, Vlachopoulos-Diederichs LDP, shotcrete and
+  bolts and the Hoek-Marinos squeezing class (`sm_convergence`), pillars by tributary area
+  with four strength formulas (`sm_pillar`), crown pillar scaled span of Carter
+  (`sm_span`), design charts drawn in the DWG (`sm_draw`).
+- Sample discontinuities with three sets (`examples/geotechnics/discontinuidades.csv`).
+
+### Not included (on purpose)
+- Direct toppling, the critical scaled span (Sc–Q, Lang's chart) and Kirsch for
+  non-circular shapes beyond an equivalent radius: their criteria are empirical or need a
+  verified reference.
+
 ## [0.7.0] — unreleased
 
 ### Added

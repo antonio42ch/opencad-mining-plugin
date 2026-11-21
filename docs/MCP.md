@@ -816,3 +816,166 @@ Positional form: `MIN_GT_VIEW attribute` (`-` skips one).
 
 Result `data`: `attribute`, `column`; the drawing itself is reported by the resource view.
 
+### `st_stereonet` — `MIN_ST_STEREONET`
+
+Equal-area lower-hemisphere stereonet of the discontinuity poles (table and/or traces with dip), density contours and the set planes; chart in the panel.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `joints` | boolean | yes | Use the oriented discontinuities loaded with gt_load. |
+| `traces` | boolean | yes | Also use the geological traces (gm_trace) that store a dip and dip direction. |
+| `contours` | boolean | yes | Draw pole density contours (1 % counting cone). |
+
+Result `data`: `poles`, `from_table`, `from_traces`, `max_density` (% per 1 %), `sets` (shown).
+
+### `st_sets` — `MIN_ST_SETS`
+
+Group the poles into discontinuity sets (spherical clustering; Fisher K and 95 % cone) and write them into the sets table (friction and cohesion of existing rows are kept).
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `n_sets` | integer 0..6 | yes | Sets to find; 0 picks the density peaks that hold at least 3 poles (at most 6). |
+| `min_angle` | number 5..90 | yes | Minimum angle between set mean poles. |
+| `max_angle` | number 5..90 | yes | Poles farther than this from every set stay unassigned. |
+| `sets` | table `Set | Dip | Dip direction | φ (°) | c (kPa)` | yes | Discontinuity sets: rows of [name, dip, dip direction, friction degrees, cohesion kPa]. Filled by st_sets, editable. |
+
+Result `data`: `sets`: list of `{name, dip, dipdir, count, k, alpha95}`, `unassigned`.
+
+### `st_kinematic` — `MIN_ST_KINEMATIC`
+
+Markland kinematic analysis for a slope or excavation face: planar sliding, wedge sliding and flexural toppling (direct toppling not included), for every pole, pole pair and set.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `face_dip` | number 0..90 | yes | Dip of the slope or excavation face (90 = vertical wall). |
+| `face_dipdir` | number 0..360 | yes | Dip direction of the face (direction it faces). |
+| `friction` | number 0..90 | yes | Friction angle of the discontinuities. |
+| `lateral` | number 0..90 | yes | Lateral limits for planar sliding and toppling (usually 20). |
+
+Result `data`: `planar`, `wedge`, `flexural` (`{critical, of, pct}`), `planar_sets`, `wedge_sets` (pairs of set names), `flexural_sets`.
+
+### `st_wedges` — `MIN_ST_WEDGES`
+
+Largest wedges of three sets in the roof and walls of a working (planar faces), with volume, weight, failure mode and factor of safety (Hoek-Bray vector method, support pressure optional); drawn when an axis or point is given.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `axis_trend` | number 0..360 | yes | Trend of the working's axis (ignored when an axis polyline is given). |
+| `axis_plunge` | number -90..90 | yes | Plunge of the axis (positive down). |
+| `width` | number ≥ 0.1 | yes | Width of the opening (span of roof wedges). |
+| `height` | number ≥ 0.1 | yes | Height of the opening (span of wall wedges). |
+| `max_length` | number ≥ 0 | yes | Limit of the wedge trace along the axis (e.g. joint trace length). |
+| `set_a` | integer 1..20 | yes | First set of the wedge (1-based row of the sets table). |
+| `set_b` | integer 1..20 | yes | Second set (row). |
+| `set_c` | integer 1..20 | yes | Third set (row). |
+| `gamma` | number ≥ 1 | yes | Unit weight of the rock (wedges, in situ stress). |
+| `support` | number ≥ 0 | yes | Support pressure on the wedge base (bolts, shotcrete); 0 = none. |
+| `chainage` | number ≥ 0 | yes | Horizontal chainage on the axis polyline where the wedges are drawn. |
+| `axis` | entity handle (hex) |  | Axis polyline: its direction at `chainage` replaces the trend/plunge and the wedges are drawn there. |
+| `at` | point `x,y[,z]` |  | Draw the wedges with the axis passing through this point (floor level per the workings settings). Without axis or at: computed only. |
+
+Result `data`: `sets` (names used), `wedges`: list of `{face, mode, fs, volume, weight, apex_height, base_area}` (fs null = stable); `drawn`.
+
+### `st_draw` — `MIN_ST_DRAW`
+
+Draw the stereonet (net, poles, contours, set great circles) in the DWG as 2D entities.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `radius` | number ≥ 0.1 | yes | Radius of the stereonet drawn in the DWG. |
+| `at` | point `x,y[,z]` |  | Centre of the stereonet (world x,y[,z]; default 0,0,0). |
+
+Result `data`: `entities`.
+
+### `sm_stress` — `MIN_SM_STRESS`
+
+In situ stresses from the depth gradient (sigma_v = gamma H, sigma_H, sigma_h by K ratios) and their components in the section of a working with the given trend.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `depth` | number ≥ 1 | yes | Depth below surface of the working or pillars. |
+| `gamma` | number ≥ 1 | yes | Unit weight of the overburden. |
+| `k_h` | number ≥ 0 | yes | Ratio of the major horizontal to the vertical stress. |
+| `k_hmin` | number ≥ 0 | yes | Ratio of the minor horizontal to the vertical stress. |
+| `az_h` | number 0..360 | yes | Azimuth of the major horizontal stress. |
+| `axis_trend` | number 0..360 | yes | Trend of the working whose section stresses are computed. |
+
+Result `data`: `sigma_v`, `sigma_h_max`, `sigma_h_min`, `section`: `{sigma_x, sigma_z, tau_xz, sigma_1, sigma_3, angle, sigma_axial}` (MPa).
+
+### `sm_kirsch` — `MIN_SM_KIRSCH`
+
+Elastic stresses around a circular opening (Kirsch) in the section stress field: boundary tangential stress, strength factor with the Hoek-Brown rock mass and depth of the overstressed zone; chart in the panel. Non-circular openings use an equivalent radius (approximation).
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `opening` | one of `circle`, `equivalent` | yes | Circular opening of `radius`, or the circle with the area of width x height (approximation). |
+| `radius` | number ≥ 0.1 | yes | Radius of the circular opening. |
+
+Result `data`: `radius`, `equivalent`, `p1`, `p3`, `sigma_t_max`, `sigma_t_min`, `sigma_cm`, `strength_factor`, `overstressed_depth` (m).
+
+### `sm_convergence` — `MIN_SM_CONVERGENCE`
+
+Convergence-confinement of the working: Duncan Fama ground curve (c', phi' of the Hoek-Brown fit), Vlachopoulos-Diederichs displacement profile, shotcrete and bolt support curves, equilibrium, support factor of safety and Hoek-Marinos squeezing class; chart in the panel.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `e_mass` | number ≥ 0 | yes | Rock mass modulus; 0 takes it from the Hoek-Brown panel. |
+| `nu` | number 0..0.49 | yes | Poisson's ratio of the rock mass. |
+| `install` | number ≥ 0 | yes | Distance behind the face where the support is installed. |
+| `shotcrete` | boolean | yes | Include a shotcrete lining. |
+| `sc_thickness` | number ≥ 0.01 | yes | Shotcrete thickness. |
+| `sc_strength` | number ≥ 1 | yes | Shotcrete uniaxial compressive strength. |
+| `sc_modulus` | number ≥ 100 | yes | Shotcrete Young's modulus. |
+| `bolts` | boolean | yes | Include mechanically anchored rock bolts. |
+| `b_length` | number ≥ 0.1 | yes | Bolt length. |
+| `b_diameter` | number ≥ 0.001 | yes | Bolt diameter. |
+| `b_spacing_c` | number ≥ 0.1 | yes | Bolt spacing around the tunnel. |
+| `b_spacing_l` | number ≥ 0.1 | yes | Bolt spacing along the tunnel. |
+| `b_capacity` | number ≥ 0.001 | yes | Ultimate load of one bolt (MN); use the bolt's value. |
+| `b_q` | number ≥ 0 | yes | Deformation-load constant of the anchor and plate (m/MN), from pull tests. |
+
+Result `data`: `radius`, `p0`, `c`, `phi`, `e_mass`, `p_cr`, `plastic_radius`, `u_max` (m), `strain` (%), `squeezing`, `u_install`, `p_eq`, `u_eq`, `support_fs`, `support_p_max`.
+
+### `sm_pillar` — `MIN_SM_PILLAR`
+
+Pillar stress by tributary area (vertical stress of sm_stress), extraction ratio, strength by the chosen empirical formula (all formulas reported) and factor of safety.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `shape` | one of `square`, `rectangular`, `rib` | yes | Pillar shape for the tributary area. |
+| `width` | number ≥ 0.1 | yes | Pillar width. |
+| `length` | number ≥ 0.1 | yes | Pillar length (rectangular). |
+| `height` | number ≥ 0.1 | yes | Pillar height. |
+| `room` | number ≥ 0.1 | yes | Width of the rooms between pillars. |
+| `ucs` | number ≥ 0 | yes | Intact rock UCS for the strength formula; 0 takes σci of the Hoek-Brown panel. |
+| `formula` | one of `lunder_pakalnis`, `obert_duvall`, `bieniawski`, `hedley_grant` | yes | Empirical pillar strength formula. |
+
+Result `data`: `load`, `extraction`, `width_height`, `strength`, `fs`, `formula`, `all` (formula -> `{strength, fs}`).
+
+### `sm_span` — `MIN_SM_SPAN`
+
+Scaled span of a crown pillar (Carter 1992), compared with the critical scaled span you give.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `span` | number ≥ 0.1 | yes | Span of the crown pillar. |
+| `strike_length` | number ≥ 0.1 | yes | Length along strike. |
+| `thickness` | number ≥ 0.1 | yes | Thickness of the crown pillar. |
+| `gravity` | number ≥ 0.1 | yes | Specific gravity of the crown pillar rock. |
+| `dip` | number 0..90 | yes | Dip of the orebody / stope walls. |
+| `critical` | number ≥ 0 | yes | Critical scaled span from your reference (e.g. Carter's Sc-Q relation); compared with Cs. Not computed by the plugin. |
+
+Result `data`: `scaled_span`, `critical` (null if not given), `ratio` (Sc / Cs).
+
+### `sm_draw` — `MIN_SM_DRAW`
+
+Draw the last Kirsch or convergence-confinement chart in the DWG (frame, axes, curves).
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `chart` | one of `kirsch`, `convergence` | yes | Which computed chart to draw. |
+| `size` | number ≥ 1 | yes | Width of the drawn chart. |
+| `at` | point `x,y[,z]` |  | Lower-left corner of the chart (world; default 0,0,0). |
+
+Result `data`: `entities`.
+

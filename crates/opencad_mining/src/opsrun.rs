@@ -105,6 +105,9 @@ fn handler(host: &mut dyn HostApi, def: &OpDef, args: &Args, tab: u64, cfg: &mut
         return crate::queries::run(host, def.name, args, tab, cfg);
     }
     match def.group {
+        ops::Group::Geotechnics if def.name.starts_with("st_") || def.name.starts_with("sm_") => {
+            crate::rmcommands::run(host, def.name, args, tab, cfg)
+        }
         ops::Group::Geotechnics => crate::gtcommands::run(host, def.name, args, tab, cfg),
         ops::Group::Resources => crate::rscommands::run(host, def.name, args, tab, cfg),
         _ => crate::commands::run(host, def.name, args, tab, cfg),

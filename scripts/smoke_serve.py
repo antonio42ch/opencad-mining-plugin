@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
 RESULT = "OPENMINING_RESULT "
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model"]
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design"]
 
 
 class Server:
@@ -116,7 +116,7 @@ def main():
     data.mkdir()
     for f in ("collar.csv", "survey.csv", "assays.csv"):
         shutil.copy(DATA / f, data / f)
-    for f in ("logging.csv", "lab.csv"):
+    for f in ("logging.csv", "lab.csv", "joints.csv"):
         shutil.copy(GT_DATA / f, data / ("gt_" + f))
 
     c = Checks()
@@ -271,6 +271,35 @@ def main():
                "gt_view draws the model coloured by rock mass class")
         run("MIN_GT_SUMMARY")
         ok("gt_summary", "gt_summary repeats the classification", lambda d: d.get("with_rmr") == 5)
+
+        # 7. Structures: discontinuities -> stereonet, sets, kinematics, wedges.
+        run(f'MIN_GT_LOAD joints="{data / "gt_joints.csv"}"')
+        ok("gt_load", "gt_load reads 135 discontinuities", lambda d: (d["tables"]["joints"] or {}).get("records") == 135)
+        run("MIN_ST_STEREONET contours=true")
+        ok("st_stereonet", "st_stereonet plots the 135 poles of the table", lambda d: d.get("from_table") == 135 and d.get("max_density", 0) > 5)
+        run("MIN_ST_SETS n_sets=0 min_angle=20 max_angle=30")
+        ok("st_sets", "st_sets finds the 3 sets", lambda d: len(d.get("sets", [])) == 3)
+        run("MIN_ST_KINEMATIC face_dip=70 face_dipdir=40 friction=30 lateral=20")
+        ok("st_kinematic", "st_kinematic reports planar, wedge and toppling", lambda d: "planar" in d and "wedge" in d and "flexural" in d)
+        run("MIN_ST_WEDGES set_a=1 set_b=2 set_c=3 axis_trend=0 axis_plunge=0 width=4 height=4 at=0,200,0")
+        ok("st_wedges", "st_wedges finds and draws wedges with FS", lambda d: len(d.get("wedges", [])) >= 1 and d.get("drawn", 0) >= 1)
+        c.need(count(layer("MIN_ST_CUNAS")) >= 1, "the wedges are on MIN_ST_CUNAS")
+        run("MIN_ST_DRAW at=0,-300,0 radius=50")
+        ok("st_draw", "st_draw draws the stereonet in the DWG", lambda d: d.get("entities", 0) > 100)
+
+        # 8. Stresses and design.
+        run("MIN_SM_STRESS depth=500 gamma=27 k_h=1.5 k_hmin=1 az_h=90 axis_trend=0")
+        ok("sm_stress", "sm_stress: sigma_v 13.5, sigma_H 20.25 across a N-S working", lambda d: abs(d["sigma_v"] - 13.5) < 1e-6 and abs(d["section"]["sigma_1"] - 20.25) < 1e-6)
+        run("MIN_SM_KIRSCH opening=circle radius=2.5")
+        ok("sm_kirsch", "sm_kirsch: boundary stress 3 x 20.25 - 13.5 = 47.25", lambda d: abs(d["sigma_t_max"] - 47.25) < 1e-6)
+        run("MIN_SM_CONVERGENCE shotcrete=true sc_thickness=0.1 install=2")
+        ok("sm_convergence", "sm_convergence gives the ground curve and the support", lambda d: d.get("u_max", 0) > 0 and d.get("support_p_max") is not None)
+        run("MIN_SM_PILLAR shape=square width=8 height=5 room=6 formula=lunder_pakalnis")
+        ok("sm_pillar", "sm_pillar reports load, strength and FS", lambda d: d.get("fs", 0) > 0 and len(d.get("all", {})) == 4)
+        run("MIN_SM_SPAN span=10 strike_length=100 thickness=20 gravity=2.7 dip=70 critical=5")
+        ok("sm_span", "sm_span computes Carter's scaled span", lambda d: d.get("scaled_span", 0) > 0 and d.get("ratio") is not None)
+        run("MIN_SM_DRAW chart=convergence at=200,0,0 size=100")
+        ok("sm_draw", "sm_draw draws the convergence chart", lambda d: d.get("entities", 0) >= 3)
     finally:
         hist = s.control("history", quiet=True)
         entries = hist.get("entries", hist.get("result", {}).get("entries", []))

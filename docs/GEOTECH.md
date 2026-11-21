@@ -1,4 +1,4 @@
-# Geotechnics (phase 1)
+# Geotechnics (phases 1, 3 and 4)
 
 Data, rock mass classification, Hoek-Brown strength and a geotechnical block
 model. Empirical and analytical methods only: every value can be checked by
@@ -152,3 +152,63 @@ Q examples, the Hoek et al. 2002 parameters for GSI 50 / mi 10 / D 0:
 mb 1.677, s 0.0039, a 0.506, the simplified modulus at GSI 50). The sample
 tables in `crates/geotech_engine/tests/data` are classified by the CI test
 and by the end-to-end test in the real host.
+
+# Phase 3 — Structures
+
+Panel **Geotecnia: estructuras**. Poles come from the discontinuity table loaded
+with `gt_load joints=...` (dip, dip direction) and, optionally, from geological
+traces that store a dip (`gm_trace dip=...`).
+
+| Operation | Command | What it does |
+|---|---|---|
+| `st_stereonet` | `MIN_ST_STEREONET` | Equal-area (Schmidt) lower-hemisphere stereonet: poles, density contours (1 % counting cone, half-angle 8.11°; antipodal poles count together), set great circles |
+| `st_sets` | `MIN_ST_SETS` | Sets by spherical clustering: seeds at density peaks ≥ `min_angle` apart, k-means on axes (orientation-tensor mean), poles beyond `max_angle` unassigned. Fisher K = (N−1)/(N−R) and α95. Writes the editable sets table (φ and c kept) |
+| `st_kinematic` | `MIN_ST_KINEMATIC` | Markland test (Hoek & Bray 1981): planar sliding (φ < dip < face dip, within ±lateral), wedge sliding (intersection plunge between φ and the apparent face dip in its trend), flexural toppling (Goodman 1980: dips into the face, dip ≥ 90 − face dip + φ). **Direct toppling is not included** until its criterion is verified |
+| `st_wedges` | `MIN_ST_WEDGES` | Largest wedge of three sets on the roof and each wall (planar faces, Hoek & Brown 1980): trace scaled to the span (and `max_length`), apex height, volume, weight; stability by the vector method of Hoek & Bray: falling, sliding on one plane, sliding on two planes, with φ, c per set and a support pressure on the base. Drawn on the working at `chainage` of an axis polyline (`axis=`) or at a point (`at=`) |
+| `st_draw` | `MIN_ST_DRAW` | The stereonet as 2D entities (layer `MIN_ST_ESTEREO`) |
+
+Conventions: x east, y north, z up; dip 0–90, dip direction clockwise from
+north; pole = downward normal; projection radius `√2·sin((90 − plunge)/2)`.
+Two sets whose intersection is parallel to a face close no wedge on it (reported).
+
+# Phase 4 — Stresses and design
+
+Panel **Geotecnia: esfuerzos y diseño**. The rock mass strength comes from the
+Hoek-Brown panel (σci, GSI, mi, D, Ei).
+
+| Operation | Command | What it does |
+|---|---|---|
+| `sm_stress` | `MIN_SM_STRESS` | σv = γ·H/1000 (MPa), σH = KH·σv at its azimuth, σh = Kh·σv; components in the section of a working with the given trend (σx across, σz vertical, τ, in-plane σ1, σ3 and angle, axial) |
+| `sm_kirsch` | `MIN_SM_KIRSCH` | Kirsch (1898) around a circular opening in the in-plane σ1, σ3: σθ on the boundary (3σ1 − σ3 at the sides), strength factor σc(mass)/σθmax, depth of the zone where σθ exceeds the Hoek-Brown strength at σr. **Non-circular openings use the equal-area radius (approximation)** |
+| `sm_convergence` | `MIN_SM_CONVERGENCE` | Convergence-confinement (Hoek 1998): ground curve of Duncan Fama (1993) with c′, φ′ of the Hoek-Brown fit for tunnels (Hoek et al. 2002) and Erm (Hoek & Diederichs 2006, or typed); p0 = mean in-plane stress (the method assumes a hydrostatic field); displacement profile of Vlachopoulos & Diederichs (2009) for the installation distance; shotcrete and mechanically anchored bolts (Hoek 1998; stiffnesses add up to the smallest yield displacement); equilibrium, support FS, strain and Hoek & Marinos (2000) squeezing class |
+| `sm_pillar` | `MIN_SM_PILLAR` | Tributary-area stress (square, rectangular, rib), extraction, strength by Lunder & Pakalnis (1997), Obert & Duvall (1967), Bieniawski (1975) or Hedley & Grant (1972, K = 133·UCS/230); effective width 4A/P for rectangular pillars; FS of each formula |
+| `sm_span` | `MIN_SM_SPAN` | Crown pillar scaled span Cs = S·[γ/(t(1+S/L)(1−0.4 cos θ))]^0.5 (Carter 1992), compared with **the critical scaled span you give** (the Sc–Q relation and Lang's span chart are empirical and are not built in) |
+| `sm_draw` | `MIN_SM_DRAW` | The last Kirsch or convergence chart as polylines (layer `MIN_SM_GRAFICO`) |
+
+Fixed values: shotcrete Poisson 0.25, bolt steel modulus 200 GPa. Bolt capacity
+and the deformation-load constant Q are inputs (use the bolt's data).
+
+## Drawing (phases 3–4)
+
+| Layer | Content |
+|---|---|
+| `MIN_ST_ESTEREO` | stereonet (net, poles, contours, sets) |
+| `MIN_ST_CUNAS` | wedges (meshes; red FS < 1, orange < 1.5, green otherwise) |
+| `MIN_SM_GRAFICO` | design charts |
+
+XDATA: `RM_WEDGE` (*Cuña*): `face`, `mode`, `fs`?, `volume`, `weight`, `sets`;
+`RM_DRAW` (*Dibujo geomecánico*): `kind` (`stereonet`, `chart_kirsch`,
+`chart_convergence`), `series`?.
+
+## Verification (phases 3–4)
+
+Unit tests against closed forms and published values: projection reference
+points and inverse; pole and intersection geometry; Fisher statistics; three
+simulated sets recovered (and steep sets across the rim); Markland cases; a block
+on one plane gives tan φ / tan ψ; a symmetric two-plane wedge matches Hoek &
+Bray's wedge factor; roof pyramid falling and FS = support / weight; Kirsch 3σ1 −
+σ3, hydrostatic 2p and the far field; Duncan Fama elastic limit, continuity at
+pcr; LDP limits; shotcrete pressure; Lunder-Pakalnis ≈ 0.42 UCS at w/h = 1;
+tributary-area loads; Carter's formula. The sample discontinuities
+(`crates/geotech_engine/tests/data/joints.csv`, 135 poles in three sets) are
+grouped back into their sets by a CI test and by the end-to-end host test.

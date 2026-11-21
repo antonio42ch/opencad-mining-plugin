@@ -117,6 +117,20 @@ fn rows_of(codec: &str, cfg: &ProjectConfig) -> Vec<Vec<String>> {
             .into_iter()
             .map(|c| vec![c.name, c.above, c.below])
             .collect(),
+        "joint_sets" => cfg
+            .rm
+            .sets
+            .iter()
+            .map(|s| {
+                vec![
+                    s.name.clone(),
+                    crate::resources::num(s.dip),
+                    crate::resources::num(s.dipdir),
+                    crate::resources::num(s.friction),
+                    crate::resources::num(s.cohesion),
+                ]
+            })
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -152,6 +166,21 @@ fn json_of(codec: &str, rows: &[Vec<String>]) -> Option<Value> {
             .map(|(i, r)| {
                 let name = cell(r, 0);
                 json!({"name": if name.is_empty() { format!("C{}", i + 1) } else { name }, "above": cell(r, 1), "below": cell(r, 2)})
+            })
+            .collect::<Vec<_>>()),
+        "joint_sets" => json!(rows
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| {
+                let dip = r.get(1).and_then(|s| parse_num(s)).filter(|d| (0.0..=90.0).contains(d))?;
+                let dd = r.get(2).and_then(|s| parse_num(s))?;
+                let name = cell(r, 0);
+                Some(json!({
+                    "name": if name.is_empty() { format!("J{}", i + 1) } else { name },
+                    "dip": dip, "dipdir": dd.rem_euclid(360.0),
+                    "friction": r.get(3).and_then(|s| parse_num(s)).unwrap_or(30.0),
+                    "cohesion": r.get(4).and_then(|s| parse_num(s)).unwrap_or(0.0),
+                }))
             })
             .collect::<Vec<_>>()),
         _ => return None,

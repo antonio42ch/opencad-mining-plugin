@@ -1,17 +1,27 @@
 //! Geotechnics engine (no CAD, no UI): rock mass classification (RMR89,
 //! Q-system, GSI and correlations), Hoek-Brown 2002 strength and rock mass
-//! modulus, geotechnical data import and classification of records.
+//! modulus, geotechnical data import and classification of records;
+//! structures (stereonet, sets, kinematics, wedges) and stresses and design
+//! (in situ stress, Kirsch, convergence-confinement, pillars, crown pillars).
 //!
 //! Every rating follows the published tables; nothing is extrapolated. A
 //! record that lacks a parameter is left unclassified and says why.
 
 pub mod classify;
+pub mod convergence;
 pub mod data;
 pub mod gsi;
 pub mod hoek_brown;
+pub mod kinematic;
+pub mod kirsch;
 pub mod locate;
+pub mod pillar;
 pub mod q;
 pub mod rmr;
+pub mod sets;
+pub mod stereonet;
+pub mod stress;
+pub mod wedge;
 
 /// Rock mass class I (very good) .. V (very poor), from RMR.
 pub fn rmr_class(rmr: f64) -> u8 {
