@@ -121,7 +121,7 @@ fn handles(args: &Args, key: &str) -> Vec<Handle> {
 }
 
 /// Polylines on a layer (wildcards), as world points per polyline.
-fn layer_lines(host: &mut dyn HostApi, layer: &str) -> Vec<(String, Vec<mining_core::Vec3>)> {
+pub(crate) fn layer_lines(host: &mut dyn HostApi, layer: &str) -> Vec<(String, Vec<mining_core::Vec3>)> {
     let mut out = Vec::new();
     if layer.trim().is_empty() {
         return out;
@@ -143,7 +143,7 @@ fn layer_lines(host: &mut dyn HostApi, layer: &str) -> Vec<(String, Vec<mining_c
     out
 }
 
-fn picked_lines(host: &dyn HostApi, hs: &[Handle]) -> Vec<(String, Vec<mining_core::Vec3>)> {
+pub(crate) fn picked_lines(host: &dyn HostApi, hs: &[Handle]) -> Vec<(String, Vec<mining_core::Vec3>)> {
     let ents = host.entities_batch(hs).unwrap_or_default();
     hs.iter()
         .zip(ents)
@@ -418,6 +418,7 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
     match name {
         "vn_surfaces" => surfaces_op(host, args, tab, cfg),
         "vn_variogram" | "vn_estimate" | "vn_long" | "vn_edit" => crate::veinmodel::run(host, name, args, tab, cfg),
+        "vn_cubicate" | "vn_rules" | "vn_build" => crate::veinreserves::run(host, name, args, tab, cfg),
         other => Err(OpError::new(
             ErrorCode::UnknownCommand,
             format!("unknown vein operation {other}"),

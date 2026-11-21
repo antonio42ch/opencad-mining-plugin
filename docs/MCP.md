@@ -73,6 +73,17 @@ MIN_VN_EDIT action=exclude polygon=<handle>
 Check `validation` (cross-validation bias and correlation, composites against their
 prism) and the `out_*` counts of `summary` before accepting the model.
 
+**Narrow vein tonnage** (rules are the company's norms: test them before cubicating)
+
+```
+MIN_VN_RULES rules=[["Medido",3,15,"",""],["Indicado",2,30,"",""],["Inferido",1,"","",""]]
+MIN_VN_RULES sides=2 dist=20
+MIN_VN_CUBICATE vein=V1 level_layer=NIVELES raise_layer=CHIMENEAS mmw=0.8 overbreak_hw=0.1 recovery=90
+MIN_VN_BUILD vein=V1
+```
+
+Each block lists its sampled sides and `why` it missed the earlier rules.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -1185,4 +1196,64 @@ Edits the prism model with a polygon drawn on the long section (polygon=handle, 
 Positional form: `MIN_VN_EDIT action` (`-` skips one).
 
 Result `data`: `vein`, `edits` (list of `{action, value, vertices}`), `boundary` (vertex count), and the vn_estimate result in `estimate` (null for list).
+
+### `vn_cubicate` — `MIN_VN_CUBICATE`
+
+Tonnage of the estimated prism model: dilution (minimum mining width, hanging-wall / footwall overbreak with their grades) and recovery per prism; blocks between the levels (drifts) and raises picked or on their layers, projected on the vein plane, with sill and raise pillars kept apart; sampled sides per block (composites on the bounding workings); categories by the ordered rule table. Draws the workings and block labels on the long section and saves the blocks as CSV.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `mmw` | number ≥ 0 | yes | Thinner prisms are widened to this width, half on each wall. |
+| `overbreak_hw` | number ≥ 0 | yes | Overbreak on the hanging wall. |
+| `overbreak_fw` | number ≥ 0 | yes | Overbreak on the footwall. |
+| `grade_hw` | number ≥ 0 | yes | Grade of the diluting rock on the hanging wall. |
+| `grade_fw` | number ≥ 0 | yes | Grade of the diluting rock on the footwall. |
+| `density_waste` | number ≥ 0.1 | yes | Density of the diluting rock. |
+| `recovery` | number 0..100 | yes | Mining recovery applied to the diluted tonnes. |
+| `level_layer` | text | yes | Layer of the level polylines (wildcards allowed). Empty = none. |
+| `raise_layer` | text | yes | Layer of the raise polylines (wildcards allowed). Empty = none. |
+| `level_pillar` | number ≥ 0 | yes | Height of the pillar left above each level, along the vein (0 = none). |
+| `raise_pillar` | number ≥ 0 | yes | Total width of the pillar centred on each raise (0 = none). |
+| `side_tolerance` | number ≥ 0 | yes | A composite within this distance of a working samples that side of the block. |
+| `side_min` | integer 1..100 | yes | Composites needed on a side to count it as sampled. |
+| `rules` | table `Category | Sampled sides ≥ | Distance ≤ (m) | Samples ≥ | Diluted grade ≥` | yes | Ordered rules [category, min sampled sides, max mean distance, min samples, min diluted grade]; empty cells are not checked. Each block takes the first rule it meets; blocks that meet none are unclassified. Replace the example rules with the company's norms. |
+| `levels` | handles `1A,2B` |  | Level (drift) polylines picked instead of (or in addition to) the layer. |
+| `raises` | handles `1A,2B` |  | Raise polylines picked instead of (or in addition to) the layer. |
+
+Positional form: `MIN_VN_CUBICATE vein` (`-` skips one).
+
+Result `data`: `vein`, `workings` (`{levels, raises}`), `blocks` (list of `{name, category, sides: [lower, upper, left, right] (true / false / null), sampled, samples, dist, prisms, area, thickness, tonnes, grade, width, diluted_tonnes, diluted_grade, recovered, pillar_tonnes, why}`), `totals` (per category `{category, blocks, tonnes, grade, diluted_tonnes, diluted_grade, recovered}`, last = unclassified), `pillars` (`{tonnes, grade}`), `file`.
+
+### `vn_rules` — `MIN_VN_RULES`
+
+Lists the category rules (set them with rules=[[category, min_sides, max_dist, min_samples, min_grade], ...]) and, given sides / dist / samples / grade, tells which rule a block with those values meets and why each earlier rule fails.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `rules` | table `Category | Sampled sides ≥ | Distance ≤ (m) | Samples ≥ | Diluted grade ≥` | yes | Ordered rules [category, min sampled sides, max mean distance, min samples, min diluted grade]; empty cells are not checked. Each block takes the first rule it meets; blocks that meet none are unclassified. Replace the example rules with the company's norms. |
+| `sides` | integer 0..4 |  | Sampled sides of the block to test. |
+| `dist` | number ≥ 0 |  | Mean distance to the samples to test. |
+| `samples` | integer ≥ 0 |  | Samples of the block to test. |
+| `grade` | number |  | Diluted grade to test. |
+
+Result `data`: `rules` (list of `{category, min_sides, max_dist, min_samples, min_grade}`), `test` (`{values, rule, category, why}` or null).
+
+### `vn_build` — `MIN_VN_BUILD`
+
+Runs the whole vein model with the current settings: vn_surfaces, vn_variogram (if fit_variogram), vn_estimate and vn_cubicate (if tonnage). Stops at the first step that fails and names it; otherwise returns every step's result.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `fit_variogram` | boolean | yes | vn_build fits the in-plane variogram before estimating (otherwise uses the stored model). |
+| `tonnage` | boolean | yes | vn_build ends with vn_cubicate. |
+| `hw` | handles `1A,2B` |  | Passed to vn_surfaces. |
+| `fw` | handles `1A,2B` |  | Passed to vn_surfaces. |
+| `levels` | handles `1A,2B` |  | Passed to vn_cubicate. |
+| `raises` | handles `1A,2B` |  | Passed to vn_cubicate. |
+
+Positional form: `MIN_VN_BUILD vein` (`-` skips one).
+
+Result `data`: `vein`, `steps` (`{surfaces, variogram, estimate, cubicate}`: each step's data or null when skipped).
 

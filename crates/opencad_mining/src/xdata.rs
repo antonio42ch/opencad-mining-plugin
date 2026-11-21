@@ -43,10 +43,12 @@ pub enum Class {
     VnPrism,
     /// Long section of a vein model.
     VnLong,
+    /// Block label or working drawn on a vein long section.
+    VnBlock,
 }
 
 impl Class {
-    pub const ALL: [Class; 22] = [
+    pub const ALL: [Class; 23] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -69,6 +71,7 @@ impl Class {
         Class::VnSurface,
         Class::VnPrism,
         Class::VnLong,
+        Class::VnBlock,
     ];
 
     pub fn key(self) -> &'static str {
@@ -95,6 +98,7 @@ impl Class {
             Self::VnSurface => "VN_SURFACE",
             Self::VnPrism => "VN_PRISM",
             Self::VnLong => "VN_LONG",
+            Self::VnBlock => "VN_BLOCK",
         }
     }
 

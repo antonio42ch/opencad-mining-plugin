@@ -143,6 +143,19 @@ pub struct ModelState {
     pub composites: Vec<Composite>,
     pub prisms: Vec<Prism>,
     pub block: [f64; 2],
+    /// Category of each prism after vn_cubicate: rule index, -1 unclassified,
+    /// -2 pillar (empty before).
+    pub cats: Vec<i32>,
+}
+
+/// Colour of a category on the long section.
+pub fn cat_color(c: i32) -> u8 {
+    const PALETTE: [u8; 6] = [3, 2, 30, 6, 4, 1];
+    match c {
+        -2 => 251,
+        c if c >= 0 => PALETTE[c as usize % PALETTE.len()],
+        _ => 8,
+    }
 }
 
 fn f(x: f64, d: usize) -> String {
@@ -177,7 +190,7 @@ fn no_data(msg: impl Into<String>) -> OpError {
 }
 
 /// Surfaces of the vein: in memory, or read from the file saved next to the drawing.
-fn surfaces(host: &dyn HostApi, tab: u64, name: &str) -> Option<Surfaces> {
+pub(crate) fn surfaces(host: &dyn HostApi, tab: u64, name: &str) -> Option<Surfaces> {
     let mem = state::with_tab(tab, |t| {
         (t.vein.name == name).then(|| t.vein.surfaces.clone()).flatten()
     });
@@ -223,7 +236,7 @@ fn refresh(host: &mut dyn HostApi, cfg: &ProjectConfig, svg: Option<&str>, lines
     crate::opsbind::push_one(host, cfg, PANEL, Some((STATUS, lines.join("\n"))));
 }
 
-fn variogram_op(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
+pub(crate) fn variogram_op(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     let s = m();
     let (_, c) = load_composites(host, tab, cfg)?;
     let x = cfg.vn.clone();
@@ -361,7 +374,12 @@ fn attr(p: &Prism, by: usize) -> f64 {
     }
 }
 
-fn colors(prisms: &[Prism], by: usize) -> Vec<u8> {
+fn colors(prisms: &[Prism], by: usize, cats: &[i32]) -> Vec<u8> {
+    if by == 5 {
+        return (0..prisms.len())
+            .map(|k| cat_color(cats.get(k).copied().unwrap_or(-1)))
+            .collect();
+    }
     let vals: Vec<f64> = prisms.iter().map(|p| attr(p, by)).collect();
     let (lo, hi) = vals
         .iter()
@@ -461,7 +479,7 @@ fn summary_lines(sum: &Summary, v: &Validation) -> Vec<String> {
     l
 }
 
-fn estimate_op(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
+pub(crate) fn estimate_op(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
     let s = m();
     let (surf, c) = load_composites(host, tab, cfg)?;
     let x = &cfg.vn;
@@ -484,7 +502,7 @@ fn estimate_op(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Out
     if let Some(fl) = &file {
         lines.push(fmt(s.m_saved, &[fl]));
     }
-    let cols = colors(&prisms, x.color_by);
+    let cols = colors(&prisms, x.color_by, &[]);
     let prims: Vec<Prim> = if x.draw_prisms {
         prisms
             .iter()
@@ -525,6 +543,7 @@ fn estimate_op(host: &mut dyn HostApi, tab: u64, cfg: &mut ProjectConfig) -> Out
             composites: c.clone(),
             prisms: prisms.clone(),
             block: [x.block_u, x.block_v],
+            cats: Vec::new(),
         }
     });
     // Keep the long section in step with the model.
@@ -557,7 +576,12 @@ fn safe(name: &str) -> String {
         .collect()
 }
 
-fn long_op(host: &mut dyn HostApi, at: Option<mining_core::Vec3>, tab: u64, cfg: &mut ProjectConfig) -> Outcome {
+pub(crate) fn long_op(
+    host: &mut dyn HostApi,
+    at: Option<mining_core::Vec3>,
+    tab: u64,
+    cfg: &mut ProjectConfig,
+) -> Outcome {
     let s = m();
     let name = cfg.vn.name.trim().to_string();
     let st = state::with_tab(tab, |t| t.vein_model.clone());
@@ -599,7 +623,7 @@ fn long_op(host: &mut dyn HostApi, at: Option<mining_core::Vec3>, tab: u64, cfg:
     };
     cfg.vn.long.insert(name.clone(), place);
     let x = &cfg.vn;
-    let cols = colors(&st.prisms, x.color_by);
+    let cols = colors(&st.prisms, x.color_by, &st.cats);
     let tag = || Tag::new(Class::VnLong).with("vein", &name);
     let pt = |u: f64, v: f64| place.to_drawing(u, v);
     let mut prims: Vec<Prim> = st
@@ -668,7 +692,7 @@ fn long_op(host: &mut dyn HostApi, at: Option<mining_core::Vec3>, tab: u64, cfg:
             value: format!(
                 "{} — {}",
                 name,
-                ["ley", "potencia", "acumulación", "distancia", "varianza"][x.color_by.min(4)]
+                ["ley", "potencia", "acumulación", "distancia", "varianza", "categoría"][x.color_by.min(5)]
             ),
         },
         layer: LAYER_LONG.into(),

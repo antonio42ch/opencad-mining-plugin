@@ -125,6 +125,11 @@ impl CadModule for MiningModule {
                             crate::veinmodel::m().tool_panel,
                             icon!("vein_model"),
                         ),
+                        large(
+                            "MIN_VN_TONNAGE_PANEL",
+                            crate::veinreserves::t().tool_panel,
+                            icon!("vein_tonnage"),
+                        ),
                     ],
                 },
                 RibbonGroup {

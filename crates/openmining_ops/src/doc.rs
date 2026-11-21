@@ -50,6 +50,17 @@ MIN_VN_EDIT action=exclude polygon=<handle>
 Check `validation` (cross-validation bias and correlation, composites against their
 prism) and the `out_*` counts of `summary` before accepting the model.
 
+**Narrow vein tonnage** (rules are the company's norms: test them before cubicating)
+
+```
+MIN_VN_RULES rules=[["Medido",3,15,"",""],["Indicado",2,30,"",""],["Inferido",1,"","",""]]
+MIN_VN_RULES sides=2 dist=20
+MIN_VN_CUBICATE vein=V1 level_layer=NIVELES raise_layer=CHIMENEAS mmw=0.8 overbreak_hw=0.1 recovery=90
+MIN_VN_BUILD vein=V1
+```
+
+Each block lists its sampled sides and `why` it missed the earlier rules.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```

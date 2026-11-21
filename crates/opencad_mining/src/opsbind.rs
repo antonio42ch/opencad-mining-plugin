@@ -129,6 +129,21 @@ fn rows_of(codec: &str, cfg: &ProjectConfig) -> Vec<Vec<String>> {
                 ]
             })
             .collect(),
+        "vn_rules" => cfg
+            .vn
+            .rules
+            .iter()
+            .map(|r| {
+                let o = |v: Option<f64>| v.map(crate::resources::num).unwrap_or_default();
+                vec![
+                    r.category.clone(),
+                    o(r.min_sides.map(|x| x as f64)),
+                    o(r.max_dist),
+                    o(r.min_samples.map(|x| x as f64)),
+                    o(r.min_grade),
+                ]
+            })
+            .collect(),
         "joint_sets" => cfg
             .rm
             .sets
@@ -187,6 +202,14 @@ fn json_of(codec: &str, rows: &[Vec<String>]) -> Option<Value> {
                 let az = r.get(1).and_then(|s| parse_num(s))?;
                 let inc = r.get(2).and_then(|s| parse_num(s)).unwrap_or(0.0);
                 (!ch.is_empty() && (-90.0..=90.0).contains(&inc)).then(|| json!({"channel": ch, "azimuth": az.rem_euclid(360.0), "inclination": inc}))
+            })
+            .collect::<Vec<_>>()),
+        "vn_rules" => json!(rows
+            .iter()
+            .filter(|r| !cell(r, 0).is_empty())
+            .map(|r| {
+                let n = |i: usize| r.get(i).and_then(|s| parse_num(s)).filter(|v| *v >= 0.0);
+                json!({"category": cell(r, 0), "min_sides": n(1).map(|v| v.round() as u64), "max_dist": n(2), "min_samples": n(3).map(|v| v.round() as u64), "min_grade": n(4)})
             })
             .collect::<Vec<_>>()),
         "joint_sets" => json!(rows
@@ -731,6 +754,27 @@ mod tests {
                 back.dh.collar.as_str()
             ),
             ("/d/puntos.csv", "/d/log.csv", "/d/collar.csv")
+        );
+    }
+
+    /// The category rules survive the panel table (empty cells = not checked).
+    #[test]
+    fn vein_rules_round_trip_through_the_table() {
+        let c = ProjectConfig::default();
+        let rows = rows_of("vn_rules", &c);
+        assert_eq!(rows[0], vec!["Medido", "3", "15", "", ""]);
+        let v = json_of("vn_rules", &rows).unwrap();
+        let back: Vec<crate::veinconfig::RuleCfg> = serde_json::from_value(v).unwrap();
+        assert_eq!(back, c.vn.rules);
+        let typed = vec![
+            vec!["Reserva".to_string(), "".into(), "".into(), "2".into(), "4,5".into()],
+            vec!["".to_string(), "1".into()],
+        ];
+        let r: Vec<crate::veinconfig::RuleCfg> = serde_json::from_value(json_of("vn_rules", &typed).unwrap()).unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(
+            (r[0].min_sides, r[0].min_samples, r[0].min_grade),
+            (None, Some(2), Some(4.5))
         );
     }
 }

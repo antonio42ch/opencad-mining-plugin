@@ -192,3 +192,15 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     of it, *Edición* = *Excluir prismas*, **Editar en la longitudinal**, pick it → those prisms disappear in 3D and on
     the long section (magenta outline). *Polígono límite* with another polyline → only the prisms inside remain.
 50. *Deshacer la última*, then *Borrar ediciones y límite* → the model returns to step 48.
+
+## Vein tonnage (v0.10)
+
+51. After step 48, draw two level polylines (one along the channels) on layer `NIVELES` and a raise between
+    them on `CHIMENEAS`. Vetas → **Cubicación** → **Cubicar** → one line per block (`L1-L2/<R1`, …) with its
+    category and sampled sides (■ sampled, □ not, · no working), totals per category; red workings and block
+    labels on the long section.
+52. Raise *Ancho mínimo de minado* above the vein thickness → diluted tonnes rise and the diluted grade drops.
+    *Puente sobre cada nivel* = 3 → pillar tonnes are reported apart.
+53. Edit the rule table (e.g. Medido with 4 sides) → Cubicar → blocks move down a category and their `why`
+    names the failed condition. `MIN_VN_RULES sides=2 dist=20` in the command line tells the rule met.
+54. *Colorear por* = *Categoría* → the long section is coloured by category. **Construir todo** runs every step.

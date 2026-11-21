@@ -9,7 +9,7 @@ adjust (see [MCP.md](MCP.md)):
 | A — channels | done | Channel samples of the workings converted into drillhole data (`MIN_CH_CONVERT`, see [examples/canales](../examples/canales/README.md)) |
 | B1 — surfaces | done | Hanging-wall and footwall surfaces from mapped contacts and vein intercepts (`MIN_VN_SURFACES`) |
 | B2 — prisms and grades | done | 3D prisms between the surfaces, grades by accumulation on the vein plane, in-plane variography, validation against channels, boundary polygon, maximum distance, edits on the long section (`MIN_VN_VARIOGRAM`, `MIN_VN_ESTIMATE`, `MIN_VN_LONG`, `MIN_VN_EDIT`) |
-| B3 — tonnage | planned | Dilution and recovery, blocks between levels and raises, categories by rules managed from MCP |
+| B3 — tonnage | done | Dilution and recovery, blocks between levels and raises with pillars, sampled sides, categories by an ordered rule table managed from MCP (`MIN_VN_CUBICATE`, `MIN_VN_RULES`, `MIN_VN_BUILD`) |
 | B4 — branches | planned | Several veins, overlaps reported, incremental update when channels are added |
 
 ## B1 — Hanging-wall and footwall surfaces
@@ -106,3 +106,52 @@ default beside the model, then the last one): prisms as coloured faces, composit
 
 Edits are kept per vein in the project settings, applied in order on every estimate, and
 the model and long section are updated after each edit.
+
+## B3 — Tonnage, blocks and categories
+
+Panel **Veta: cubicación** (ribbon group *Vetas* → *Cubicación*), command `MIN_VN_CUBICATE`,
+after `MIN_VN_ESTIMATE`.
+
+**Dilution and recovery** (per prism). A prism thinner than the minimum mining width
+(`mmw`) is widened to it, half on each wall; the hanging-wall and footwall overbreak
+(`overbreak_hw`, `overbreak_fw`) are added on top. The added rock has its own density
+(`density_waste`) and grade on each wall (`grade_hw`, `grade_fw`):
+
+```
+diluted tonnes = area × (thickness × density + (hw + fw) × waste density)
+diluted grade  = (ore t × grade + hw t × grade_hw + fw t × grade_fw) / diluted tonnes
+recovered      = diluted tonnes × recovery
+```
+
+**Blocks between workings.** Levels (drifts) and raises are polylines on their layers
+(default `NIVELES` / `CHIMENEAS`) or picked (`levels=`, `raises=`); they are projected on
+the vein plane. Levels are numbered bottom-up `L1, L2, …` and raises left to right
+`R1, R2, …` along strike; each prism belongs to the panel between them, named
+`L1-L2/R1-R2` (`<L1`, `>L2`, `<R1`, `>R1` outside the first or last working). Prisms
+inside the sill pillar above each level (`level_pillar` m) or the pillar centred on each
+raise (`raise_pillar` m wide) are kept apart and reported as pillars.
+
+**Sampled sides.** Each side of a block (lower level, upper level, left raise, right
+raise) is sampled when at least `side_min` composites lie within `side_tolerance` metres
+of that working inside the block's span. A side without a working (an open edge of the
+model) does not count. The result lists the sides as `true` / `false` / `null`.
+
+**Categories by rules** (managed from MCP). The table `rules` is an ordered list of
+`[category, min sampled sides, max mean distance, min samples, min diluted grade]`; an
+empty cell is not checked. Each block takes the **first** rule it meets; blocks that meet
+none are unclassified. The plugin ships example rules (Medido 3 sides ≤ 15 m, Indicado
+2 sides ≤ 30 m, Inferido 1 side) — replace them with the company's norms, from the panel
+or with `rules=[[...], ...]`. `MIN_VN_RULES sides=2 dist=20 samples=4 grade=3.5` tells
+which rule a block with those values meets and why every earlier rule fails, so norms can
+be tested before cubicating. Each block of the result also carries `why`.
+
+**Outputs.** Command line and panel: one line per block (category, in-situ, diluted and
+recovered tonnes and grades, sampled sides ■ □ ·, mean distance) and totals per category;
+the result JSON (`blocks`, `totals`, `pillars`); `<drawing>_veta_<name>_bloques.csv`; on the
+long section, the workings (red) and the block labels coloured by category
+(`MIN_VN_BLOQUES`, XDATA `VN_BLOCK`). With *Colorear por* = *Categoría* the long section
+is coloured by category too.
+
+**Build all** (`MIN_VN_BUILD`): runs `vn_surfaces`, `vn_variogram` (if `fit_variogram`),
+`vn_estimate` and `vn_cubicate` (if `tonnage`) with the current settings, stops at the
+first failing step and names it.

@@ -47,7 +47,7 @@ pub struct VeinConfig {
     pub max_dist: f64,
     pub disc: usize,
     pub density: f64,
-    /// 0 grade, 1 thickness, 2 accumulation, 3 distance, 4 kriging variance.
+    /// 0 grade, 1 thickness, 2 accumulation, 3 distance, 4 kriging variance, 5 category.
     pub color_by: usize,
     pub draw_prisms: bool,
     pub long_labels: bool,
@@ -58,6 +58,70 @@ pub struct VeinConfig {
     pub long: BTreeMap<String, LongPlacement>,
     /// Boundary and edits on the long section, per vein.
     pub edits: BTreeMap<String, VeinEdits>,
+    // Stage B3: tonnage.
+    pub mmw: f64,
+    pub ob_hw: f64,
+    pub ob_fw: f64,
+    pub grade_hw: f64,
+    pub grade_fw: f64,
+    pub density_waste: f64,
+    /// Percent.
+    pub recovery: f64,
+    pub level_layer: String,
+    pub raise_layer: String,
+    pub level_pillar: f64,
+    pub raise_pillar: f64,
+    pub side_tol: f64,
+    pub side_min: usize,
+    pub rules: Vec<RuleCfg>,
+    pub build_fit: bool,
+    pub build_cubicate: bool,
+}
+
+/// One category rule; `None` = not checked.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RuleCfg {
+    pub category: String,
+    pub min_sides: Option<usize>,
+    pub max_dist: Option<f64>,
+    pub min_samples: Option<usize>,
+    pub min_grade: Option<f64>,
+}
+
+impl RuleCfg {
+    pub fn rule(&self) -> vein_engine::reserves::Rule {
+        vein_engine::reserves::Rule {
+            category: self.category.clone(),
+            min_sides: self.min_sides,
+            max_dist: self.max_dist,
+            min_samples: self.min_samples,
+            min_grade: self.min_grade,
+        }
+    }
+}
+
+/// Example rules (replace them with the company's norms).
+pub fn example_rules() -> Vec<RuleCfg> {
+    vec![
+        RuleCfg {
+            category: "Medido".into(),
+            min_sides: Some(3),
+            max_dist: Some(15.0),
+            ..Default::default()
+        },
+        RuleCfg {
+            category: "Indicado".into(),
+            min_sides: Some(2),
+            max_dist: Some(30.0),
+            ..Default::default()
+        },
+        RuleCfg {
+            category: "Inferido".into(),
+            min_sides: Some(1),
+            ..Default::default()
+        },
+    ]
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
@@ -140,6 +204,22 @@ impl Default for VeinConfig {
             edit_value: 0.0,
             long: BTreeMap::new(),
             edits: BTreeMap::new(),
+            mmw: 0.8,
+            ob_hw: 0.1,
+            ob_fw: 0.05,
+            grade_hw: 0.0,
+            grade_fw: 0.0,
+            density_waste: 2.6,
+            recovery: 90.0,
+            level_layer: "NIVELES".into(),
+            raise_layer: "CHIMENEAS".into(),
+            level_pillar: 0.0,
+            raise_pillar: 0.0,
+            side_tol: 3.0,
+            side_min: 1,
+            rules: example_rules(),
+            build_fit: true,
+            build_cubicate: true,
         }
     }
 }

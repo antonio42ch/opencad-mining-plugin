@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
 RESULT = "OPENMINING_RESULT "
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels", "min_vein", "min_vein_model"]
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels", "min_vein", "min_vein_model", "min_vein_tonnage"]
 
 
 class Server:
@@ -377,6 +377,25 @@ def main():
         run("MIN_VN_ESTIMATE vein=NOPE")
         c.need(result("vn_estimate").get("error", {}).get("code") == "no_data", "a vein without surfaces is reported as no_data")
         run("MIN_VN_ESTIMATE vein=V1")
+        tonnes = result("vn_estimate").get("data", {}).get("summary", {}).get("tonnes", 0)
+
+        # 12. Tonnage: two levels (the lower one along the channels) and a raise between them.
+        lv = poly([(500000, 8500030, 3950), (500000, 8500090, 3950)]) + poly([(500000, 8500030, 3958), (500000, 8500090, 3958)])
+        rs_ = poly([(500000, 8500060, 3940), (500000, 8500060, 3962)])
+        c.need(len(lv) == 2 and len(rs_) == 1, f"2 levels and 1 raise drawn ({lv} {rs_})")
+        run(f"MIN_VN_CUBICATE vein=V1 levels={','.join(lv)} raises={','.join(rs_)} level_layer= raise_layer= mmw=0.8 overbreak_hw=0.1 overbreak_fw=0.1 recovery=90 side_tolerance=3 side_min=1")
+        def blk(d, name):
+            return next((b for b in d.get("blocks", []) if b["name"] == name), None)
+        ok("vn_cubicate", "vn_cubicate splits the prisms into blocks between the levels and the raise", lambda d: d["workings"] == {"levels": 2, "raises": 1} and len(d["blocks"]) >= 4)
+        ok("vn_cubicate", "block L1-L2/<R1: lower level and raise sampled, classified", lambda d: blk(d, "L1-L2/<R1") is not None and blk(d, "L1-L2/<R1")["sides"][0] is True and blk(d, "L1-L2/<R1")["sides"][1] is False and blk(d, "L1-L2/<R1")["sampled"] >= 2 and blk(d, "L1-L2/<R1")["category"] is not None)
+        ok("vn_cubicate", "block tonnes add up to the model; dilution adds tonnes, recovery removes them", lambda d: abs(sum(b["tonnes"] for b in d["blocks"]) - tonnes) < 1e-6 * max(tonnes, 1) and sum(b["diluted_tonnes"] for b in d["blocks"]) > tonnes and all(b["recovered"] < b["diluted_tonnes"] for b in d["blocks"] if b["diluted_tonnes"] > 0))
+        c.need(count(layer("MIN_VN_BLOQUES")) > 0, "workings and block labels drawn on the long section")
+        run("MIN_VN_RULES sides=3 dist=5")
+        ok("vn_rules", "vn_rules: 3 sampled sides at 5 m meet the first example rule", lambda d: d["test"]["category"] == "Medido" and d["test"]["rule"] == 1)
+        run("MIN_VN_RULES sides=0 dist=5")
+        ok("vn_rules", "vn_rules: no sampled side meets no rule and says why", lambda d: d["test"]["category"] is None and len(d["test"]["why"]) == 3)
+        run(f"MIN_VN_BUILD vein=V1 hw={','.join(hw)} fw={','.join(fw)} levels={','.join(lv)} raises={','.join(rs_)} fit_variogram=false tonnage=true")
+        ok("vn_build", "vn_build runs surfaces, estimate and tonnage in one call", lambda d: d["steps"]["surfaces"] is not None and d["steps"]["variogram"] is None and d["steps"]["estimate"]["summary"]["prisms"] > 0 and len(d["steps"]["cubicate"]["blocks"]) >= 4)
 
         run("MIN_CH_CONVERT sheet=nothing.csv")
         c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")

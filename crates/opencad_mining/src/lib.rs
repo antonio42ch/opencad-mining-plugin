@@ -46,6 +46,7 @@ pub mod state;
 pub mod veincommands;
 pub mod veinconfig;
 pub mod veinmodel;
+pub mod veinreserves;
 pub mod xdata;
 
 use ocs_plugin_api::host::acadrust::EntityType;
@@ -68,7 +69,7 @@ pub static MANIFEST: PluginManifest = PluginManifest {
 };
 
 macro_rules! classes {
-    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr, $v:expr, $w:expr) => {
+    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr, $v:expr, $w:expr, $b:expr) => {
         static $name: EntityClasses = EntityClasses {
             app_id: xdata::APP,
             class_prefix: xdata::CLASS_PREFIX,
@@ -94,6 +95,7 @@ macro_rules! classes {
                 ("VN_SURFACE", $v.cls_surface),
                 ("VN_PRISM", $w.cls_prism),
                 ("VN_LONG", $w.cls_long),
+                ("VN_BLOCK", $b.cls_block),
             ],
         };
     };
@@ -105,7 +107,8 @@ classes!(
     gti18n::ES,
     rmi18n::ES,
     veincommands::ES,
-    veinmodel::ES
+    veinmodel::ES,
+    veinreserves::ES
 );
 classes!(
     CLASSES_EN,
@@ -114,7 +117,8 @@ classes!(
     gti18n::EN,
     rmi18n::EN,
     veincommands::EN,
-    veinmodel::EN
+    veinmodel::EN,
+    veinreserves::EN
 );
 classes!(
     CLASSES_PT,
@@ -123,7 +127,8 @@ classes!(
     gti18n::PT,
     rmi18n::PT,
     veincommands::PT,
-    veinmodel::PT
+    veinmodel::PT,
+    veinreserves::PT
 );
 
 pub struct MiningPlugin;
@@ -211,6 +216,7 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_CH_PANEL" => Some(chcommands::PANEL),
             "MIN_VN_PANEL" => Some(veincommands::PANEL),
             "MIN_VN_MODEL_PANEL" => Some(veinmodel::PANEL),
+            "MIN_VN_TONNAGE_PANEL" => Some(veinreserves::PANEL),
             "MIN_GT_HB_PANEL" => Some(gtpanels::HB),
             "MIN_GT_MODEL_PANEL" => Some(gtpanels::MODEL),
             "MIN_RM_STRUCT_PANEL" => Some(rmcommands::STRUCT),

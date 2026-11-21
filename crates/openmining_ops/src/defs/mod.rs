@@ -31,6 +31,7 @@ pub fn all() -> Vec<&'static OpDef> {
         rockmech::OPS,
         vein::OPS,
         vein::MODEL_OPS,
+        vein::TONNAGE_OPS,
     ] {
         v.extend(m);
     }
@@ -51,6 +52,7 @@ pub fn panels() -> Vec<&'static PanelSpec> {
         rockmech::PANELS,
         vein::PANELS,
         vein::MODEL_PANELS,
+        vein::TONNAGE_PANELS,
     ] {
         v.extend(m);
     }

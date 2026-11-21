@@ -27,6 +27,13 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
   maximum distance, validation against the samples, CSV export, long section
   (`MIN_VN_LONG`) and polygon edits on it — exclude, set grade, set thickness, boundary
   (`MIN_VN_EDIT`).
+- **Narrow-vein tonnage** (stage B3, panel *Veta: cubicación*, `MIN_VN_CUBICATE`): dilution
+  (minimum mining width, hanging-wall / footwall overbreak with their grades and density)
+  and recovery; blocks between levels and raises projected on the vein plane, with sill and
+  raise pillars; sampled sides per block; categories by an ordered rule table managed from
+  MCP and tested with `MIN_VN_RULES` (example rules only, no company norm built in); totals
+  per category, CSV and block labels on the long section. `MIN_VN_BUILD` runs the whole
+  vein model in one call.
 
 ### Fixed
 - A file path given as a command argument was wiped by the next command: file pickers

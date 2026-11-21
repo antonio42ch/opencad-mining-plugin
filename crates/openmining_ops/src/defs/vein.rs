@@ -683,3 +683,352 @@ pub static MODEL_PANELS: &[PanelSpec] = &[PanelSpec {
         Item::Status("vn_model_status"),
     ],
 }];
+
+// ---- Stage B3: tonnage, blocks and categories -------------------------------
+
+const RULES: Param = setting(
+    "rules",
+    Kind::Table {
+        columns: &[
+            L::new("Categoría", "Category", "Categoria"),
+            L::new("Lados muestreados ≥", "Sampled sides ≥", "Lados amostrados ≥"),
+            L::new("Distancia ≤ (m)", "Distance ≤ (m)", "Distância ≤ (m)"),
+            L::new("Muestras ≥", "Samples ≥", "Amostras ≥"),
+            L::new("Ley diluida ≥", "Diluted grade ≥", "Teor diluído ≥"),
+        ],
+        codec: "vn_rules",
+    },
+    "/vn/rules",
+    L::new("Reglas de categorización", "Category rules", "Regras de categorização"),
+    "Ordered rules [category, min sampled sides, max mean distance, min samples, min diluted grade]; empty cells are not checked. Each block takes the first rule it meets; blocks that meet none are unclassified. Replace the example rules with the company's norms.",
+);
+
+const CUBICATE: &[Param] = &[
+    VEIN,
+    setting(
+        "mmw",
+        Kind::num(Some(0.0), None, 0.05),
+        "/vn/mmw",
+        L::new(
+            "Ancho mínimo de minado (m)",
+            "Minimum mining width (m)",
+            "Largura mínima de lavra (m)",
+        ),
+        "Thinner prisms are widened to this width, half on each wall.",
+    ),
+    setting(
+        "overbreak_hw",
+        Kind::num(Some(0.0), None, 0.05),
+        "/vn/ob_hw",
+        L::new(
+            "Sobre-excavación techo (m)",
+            "Hanging-wall overbreak (m)",
+            "Sobre-escavação capa (m)",
+        ),
+        "Overbreak on the hanging wall.",
+    ),
+    setting(
+        "overbreak_fw",
+        Kind::num(Some(0.0), None, 0.05),
+        "/vn/ob_fw",
+        L::new(
+            "Sobre-excavación piso (m)",
+            "Footwall overbreak (m)",
+            "Sobre-escavação lapa (m)",
+        ),
+        "Overbreak on the footwall.",
+    ),
+    setting(
+        "grade_hw",
+        Kind::num(Some(0.0), None, 0.1),
+        "/vn/grade_hw",
+        L::new(
+            "Ley de la caja techo",
+            "Hanging-wall rock grade",
+            "Teor da encaixante capa",
+        ),
+        "Grade of the diluting rock on the hanging wall.",
+    ),
+    setting(
+        "grade_fw",
+        Kind::num(Some(0.0), None, 0.1),
+        "/vn/grade_fw",
+        L::new("Ley de la caja piso", "Footwall rock grade", "Teor da encaixante lapa"),
+        "Grade of the diluting rock on the footwall.",
+    ),
+    setting(
+        "density_waste",
+        Kind::num(Some(0.1), None, 0.1),
+        "/vn/density_waste",
+        L::new(
+            "Densidad de la caja (t/m³)",
+            "Wall rock density (t/m³)",
+            "Densidade da encaixante (t/m³)",
+        ),
+        "Density of the diluting rock.",
+    ),
+    setting(
+        "recovery",
+        Kind::num(Some(0.0), Some(100.0), 1.0),
+        "/vn/recovery",
+        L::new("Recuperación (%)", "Recovery (%)", "Recuperação (%)"),
+        "Mining recovery applied to the diluted tonnes.",
+    ),
+    setting(
+        "level_layer",
+        Kind::Text,
+        "/vn/level_layer",
+        L::new(
+            "Capa de niveles (galerías)",
+            "Level layer (drifts)",
+            "Camada de níveis (galerias)",
+        ),
+        "Layer of the level polylines (wildcards allowed). Empty = none.",
+    ),
+    setting(
+        "raise_layer",
+        Kind::Text,
+        "/vn/raise_layer",
+        L::new("Capa de chimeneas", "Raise layer", "Camada de chaminés"),
+        "Layer of the raise polylines (wildcards allowed). Empty = none.",
+    ),
+    setting(
+        "level_pillar",
+        Kind::num(Some(0.0), None, 0.5),
+        "/vn/level_pillar",
+        L::new(
+            "Puente sobre cada nivel (m)",
+            "Sill pillar above each level (m)",
+            "Pilar sobre cada nível (m)",
+        ),
+        "Height of the pillar left above each level, along the vein (0 = none).",
+    ),
+    setting(
+        "raise_pillar",
+        Kind::num(Some(0.0), None, 0.5),
+        "/vn/raise_pillar",
+        L::new("Pilar en chimeneas (m)", "Raise pillar (m)", "Pilar nas chaminés (m)"),
+        "Total width of the pillar centred on each raise (0 = none).",
+    ),
+    setting(
+        "side_tolerance",
+        Kind::num(Some(0.0), None, 0.5),
+        "/vn/side_tol",
+        L::new(
+            "Tolerancia de lado muestreado (m)",
+            "Sampled side tolerance (m)",
+            "Tolerância de lado amostrado (m)",
+        ),
+        "A composite within this distance of a working samples that side of the block.",
+    ),
+    setting(
+        "side_min",
+        Kind::Integer {
+            min: Some(1),
+            max: Some(100),
+        },
+        "/vn/side_min",
+        L::new("Muestras por lado", "Samples per side", "Amostras por lado"),
+        "Composites needed on a side to count it as sampled.",
+    ),
+    RULES,
+    input(
+        "levels",
+        Kind::Handles,
+        false,
+        L::new("Niveles", "Levels", "Níveis"),
+        "Level (drift) polylines picked instead of (or in addition to) the layer.",
+    ),
+    input(
+        "raises",
+        Kind::Handles,
+        false,
+        L::new("Chimeneas", "Raises", "Chaminés"),
+        "Raise polylines picked instead of (or in addition to) the layer.",
+    ),
+];
+
+const RULES_TEST: &[Param] = &[
+    RULES,
+    input(
+        "sides",
+        Kind::Integer {
+            min: Some(0),
+            max: Some(4),
+        },
+        false,
+        L::new("Lados muestreados", "Sampled sides", "Lados amostrados"),
+        "Sampled sides of the block to test.",
+    ),
+    input(
+        "dist",
+        Kind::num(Some(0.0), None, 1.0),
+        false,
+        L::new("Distancia (m)", "Distance (m)", "Distância (m)"),
+        "Mean distance to the samples to test.",
+    ),
+    input(
+        "samples",
+        Kind::Integer {
+            min: Some(0),
+            max: None,
+        },
+        false,
+        L::new("Muestras", "Samples", "Amostras"),
+        "Samples of the block to test.",
+    ),
+    input(
+        "grade",
+        Kind::num(None, None, 0.1),
+        false,
+        L::new("Ley diluida", "Diluted grade", "Teor diluído"),
+        "Diluted grade to test.",
+    ),
+];
+
+const BUILD: &[Param] = &[
+    VEIN,
+    setting(
+        "fit_variogram",
+        Kind::Bool,
+        "/vn/build_fit",
+        L::new("Ajustar el variograma", "Fit the variogram", "Ajustar o variograma"),
+        "vn_build fits the in-plane variogram before estimating (otherwise uses the stored model).",
+    ),
+    setting(
+        "tonnage",
+        Kind::Bool,
+        "/vn/build_cubicate",
+        L::new("Cubicar", "Compute tonnage", "Cubar"),
+        "vn_build ends with vn_cubicate.",
+    ),
+    input(
+        "hw",
+        Kind::Handles,
+        false,
+        L::new("Polilíneas de techo", "Hanging-wall polylines", "Polilinhas de capa"),
+        "Passed to vn_surfaces.",
+    ),
+    input(
+        "fw",
+        Kind::Handles,
+        false,
+        L::new("Polilíneas de piso", "Footwall polylines", "Polilinhas de lapa"),
+        "Passed to vn_surfaces.",
+    ),
+    input(
+        "levels",
+        Kind::Handles,
+        false,
+        L::new("Niveles", "Levels", "Níveis"),
+        "Passed to vn_cubicate.",
+    ),
+    input(
+        "raises",
+        Kind::Handles,
+        false,
+        L::new("Chimeneas", "Raises", "Chaminés"),
+        "Passed to vn_cubicate.",
+    ),
+];
+
+pub static TONNAGE_OPS: &[OpDef] = &[
+    OpDef {
+        name: "vn_cubicate",
+        command: "MIN_VN_CUBICATE",
+        aliases: &[],
+        label: L::new("Cubicar", "Compute tonnage", "Cubar"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Tonnage of the estimated prism model: dilution (minimum mining width, hanging-wall / footwall overbreak with their grades) and recovery per prism; blocks between the levels (drifts) and raises picked or on their layers, projected on the vein plane, with sill and raise pillars kept apart; sampled sides per block (composites on the bounding workings); categories by the ordered rule table. Draws the workings and block labels on the long section and saves the blocks as CSV.",
+        params: CUBICATE,
+        positional: &["vein"],
+        result: "`vein`, `workings` (`{levels, raises}`), `blocks` (list of `{name, category, sides: [lower, upper, left, right] (true / false / null), sampled, samples, dist, prisms, area, thickness, tonnes, grade, width, diluted_tonnes, diluted_grade, recovered, pillar_tonnes, why}`), `totals` (per category `{category, blocks, tonnes, grade, diluted_tonnes, diluted_grade, recovered}`, last = unclassified), `pillars` (`{tonnes, grade}`), `file`.",
+    },
+    OpDef {
+        name: "vn_rules",
+        command: "MIN_VN_RULES",
+        aliases: &[],
+        label: L::new("Probar reglas", "Test rules", "Testar regras"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Lists the category rules (set them with rules=[[category, min_sides, max_dist, min_samples, min_grade], ...]) and, given sides / dist / samples / grade, tells which rule a block with those values meets and why each earlier rule fails.",
+        params: RULES_TEST,
+        positional: &[],
+        result: "`rules` (list of `{category, min_sides, max_dist, min_samples, min_grade}`), `test` (`{values, rule, category, why}` or null).",
+    },
+    OpDef {
+        name: "vn_build",
+        command: "MIN_VN_BUILD",
+        aliases: &[],
+        label: L::new("Construir todo", "Build all", "Construir tudo"),
+        group: Group::Veins,
+        kind: OpKind::Action,
+        summary: "Runs the whole vein model with the current settings: vn_surfaces, vn_variogram (if fit_variogram), vn_estimate and vn_cubicate (if tonnage). Stops at the first step that fails and names it; otherwise returns every step's result.",
+        params: BUILD,
+        positional: &["vein"],
+        result: "`vein`, `steps` (`{surfaces, variogram, estimate, cubicate}`: each step's data or null when skipped).",
+    },
+];
+
+pub static TONNAGE_PANELS: &[PanelSpec] = &[PanelSpec {
+    id: "min_vein_tonnage",
+    title: L::new("Veta: cubicación", "Vein: tonnage", "Veio: cubagem"),
+    command: "MIN_VN_TONNAGE_PANEL",
+    items: &[
+        Item::Param("vn_cubicate", "vein"),
+        Item::Section {
+            id: "vn_f_dilution",
+            title: L::new(
+                "Dilución y recuperación",
+                "Dilution and recovery",
+                "Diluição e recuperação",
+            ),
+            items: &[
+                Item::Param("vn_cubicate", "mmw"),
+                Item::Param("vn_cubicate", "overbreak_hw"),
+                Item::Param("vn_cubicate", "overbreak_fw"),
+                Item::Param("vn_cubicate", "grade_hw"),
+                Item::Param("vn_cubicate", "grade_fw"),
+                Item::Param("vn_cubicate", "density_waste"),
+                Item::Param("vn_cubicate", "recovery"),
+            ],
+            collapsed: false,
+        },
+        Item::Section {
+            id: "vn_f_blocks",
+            title: L::new(
+                "Bloques entre labores",
+                "Blocks between workings",
+                "Blocos entre labores",
+            ),
+            items: &[
+                Item::Param("vn_cubicate", "level_layer"),
+                Item::Param("vn_cubicate", "raise_layer"),
+                Item::Param("vn_cubicate", "level_pillar"),
+                Item::Param("vn_cubicate", "raise_pillar"),
+                Item::Param("vn_cubicate", "side_tolerance"),
+                Item::Param("vn_cubicate", "side_min"),
+            ],
+            collapsed: false,
+        },
+        Item::Section {
+            id: "vn_f_rules",
+            title: L::new("Categorías", "Categories", "Categorias"),
+            items: &[Item::Param("vn_cubicate", "rules")],
+            collapsed: false,
+        },
+        Item::Button("vn_cubicate"),
+        Item::Section {
+            id: "vn_f_build",
+            title: L::new("Construir todo", "Build all", "Construir tudo"),
+            items: &[
+                Item::Param("vn_build", "fit_variogram"),
+                Item::Param("vn_build", "tonnage"),
+                Item::Button("vn_build"),
+            ],
+            collapsed: true,
+        },
+        Item::Status("vn_tonnage_status"),
+    ],
+}];
