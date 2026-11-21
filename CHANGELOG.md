@@ -3,7 +3,7 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
-## [0.8.0] — unreleased
+## [0.8.0] — 2026-11-21
 
 ### Added
 - **Geotechnics phase 3 — structures** (panel *Geotecnia: estructuras*): equal-area
@@ -26,7 +26,7 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
   non-circular shapes beyond an equivalent radius: their criteria are empirical or need a
   verified reference.
 
-## [0.7.0] — unreleased
+## [0.7.0] — 2026-11-21
 
 ### Added
 - **Operations for AI clients (MCP).** Every action is a typed operation (new crate
