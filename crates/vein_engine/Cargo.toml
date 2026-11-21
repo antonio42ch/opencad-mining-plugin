@@ -1,0 +1,11 @@
+[package]
+name = "vein_engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Narrow-vein modelling for Open Mining: vein frame, intercepts from holes and channels, hanging-wall and footwall surfaces with diagnostics. std + engines."
+
+[dependencies]
+mining_core = { path = "../mining_core" }
+drillhole_engine = { path = "../drillhole_engine", default-features = false }
+geostat_engine = { path = "../geostat_engine" }

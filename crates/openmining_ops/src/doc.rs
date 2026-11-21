@@ -28,6 +28,15 @@ MIN_DH_DRAW assay_attr=au
 MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=1,1,0
 ```
 
+**Narrow vein surfaces** (hanging wall and footwall from mapped contacts and vein intercepts)
+
+```
+MIN_VN_SURFACES vein=V1 hw_layer=VETA_TECHO fw_layer=VETA_PISO vein_attr=tipo vein_values=VETA step=2 radius=40
+```
+
+Read `diagnostics` and `worst`: fix the contacts it names, or change `radius`, `step` or
+`method`, and run it again.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -180,6 +189,7 @@ the history tool):\n\n```\n{PREFIX}{{\"op\":\"gt_load\",\"ok\":true,\"status\":\
         Group::Geology,
         Group::Resources,
         Group::Geotechnics,
+        Group::Veins,
     ];
     for g in groups {
         let ops: Vec<&OpDef> = crate::all().into_iter().filter(|d| d.group == g).collect();

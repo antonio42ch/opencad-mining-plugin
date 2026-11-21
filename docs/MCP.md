@@ -51,6 +51,15 @@ MIN_DH_DRAW assay_attr=au
 MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=1,1,0
 ```
 
+**Narrow vein surfaces** (hanging wall and footwall from mapped contacts and vein intercepts)
+
+```
+MIN_VN_SURFACES vein=V1 hw_layer=VETA_TECHO fw_layer=VETA_PISO vein_attr=tipo vein_values=VETA step=2 radius=40
+```
+
+Read `diagnostics` and `worst`: fix the contacts it names, or change `radius`, `step` or
+`method`, and run it again.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -102,7 +111,7 @@ MIN_GT_VIEW attribute=class
 | Argument | Type | Setting | Description |
 |---|---|---|---|
 | `op` | text |  | Operation name or command (gt_view, MIN_GT_VIEW): return its parameters, JSON Schema and result. Without it the list of operations. |
-| `group` | text |  | List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics. |
+| `group` | text |  | List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics, veins. |
 | `workflows` | boolean |  | Also return the typical workflows (sequences of commands) and the error codes. |
 
 Result `data`: `groups`, `operations` (list of `{name, command, group, kind, summary}`); with `op`: the same plus `aliases`, `positional`, `parameters` (`{key, type, setting, required, help, options}`), `input_schema`, `result`; with `workflows`: `workflows` (text) and `error_codes` (code -> meaning).
@@ -1053,4 +1062,38 @@ Draw the last Kirsch or convergence-confinement chart in the DWG (frame, axes, c
 | `at` | point `x,y[,z]` |  | Lower-left corner of the chart (world; default 0,0,0). |
 
 Result `data`: `entities`.
+
+## Narrow veins
+
+### `vn_surfaces` — `MIN_VN_SURFACES`
+
+Build the hanging-wall and footwall surfaces of a narrow vein from the mapped contact polylines (by layer, or picked as hw= / fw=) and from the vein intercepts of the loaded drillholes and channels; they are interpolated in the vein frame (strike, dip, normal), drawn and saved, and diagnosed: fit to each contact (worst first), nodes where the footwall crosses above the hanging wall, nodes with one wall only, thickness range. Read the diagnostics and adjust step, radius, method or the contacts, then build again.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces and model are stored under it). |
+| `hw_layer` | text | yes | Layer of the mapped hanging-wall contact polylines (wildcards * ? allowed). Empty = none. |
+| `fw_layer` | text | yes | Layer of the mapped footwall contact polylines (wildcards allowed). Empty = none. |
+| `intercepts` | boolean | yes | Also use the vein intervals of the loaded drillholes and channels as hanging-wall / footwall contacts. |
+| `vein_attr` | text | yes | Geology attribute that marks the vein intervals (e.g. tipo, lito). |
+| `vein_values` | text | yes | Values of that attribute that are vein, separated by ; (e.g. VETA). |
+| `orientation` | one of `fit`, `typed` | yes | Plane of the vein frame: fitted to all contacts (least squares) or the dip / dip direction typed. |
+| `dip` | number 0..90 | yes | Dip of the reference plane (orientation=typed). |
+| `dipdir` | number 0..360 | yes | Dip direction of the reference plane (orientation=typed). |
+| `step` | number ≥ 0.1 | yes | Grid spacing on the vein plane. |
+| `margin` | number ≥ 0 | yes | Margin of the grid around the contacts. |
+| `radius` | number ≥ 0.1 | yes | Search radius; grid nodes farther from the contacts stay empty (maximum extrapolation). |
+| `min_samples` | integer 1..50 | yes | Minimum contact points to estimate a node. |
+| `max_samples` | integer 1..200 | yes | Maximum contact points used per node. |
+| `method` | one of `kriging`, `idw` | yes | Interpolation of the walls. |
+| `power` | number ≥ 0.1 | yes | Inverse distance power (method=idw). |
+| `range` | number ≥ 0 | yes | Range of the spherical model (method=kriging); 0 uses the search radius. |
+| `densify` | number ≥ 0 | yes | Points taken along the mapped polylines at least every this distance (0 = vertices only). |
+| `min_thickness` | number ≥ 0 | yes | Nodes thinner than this are reported as thin (diagnostic only). |
+| `hw` | handles `1A,2B` |  | Hanging-wall contact polylines picked instead of (or in addition to) the layer. |
+| `fw` | handles `1A,2B` |  | Footwall contact polylines picked instead of (or in addition to) the layer. |
+
+Positional form: `MIN_VN_SURFACES vein` (`-` skips one).
+
+Result `data`: `vein`, `plane` (`{dip, dipdir, origin}`), `contacts` (`{hanging_wall, footwall, from_layers, from_handles, from_intercepts}`), `grid` (`{nx, ny, step, nodes}`), `diagnostics` (`{both, one_side, crossings, thin, thickness_min, thickness_mean, thickness_max, rms_hw, rms_fw, unchecked}`), `worst` (list of `{source, side, residual, point}`), `file` (saved surfaces or null).
 

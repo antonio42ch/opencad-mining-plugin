@@ -8,6 +8,7 @@ PST_SolidMine and GeoMapper.
 |---|---|---|
 | Drillholes | `MIN_DH_PANEL` `MIN_DH_LOAD` `MIN_DH_DRAW` `MIN_DH_CLEAR` `MIN_DH_GEOCOLORS` | CSV/XLSX import with column mapping, validation R01–R07, minimum-curvature desurvey, 3D traces coloured by grade or geology, labels |
 | Channels | `MIN_CH_PANEL` `MIN_CH_CONVERT` `MIN_CH_ORIENT` | Channel samples of the workings, located from topographic points and distances, converted into drillhole data (holes `CH-…`) appended to the drillholes — see [examples/canales](examples/canales/README.md) |
+| Veins | `MIN_VN_PANEL` `MIN_VN_SURFACES` | Narrow-vein model built from data: hanging-wall and footwall surfaces from mapped contacts and vein intercepts with diagnostics (prisms, grades and tonnage next) — see [docs/VEINS.md](docs/VEINS.md) |
 | Workings | `MIN_UG_PANEL` `MIN_UG_AXIS` `MIN_UG_HBOUND` `MIN_UG_VBOUND` | Closed solids (mesh) from an axis + section, or from four boundary polylines |
 | Axes | `MIN_AX_PANEL` `MIN_AX_LINE` `MIN_AX_CURVE` `MIN_AX_UNDO` `MIN_AX_NEW` `MIN_AX_PICKSTART` `MIN_AX_FROMPOLY` | Working axes as chains of straights and curves (radius + length or angle, right/left) with grade in % or °, drawn in series from the previous end |
 | Sections | `MIN_SC_PANEL` `MIN_SC_RUN` | Cut solids (meshes) with planes perpendicular to an axis, vertical through 2 points (+ parallels), horizontal levels or 3 points; 3D polylines in place and 2D sheets with grid, title and area |
@@ -52,6 +53,7 @@ Release: bump `version` in `Cargo.toml` and `plugin.toml`, add a
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers, crates, data flow, design rules
 - [docs/RESOURCES.md](docs/RESOURCES.md) — resource estimation: methods, conventions, file format
 - [docs/MCP.md](docs/MCP.md) — every operation for AI clients: arguments, results, error codes, workflows
+- [docs/VEINS.md](docs/VEINS.md) — narrow veins: channels, surfaces (and the coming prism model)
 - [docs/GEOTECH.md](docs/GEOTECH.md) — geotechnics: tables, RMR89 / Q / GSI, Hoek-Brown, block model
 - [docs/PLUGIN.md](docs/PLUGIN.md) — commands, panels, layers, **XDATA schema**, settings storage
 - [docs/MIGRATION.md](docs/MIGRATION.md) — mapping from the legacy C# (AutoCAD) tools

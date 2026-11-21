@@ -85,7 +85,7 @@ const RESOURCES: &[Param] = &[
 
 const HELP: &[Param] = &[
     input("op", Kind::Text, false, L::same("op"), "Operation name or command (gt_view, MIN_GT_VIEW): return its parameters, JSON Schema and result. Without it the list of operations."),
-    input("group", Kind::Text, false, L::same("group"), "List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics."),
+    input("group", Kind::Text, false, L::same("group"), "List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics, veins."),
     input("workflows", Kind::Bool, false, L::same("workflows"), "Also return the typical workflows (sequences of commands) and the error codes."),
 ];
 

@@ -43,6 +43,8 @@ pub mod sections;
 pub mod session;
 pub mod solids;
 pub mod state;
+pub mod veincommands;
+pub mod veinconfig;
 pub mod xdata;
 
 use ocs_plugin_api::host::acadrust::EntityType;
@@ -65,7 +67,7 @@ pub static MANIFEST: PluginManifest = PluginManifest {
 };
 
 macro_rules! classes {
-    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr) => {
+    ($name:ident, $s:expr, $r:expr, $g:expr, $m:expr, $v:expr) => {
         static $name: EntityClasses = EntityClasses {
             app_id: xdata::APP,
             class_prefix: xdata::CLASS_PREFIX,
@@ -88,13 +90,35 @@ macro_rules! classes {
                 ("GT_REC", $g.cls_rec),
                 ("RM_DRAW", $m.cls_draw),
                 ("RM_WEDGE", $m.cls_wedge),
+                ("VN_SURFACE", $v.cls_surface),
             ],
         };
     };
 }
-classes!(CLASSES_ES, i18n::ES, rsi18n::ES, gti18n::ES, rmi18n::ES);
-classes!(CLASSES_EN, i18n::EN, rsi18n::EN, gti18n::EN, rmi18n::EN);
-classes!(CLASSES_PT, i18n::PT, rsi18n::PT, gti18n::PT, rmi18n::PT);
+classes!(
+    CLASSES_ES,
+    i18n::ES,
+    rsi18n::ES,
+    gti18n::ES,
+    rmi18n::ES,
+    veincommands::ES
+);
+classes!(
+    CLASSES_EN,
+    i18n::EN,
+    rsi18n::EN,
+    gti18n::EN,
+    rmi18n::EN,
+    veincommands::EN
+);
+classes!(
+    CLASSES_PT,
+    i18n::PT,
+    rsi18n::PT,
+    gti18n::PT,
+    rmi18n::PT,
+    veincommands::PT
+);
 
 pub struct MiningPlugin;
 
@@ -179,6 +203,7 @@ impl BuiltinPlugin for MiningPlugin {
             "MIN_RS_BM_PANEL" => Some(rspanels::BM),
             "MIN_GT_DATA_PANEL" => Some(gtpanels::DATA),
             "MIN_CH_PANEL" => Some(chcommands::PANEL),
+            "MIN_VN_PANEL" => Some(veincommands::PANEL),
             "MIN_GT_HB_PANEL" => Some(gtpanels::HB),
             "MIN_GT_MODEL_PANEL" => Some(gtpanels::MODEL),
             "MIN_RM_STRUCT_PANEL" => Some(rmcommands::STRUCT),

@@ -27,6 +27,7 @@ pub struct ProjectConfig {
     pub gt: crate::gtconfig::GeotechConfig,
     pub rm: crate::rmconfig::RockMechConfig,
     pub ch: crate::chconfig::ChannelsConfig,
+    pub vn: crate::veinconfig::VeinConfig,
 }
 
 impl Default for ProjectConfig {
@@ -43,6 +44,7 @@ impl Default for ProjectConfig {
             gt: Default::default(),
             rm: Default::default(),
             ch: Default::default(),
+            vn: Default::default(),
         }
     }
 }

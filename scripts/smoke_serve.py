@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
 RESULT = "OPENMINING_RESULT "
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels"]
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels", "min_vein"]
 
 
 class Server:
@@ -336,6 +336,25 @@ def main():
         ok("dh_draw", "dh_draw draws the 6 holes (drillholes + channels)", lambda d: d.get("holes") == 6)
         run("MIN_CH_ORIENT channel=C2 p1=0,0,0 p2=0,10,0")
         ok("ch_orient", "ch_orient sets channel C2 to azimuth 0 and converts again", lambda d: abs(d.get("azimuth", -1)) < 1e-9 and d["converted"]["channels"] == 3)
+        # 10. Vein surfaces: hanging wall and footwall contacts mapped as 3D polylines
+        #     (a vertical vein striking north, 1.2 m thick, around the channels).
+        org = (result("dh_load").get("data") or {}).get("origin") or [0, 0, 0]
+        def poly(pts):
+            before = set(handles(s.send({"op": "query", "type": "Polyline3D"})))
+            run("3DPOLY " + " ".join(f"{x - org[0]},{y - org[1]},{z - org[2]}" for x, y, z in pts))
+            after = handles(s.send({"op": "query", "type": "Polyline3D"}))
+            return [h for h in after if h not in before]
+        hw, fw = [], []
+        for z in (3945, 3955):
+            hw += poly([(500000.6, 8500040, z), (500000.6, 8500060, z), (500000.6, 8500080, z)])
+            fw += poly([(499999.4, 8500040, z), (499999.4, 8500060, z), (499999.4, 8500080, z)])
+        c.need(len(hw) == 2 and len(fw) == 2, f"4 contact polylines drawn ({hw} {fw})")
+        run(f"MIN_VN_SURFACES vein=V1 hw={','.join(hw)} fw={','.join(fw)} hw_layer= fw_layer= intercepts=false step=1 radius=30 densify=2 method=idw")
+        ok("vn_surfaces", "vn_surfaces: vertical plane, ~1.2 m thick, no crossings", lambda d: abs(d["plane"]["dip"] - 90) < 5 and abs(d["diagnostics"]["thickness_mean"] - 1.2) < 0.3 and d["diagnostics"]["crossings"] == 0 and d["contacts"]["from_handles"] > 0)
+        c.need(count(layer("MIN_VN_TECHO")) >= 1 and count(layer("MIN_VN_PISO")) >= 1, "both vein surfaces are drawn")
+        run("MIN_VN_SURFACES vein=V1 hw_layer=NO_EXISTE fw_layer=NO_EXISTE intercepts=false")
+        c.need(result("vn_surfaces").get("error", {}).get("code") == "no_data", "no contacts is reported as no_data")
+
         run("MIN_CH_CONVERT sheet=nothing.csv")
         c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")
 

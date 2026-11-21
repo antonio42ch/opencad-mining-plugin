@@ -16,6 +16,7 @@ fn group_key(g: Group) -> &'static str {
         Group::Geology => "geology",
         Group::Resources => "resources",
         Group::Geotechnics => "geotechnics",
+        Group::Veins => "veins",
     }
 }
 

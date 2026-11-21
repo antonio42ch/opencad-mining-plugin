@@ -116,6 +116,13 @@ impl CadModule for MiningModule {
                     ],
                 },
                 RibbonGroup {
+                    title: crate::veincommands::v().grp,
+                    tools: vec![
+                        large("MIN_VN_PANEL", crate::veincommands::v().tool_panel, icon!("vein")),
+                        small("MIN_VN_SURFACES", crate::veincommands::v().tool_surfaces, icon!("vein")),
+                    ],
+                },
+                RibbonGroup {
                     title: t.grp_geology,
                     tools: vec![
                         large("MIN_GM_PANEL", t.tool_panel, icon!("geomap")),

@@ -970,6 +970,7 @@ dependencies = [
  "serde",
  "serde_json",
  "solids_engine",
+ "vein_engine",
 ]
 
 [[package]]
@@ -1676,6 +1677,15 @@ checksum = "3c14b15dffa2f4bd712103e857140aa04a4f2ff6e955c77d7eb8e53ee02a3b64"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "vein_engine"
+version = "0.9.0"
+dependencies = [
+ "drillhole_engine",
+ "geostat_engine",
+ "mining_core",
 ]
 
 [[package]]

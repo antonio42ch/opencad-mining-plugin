@@ -24,6 +24,7 @@ pub struct TabState {
     pub rs: crate::resources::RsState,
     pub gt: crate::geotech::GtState,
     pub rm: crate::rmcommands::RmState,
+    pub vein: crate::veincommands::VeinState,
 }
 
 /// What an interactive pick hands over to the follow-up command.

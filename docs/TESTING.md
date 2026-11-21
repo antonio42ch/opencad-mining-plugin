@@ -171,3 +171,13 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     channels come back by themselves ("Canales agregados de nuevo").
 43. Delete the HACIA value of one row and the azimut column is absent → that channel is reported (no
     direction) and the rest are converted.
+
+## Vein surfaces (v0.10)
+
+44. Draw two 3D polylines on layer `VETA_TECHO` and two on `VETA_PISO` (the walls of a vein at two levels),
+    Vetas → **Veta** → **Construir superficies** → plane orientation, contact counts, thickness range and
+    RMS in the command line; orange (hanging wall) and cyan (footwall) meshes.
+45. Move one footwall vertex across the hanging wall → crossings reported near that polyline, and it is the
+    first "worst" contact. Reduce the radius → nodes with one wall only are reported.
+46. With channels converted (step 41), tick *Usar intersecciones* (attribute `tipo`, value `VETA`) → the
+    contact counts include the intercepts.

@@ -15,6 +15,16 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
   can carry its own azimuth / inclination or be oriented with two clicks. Converted tables
   are written next to the drawing and the channels are appended again after each drillhole
   load. Example in `examples/canales`.
+- **Narrow-vein surfaces** (stage B1, panel *Veta: superficies*, `MIN_VN_SURFACES`):
+  hanging-wall and footwall surfaces built from mapped contact polylines (by layer or picked)
+  and from the vein intercepts of drillholes and channels, interpolated in the vein frame
+  (kriging or IDW, search radius = maximum extrapolation), drawn, saved next to the drawing
+  and diagnosed (fit to each contact, crossings, one-sided nodes, thickness range).
+
+### Fixed
+- A file path given as a command argument was wiped by the next command: file pickers
+  ignore text values, so the empty picker overwrote the setting. Paths are pushed as path
+  values.
 
 ## [0.9.0] — unreleased
 

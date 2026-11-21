@@ -11,6 +11,7 @@ mod queries;
 mod resources;
 mod rockmech;
 mod sections;
+mod vein;
 mod workings;
 
 use crate::{OpDef, PanelSpec};
@@ -28,6 +29,7 @@ pub fn all() -> Vec<&'static OpDef> {
         resources::OPS,
         geotech::OPS,
         rockmech::OPS,
+        vein::OPS,
     ] {
         v.extend(m);
     }
@@ -46,6 +48,7 @@ pub fn panels() -> Vec<&'static PanelSpec> {
         resources::PANELS,
         geotech::PANELS,
         rockmech::PANELS,
+        vein::PANELS,
     ] {
         v.extend(m);
     }
