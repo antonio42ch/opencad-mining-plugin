@@ -256,6 +256,9 @@ fn to_dialog(p: &Param, v: &Value, cfg: &ProjectConfig, lists: &Lists, l: ops::L
             index: v.as_u64().unwrap_or(0) as usize,
             text: String::new(),
         },
+        // A file picker only takes a path value: a text one is ignored, the picker
+        // stays empty and its empty value would wipe the setting on the next run.
+        Kind::Path { .. } => DialogValue::FilePath(v.as_str().unwrap_or("").to_string()),
         _ => DialogValue::Text(v.as_str().unwrap_or("").to_string()),
     }
 }
@@ -697,6 +700,37 @@ mod tests {
         assert_eq!(
             rows_of("contacts", &c),
             vec![vec!["C1".to_string(), "OX".into(), String::new()]]
+        );
+    }
+
+    /// Paths are pushed as path values (the only kind a file picker accepts),
+    /// so a path given as an argument survives the next panel read.
+    #[test]
+    fn paths_are_pushed_as_file_paths_and_read_back() {
+        let mut c = ProjectConfig::default();
+        c.ch.points = "/d/puntos.csv".into();
+        c.gt.logging = "/d/log.csv".into();
+        c.dh.collar = "/d/collar.csv".into();
+        let mut flat = HashMap::new();
+        for id in panel_ids() {
+            flat.extend(values(id, &c, &Lists::default()));
+        }
+        for k in ["ch.points", "gt.logging", "dh.collar"] {
+            assert!(
+                matches!(&flat[k], DialogValue::FilePath(p) if p.starts_with("/d/")),
+                "{k}: {:?}",
+                flat[k]
+            );
+        }
+        let mut back = ProjectConfig::default();
+        apply(&mut back, &flat);
+        assert_eq!(
+            (
+                back.ch.points.as_str(),
+                back.gt.logging.as_str(),
+                back.dh.collar.as_str()
+            ),
+            ("/d/puntos.csv", "/d/log.csv", "/d/collar.csv")
         );
     }
 }
