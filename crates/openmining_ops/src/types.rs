@@ -162,6 +162,7 @@ pub enum Group {
     Geology,
     Resources,
     Geotechnics,
+    Veins,
 }
 
 impl Group {
@@ -175,6 +176,7 @@ impl Group {
             Group::Geology => "Geological mapping",
             Group::Resources => "Resource estimation",
             Group::Geotechnics => "Geotechnics",
+            Group::Veins => "Narrow veins",
         }
     }
 }

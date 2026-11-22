@@ -3,6 +3,7 @@
 //! AI clients; edit them like any source file.
 
 mod axes;
+mod channels;
 mod drillholes;
 mod geology;
 mod geotech;
@@ -10,6 +11,7 @@ mod queries;
 mod resources;
 mod rockmech;
 mod sections;
+mod vein;
 mod workings;
 
 use crate::{OpDef, PanelSpec};
@@ -19,6 +21,7 @@ pub fn all() -> Vec<&'static OpDef> {
     for m in [
         queries::OPS,
         drillholes::OPS,
+        channels::OPS,
         workings::OPS,
         axes::OPS,
         sections::OPS,
@@ -26,6 +29,9 @@ pub fn all() -> Vec<&'static OpDef> {
         resources::OPS,
         geotech::OPS,
         rockmech::OPS,
+        vein::OPS,
+        vein::MODEL_OPS,
+        vein::TONNAGE_OPS,
     ] {
         v.extend(m);
     }
@@ -36,6 +42,7 @@ pub fn panels() -> Vec<&'static PanelSpec> {
     let mut v: Vec<&'static PanelSpec> = Vec::new();
     for m in [
         drillholes::PANELS,
+        channels::PANELS,
         workings::PANELS,
         axes::PANELS,
         sections::PANELS,
@@ -43,6 +50,9 @@ pub fn panels() -> Vec<&'static PanelSpec> {
         resources::PANELS,
         geotech::PANELS,
         rockmech::PANELS,
+        vein::PANELS,
+        vein::MODEL_PANELS,
+        vein::TONNAGE_PANELS,
     ] {
         v.extend(m);
     }

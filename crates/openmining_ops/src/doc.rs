@@ -5,7 +5,7 @@ use std::fmt::Write;
 use crate::result::{ErrorCode, PREFIX};
 use crate::{Group, Kind, OpDef, OpKind};
 
-const WORKFLOWS: &str = r#"## Typical workflows
+pub const WORKFLOWS: &str = r#"## Typical workflows
 
 Start with `MIN_STATUS`: it says what is loaded and lists the next operations (`next`). After an error
 with code `no_data`, call it again. Entity handles come from the `created` list of a result, from
@@ -19,6 +19,56 @@ MIN_DH_LOAD collar="C:\data\collar.csv" survey="C:\data\survey.csv" assays="C:\d
 MIN_DH_LIST
 MIN_DH_DRAW assay_attr=cu% scheme=rainbow
 ```
+
+**Channel samples of the workings** (converted into holes `CH-…` appended to the drillholes)
+
+```
+MIN_CH_CONVERT points="C:\data\topo_points.csv" sheet="C:\data\channels.csv"
+MIN_DH_DRAW assay_attr=au
+MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=1,1,0
+```
+
+**Narrow vein surfaces** (hanging wall and footwall from mapped contacts and vein intercepts)
+
+```
+MIN_VN_SURFACES vein=V1 hw_layer=VETA_TECHO fw_layer=VETA_PISO vein_attr=tipo vein_values=VETA step=2 radius=40
+```
+
+Read `diagnostics` and `worst`: fix the contacts it names, or change `radius`, `step` or
+`method`, and run it again.
+
+**Narrow vein prism model** (after the surfaces; edits are polygons drawn on the long section)
+
+```
+MIN_VN_VARIOGRAM vein=V1 grade=au thickness_col=potencia lag=10 nlags=10
+MIN_VN_ESTIMATE vein=V1 block_u=5 block_v=5 max_distance=40 density=2.7
+MIN_VN_LONG vein=V1
+MIN_VN_EDIT action=boundary polygon=<handle>
+MIN_VN_EDIT action=exclude polygon=<handle>
+```
+
+Check `validation` (cross-validation bias and correlation, composites against their
+prism) and the `out_*` counts of `summary` before accepting the model.
+
+**Narrow vein tonnage** (rules are the company's norms: test them before cubicating)
+
+```
+MIN_VN_RULES rules=[["Medido",3,15,"",""],["Indicado",2,30,"",""],["Inferido",1,"","",""]]
+MIN_VN_RULES sides=2 dist=20
+MIN_VN_CUBICATE vein=V1 level_layer=NIVELES raise_layer=CHIMENEAS mmw=0.8 overbreak_hw=0.1 recovery=90
+MIN_VN_BUILD vein=V1
+```
+
+Each block lists its sampled sides and `why` it missed the earlier rules.
+
+**Whole vein model in one call** (channels already converted; levels and raises are 3D polylines)
+
+```
+MIN_VN_BUILD vein=V1 vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia levels=<h1>,<h2> raises=<h3>
+```
+
+It accepts every argument of its steps; arguments given are stored, so the next call (or the
+panel) keeps them. Read each step's result in `steps` and the diagnostics before reporting.
 
 **Resource estimation** (one variogram model saved per domain before estimating)
 
@@ -138,6 +188,13 @@ fn op(out: &mut String, d: &OpDef) {
         );
     }
     let _ = writeln!(out, "Result `data`: {}\n", d.result);
+    if let Some(e) = crate::examples::find(d.name) {
+        let _ = writeln!(
+            out,
+            "Example (values abbreviated with `…`):\n\n```\n{}\n→ {}\n```\n",
+            e.call, e.data
+        );
+    }
 }
 
 pub fn markdown() -> String {
@@ -172,6 +229,7 @@ the history tool):\n\n```\n{PREFIX}{{\"op\":\"gt_load\",\"ok\":true,\"status\":\
         Group::Geology,
         Group::Resources,
         Group::Geotechnics,
+        Group::Veins,
     ];
     for g in groups {
         let ops: Vec<&OpDef> = crate::all().into_iter().filter(|d| d.group == g).collect();

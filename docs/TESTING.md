@@ -149,3 +149,58 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
     equilibrium and FS (or "the support reaches its capacity"); squeezing class.
 36. Pilares 8 × 8 × 5 m, rooms 6 m → load, four strengths and FS; pilar corona with a critical
     Sc → Sc / Cs. **Dibujar gráfico** draws the last chart.
+37. Geotecnia → Modelo → **Estimar geotecnia**, then *Tipo de vista* = **Cubos**, *Atributo* =
+    Clase de macizo, **Ver modelo** → one cube per block coloured by class (blue to red), one mesh per
+    colour on `MIN_RS_VISTA`. Set *Máximo de polígonos / cubos* to 20 → the command line says how many
+    of how many blocks were drawn. Switch back to *Niveles (planta)* → plans again.
+38. Modelo → **Estimar geotecnia**, then in *Vista* choose *Atributo* = Clase de macizo, *Tipo de vista* = Cubos and open
+    *Filtro y corte*: *Mostrar* = solo mayores que el umbral, umbral 3, **Ver modelo** → only classes IV and V.
+    Choose *Atributo* = Distancia media a los registros → the blocks far from any record are red.
+39. *Cortar con un plano*: a vertical plane (buzamiento 90, dirección 90) through the middle of the model, side
+    *El lado hacia el que apunta el plano* → half the model; the other side → the rest; together every block.
+40. `MIN_HELP` lists the operations; `MIN_HELP op=gt_view` gives the parameters, the options of `mode` and the schema;
+    `MIN_HELP workflows=true` adds the command sequences and the error codes.
+
+## Channel samples (v0.10)
+
+41. Load the reference drillholes, then Sondajes → **Canales**: `examples/canales/puntos_topograficos.csv` and
+    `muestreo_canales.csv` → **Convertir canales** → "24 convertidos (72 muestras)". **Dibujar** with
+    attribute `au`: short coloured channels on the backs of the two galleries, across the N30E vein.
+42. Type channel `3950-101-03` → **Orientar canal en pantalla**, two clicks → that channel turns to the
+    clicked direction and appears in the orientations table. Reload the drillholes (`MIN_DH_LOAD`): the
+    channels come back by themselves ("Canales agregados de nuevo").
+43. Delete the HACIA value of one row and the azimut column is absent → that channel is reported (no
+    direction) and the rest are converted.
+
+## Vein surfaces (v0.10)
+
+44. Draw two 3D polylines on layer `VETA_TECHO` and two on `VETA_PISO` (the walls of a vein at two levels),
+    Vetas → **Veta** → **Construir superficies** → plane orientation, contact counts, thickness range and
+    RMS in the command line; orange (hanging wall) and cyan (footwall) meshes.
+45. Move one footwall vertex across the hanging wall → crossings reported near that polyline, and it is the
+    first "worst" contact. Reduce the radius → nodes with one wall only are reported.
+46. With channels converted (step 41), tick *Usar intersecciones* (attribute `tipo`, value `VETA`) → the
+    contact counts include the intercepts.
+
+## Vein prism model (v0.10)
+
+47. With the surfaces of step 44 and channels with `tipo = VETA` and `au`, Vetas → **Modelo** →
+    *Variografía en el plano* → composites count, model in the settings and the chart.
+48. **Estimar prismas** → coloured prisms between the walls on `MIN_VN_PRISMAS`, totals, validation lines,
+    and `<dwg>_veta_V1_prismas.csv`. Change *Colorear por* to *Potencia* and estimate again.
+49. **Longitudinal** → long section beside the model with the channel labels. Draw a closed polyline over part
+    of it, *Edición* = *Excluir prismas*, **Editar en la longitudinal**, pick it → those prisms disappear in 3D and on
+    the long section (magenta outline). *Polígono límite* with another polyline → only the prisms inside remain.
+50. *Deshacer la última*, then *Borrar ediciones y límite* → the model returns to step 48.
+
+## Vein tonnage (v0.10)
+
+51. After step 48, draw two level polylines (one along the channels) on layer `NIVELES` and a raise between
+    them on `CHIMENEAS`. Vetas → **Cubicación** → **Cubicar** → one line per block (`L1-L2/<R1`, …) with its
+    category and sampled sides (■ sampled, □ not, · no working), totals per category; red workings and block
+    labels on the long section.
+52. Raise *Ancho mínimo de minado* above the vein thickness → diluted tonnes rise and the diluted grade drops.
+    *Puente sobre cada nivel* = 3 → pillar tonnes are reported apart.
+53. Edit the rule table (e.g. Medido with 4 sides) → Cubicar → blocks move down a category and their `why`
+    names the failed condition. `MIN_VN_RULES sides=2 dist=20` in the command line tells the rule met.
+54. *Colorear por* = *Categoría* → the long section is coloured by category. **Construir todo** runs every step.

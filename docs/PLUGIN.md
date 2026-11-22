@@ -14,6 +14,8 @@ forms below (positional paths, picks) keep working.
 | `MIN_DH_PANEL` / `MIN_UG_PANEL` / `MIN_GM_PANEL` | Show/hide the module panel |
 | `MIN_DH_LOAD [collar [survey [assays [geo]]]]` | Read collar/survey/assays/geology (CSV, TXT, TSV, XLSX, XLS, ODS), map columns, validate. Paths given as arguments (quoted when they contain spaces, `-` to skip one) replace the panel's; scripts and automation use this form |
 | `MIN_DH_DRAW` | Draw (replacing any previous drawing of the same holes) |
+| `MIN_CH_CONVERT [points [sheet]]` | Convert a channel sampling sheet (topographic point + distance along the working, sample widths, potencia, grades) into drillhole data `CH-…` appended to the loaded drillholes; writes `<drawing>_canales_*.csv`. With *Reconvertir al cargar sondajes* the channels are appended again after every `MIN_DH_LOAD` |
+| `MIN_CH_ORIENT` | Orientation of one channel from two clicks (or `p1=`/`p2=`), kept in the orientations table |
 | `MIN_DH_CLEAR` | Remove every drillhole entity created by the plugin |
 | `MIN_DH_GEOCOLORS` | Fill the geology colour table with the values of the selected attribute |
 | `MIN_UG_AXIS` | Solid along a 3D polyline (uses the selection if one entity is selected) |
@@ -142,6 +144,10 @@ offsets/elevations as labels), title, area and the axis marker. With
 | `MIN_GT_SONDAJE` | classified logging intervals | per class |
 | `MIN_GT_MAPEO` | classified face mapping and labels | per class |
 | `MIN_ST_ESTEREO` | stereonet drawn in the DWG | 7 |
+| `MIN_VN_TECHO` / `MIN_VN_PISO` | vein hanging-wall / footwall surfaces | 30 / 4 |
+| `MIN_VN_PRISMAS` | vein prism model (coloured by attribute) | 7 |
+| `MIN_VN_LONG` | vein long section, samples and edit polygons | 7 |
+| `MIN_VN_BLOQUES` | workings and block labels on the vein long section | 1 |
 | `MIN_ST_CUNAS` | wedges on workings | by FS |
 | `MIN_SM_GRAFICO` | design charts | 7 |
 | `MIN_SC_LAMINA` | sheet frames, titles, areas, sections, markers | 7 |
@@ -173,6 +179,10 @@ bump. A breaking change increments `schema`.
 | `GM_PROJ` | Traza proyectada | `src` (hex handle of the source), `dip`, `dipdir`, and `height` (target) or `delta` |
 | `AX_AXIS` | Eje de labor | `id`, `e`, `n`, `z`, `az` (start), `length`, `elements`, `e1`…`eN` (see below) |
 | `SC_CUT` | Sección 3D | `set` (run id), `plane` (title), `area` |
+| `VN_SURFACE` | Superficie de veta | `vein`, `side` (`hanging_wall`, `footwall`) |
+| `VN_PRISM` | Prisma de veta | `vein`, `i`, `j`, grade, `thickness`, `tonnes` |
+| `VN_LONG` | Longitudinal de veta | `vein`, `i`/`j`/`value`, `hole` or `edit` |
+| `VN_BLOCK` | Bloque de veta | `vein`, `block` and `category`, or `working` |
 | `RM_WEDGE` | Cuña | `face`, `mode`, `fs`?, `volume`, `weight`, `sets` |
 | `RM_DRAW` | Dibujo geomecánico | `kind`, `series`? |
 | `GT_REC` | Registro geotécnico | `src`, `row`, `id`, `rmr`?, `q`?, `qp`?, `gsi`?, `class`?, `lith`?, `label`? — see GEOTECH.md |

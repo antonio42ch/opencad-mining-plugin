@@ -3,6 +3,75 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — unreleased
+
+First release since 0.8.0: it includes the geotechnical model view as cubes, the filter / cut and
+confidence columns, `MIN_HELP`, the channel samples and the narrow-vein model (stages A, B1–B3).
+
+### Added
+- **Channel samples** (panel *Canales de muestreo*, `MIN_CH_CONVERT`, `MIN_CH_ORIENT`): the
+  sampling sheet of the workings (channel, topographic point, distance along the working
+  towards the next point or an azimuth, sample widths or from/to, potencia, sample type,
+  grades) is converted into drillhole data — holes `CH-…` appended to the loaded drillholes,
+  so drawing, composites, queries and the coming vein model use them. Channels are
+  horizontal and perpendicular to the working by default, centred on their position; each
+  can carry its own azimuth / inclination or be oriented with two clicks. Converted tables
+  are written next to the drawing and the channels are appended again after each drillhole
+  load. Example in `examples/canales`.
+- **Narrow-vein surfaces** (stage B1, panel *Veta: superficies*, `MIN_VN_SURFACES`):
+  hanging-wall and footwall surfaces built from mapped contact polylines (by layer or picked)
+  and from the vein intercepts of drillholes and channels, interpolated in the vein frame
+  (kriging or IDW, search radius = maximum extrapolation), drawn, saved next to the drawing
+  and diagnosed (fit to each contact, crossings, one-sided nodes, thickness range).
+- **Narrow-vein prism model** (stage B2, panel *Veta: modelo de prismas*): composites of the
+  vein intercepts (true thickness from `potencia`), in-plane variography of the accumulation
+  with a fitted model (`MIN_VN_VARIOGRAM`), prisms between the walls with accumulation and
+  thickness block-kriged with the same weights (`MIN_VN_ESTIMATE`), boundary polygon and
+  maximum distance, validation against the samples, CSV export, long section
+  (`MIN_VN_LONG`) and polygon edits on it — exclude, set grade, set thickness, boundary
+  (`MIN_VN_EDIT`).
+- **Narrow-vein tonnage** (stage B3, panel *Veta: cubicación*, `MIN_VN_CUBICATE`): dilution
+  (minimum mining width, hanging-wall / footwall overbreak with their grades and density)
+  and recovery; blocks between levels and raises projected on the vein plane, with sill and
+  raise pillars; sampled sides per block; categories by an ordered rule table managed from
+  MCP and tested with `MIN_VN_RULES` (example rules only, no company norm built in); totals
+  per category, CSV and block labels on the long section. `MIN_VN_BUILD` runs the whole
+  vein model in one call.
+- **Filter and cut in the geotechnical model view:** show only the blocks below or above a
+  threshold of the attribute (e.g. classes IV and V, RMR < 40) and keep one side of a plane
+  (point, dip, dip direction), to see inside a cubes view. The colour scale stays that of
+  the whole model. Geotechnical attributes only.
+- **Confidence columns** `gt_dist` and `gt_n` (mean distance to the records and number of
+  records used by each block) and two view attributes to colour by them.
+- **`MIN_HELP`:** describes the operations (list, or one in full with its parameters,
+  options and JSON Schema; `workflows=true` adds the command sequences and error codes), so
+  an AI client can discover what Open Mining does without the guide.
+- **Geotechnical block model view as cubes** (and sections): `MIN_GT_VIEW` has its own
+  mode in the *Modelo* panel — level plans, sections by two points, sections along an
+  axis or cubes — with levels, section spacing and the maximum of polygons / cubes.
+  Before, it used the view mode of the Resources panel (levels by default) and the
+  geotechnical panel could not change it. Arguments: `mode=`, `z_from=`, `z_to=`,
+  `z_step=`, `spacing=`, `count=`, `interval=`, `limit=`, `axis=`, `p1=`, `p2=`.
+
+- **Documentation for distribution:** README (English and Spanish) with the installation steps from the
+  repository link, installation guide, user guide, narrow-vein guide in Spanish, command cheat sheets, an
+  end-to-end vein example with the numbers to expect (`examples/veta`, checked by a test), a quick start
+  for AI assistants (`docs/AI_QUICKSTART.md`) and `AGENTS.md`; `docs/MCP.md` now carries a worked example
+  (call and result) for the main operations.
+- **`MIN_STATUS` reports the vein model** (`veins`: channels, surfaces, prisms, tonnage) and suggests the next
+  vein operation; `MIN_ENTITIES` accepts the vein classes (`VN_SURFACE`, `VN_PRISM`, `VN_LONG`, `VN_BLOCK`).
+- **`MIN_VN_BUILD` accepts the arguments of all its steps** (contacts, step, radius, grade, block sizes,
+  dilution, workings, rules…), so a whole vein model is set and built in one call.
+
+### Changed
+- `MIN_VN_SURFACES`: the contact limits are `min_contacts` / `max_contacts` (they clashed with the estimation
+  limits `min_samples` / `max_samples` once the steps share one call).
+
+### Fixed
+- A file path given as a command argument was wiped by the next command: file pickers
+  ignore text values, so the empty picker overwrote the setting. Paths are pushed as path
+  values.
+
 ## [0.8.0] — 2026-11-21
 
 ### Added

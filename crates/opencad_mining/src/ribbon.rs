@@ -57,6 +57,7 @@ impl CadModule for MiningModule {
                         small("MIN_DH_LOAD", t.tool_load, icon!("load")),
                         small("MIN_DH_DRAW", t.tool_draw, icon!("draw")),
                         small("MIN_DH_CLEAR", t.tool_clear, icon!("clear")),
+                        large("MIN_CH_PANEL", crate::chcommands::c().tool, icon!("channels")),
                     ],
                 },
                 RibbonGroup {
@@ -112,6 +113,23 @@ impl CadModule for MiningModule {
                         large("MIN_RM_DESIGN_PANEL", rm.tool_design, icon!("hoekbrown")),
                         small("MIN_ST_STEREONET", rm.tool_stereo, icon!("stereonet")),
                         small("MIN_ST_WEDGES", rm.tool_wedges, icon!("geotech")),
+                    ],
+                },
+                RibbonGroup {
+                    title: crate::veincommands::v().grp,
+                    tools: vec![
+                        large("MIN_VN_PANEL", crate::veincommands::v().tool_panel, icon!("vein")),
+                        small("MIN_VN_SURFACES", crate::veincommands::v().tool_surfaces, icon!("vein")),
+                        large(
+                            "MIN_VN_MODEL_PANEL",
+                            crate::veinmodel::m().tool_panel,
+                            icon!("vein_model"),
+                        ),
+                        large(
+                            "MIN_VN_TONNAGE_PANEL",
+                            crate::veinreserves::t().tool_panel,
+                            icon!("vein_tonnage"),
+                        ),
                     ],
                 },
                 RibbonGroup {

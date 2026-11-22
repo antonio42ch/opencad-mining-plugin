@@ -33,7 +33,9 @@ use crate::xdata::{Class, Tag};
 
 pub const LAYER_HOLES: &str = "MIN_GT_SONDAJE";
 pub const LAYER_MAP: &str = "MIN_GT_MAPEO";
-pub const COLUMNS: [&str; 4] = ["gt_rmr", "gt_gsi", "gt_logq", "gt_class"];
+/// Block model columns of the geotechnical estimation (the view attributes follow this order):
+/// RMR, GSI, log Q, class, mean distance to the records used, number of records used.
+pub const COLUMNS: [&str; 6] = ["gt_rmr", "gt_gsi", "gt_logq", "gt_class", "gt_dist", "gt_n"];
 const GRAY: u8 = 8;
 
 /// ACI colour of rock mass class I..V (blue, green, yellow, orange, red).
@@ -651,6 +653,12 @@ pub fn estimate(model: &mut BlockModel, results: &[GtResult], cfg: &ProjectConfi
     let attrs: [(&str, Attr); 3] = [("gt_rmr", |c| c.rmr), ("gt_gsi", |c| c.gsi), ("gt_logq", |c| c.log_q())];
     let mut columns = Vec::new();
     let mut estimated = vec![false; model.len()];
+    // Confidence: how far and how many records informed each block (taken from the
+    // first attribute that has records; every attribute uses the same search).
+    for c in ["gt_dist", "gt_n"] {
+        model.columns.remove(c);
+    }
+    let mut confidence = false;
     for (col, value) in attrs {
         let samples: Vec<Sample> = points
             .iter()
@@ -698,6 +706,14 @@ pub fn estimate(model: &mut BlockModel, results: &[GtResult], cfg: &ProjectConfi
             estimated[i] |= v.is_finite();
         }
         *model.column_mut(col) = values;
+        if !confidence {
+            for (target, suffix) in [("gt_dist", "dist"), ("gt_n", "n")] {
+                if let Some(v) = model.column(&format!("{var}_{suffix}")).map(<[f32]>::to_vec) {
+                    *model.column_mut(target) = v;
+                }
+            }
+            confidence = true;
+        }
         for c in blockmodel_engine::estimate::column_names(&var) {
             model.columns.remove(&c);
         }
@@ -726,6 +742,9 @@ pub fn estimate(model: &mut BlockModel, results: &[GtResult], cfg: &ProjectConfi
             })
             .collect();
         columns.push("gt_class");
+    }
+    if confidence {
+        columns.extend(["gt_dist", "gt_n"]);
     }
     let total = (0..model.len()).filter(|&i| model.domain[i] != 0).count();
     Ok(EstOutcome {
@@ -900,6 +919,160 @@ mod tests {
         );
     }
 
+    /// The geotechnical model drawn as cubes, levels and by class colours.
+    #[test]
+    fn model_views_as_levels_and_cubes() {
+        use crate::resources::{view, ViewInput, GT_VIEW_ATTR};
+        let (cfg, mut st) = loaded("v");
+        st.results = classify_all(&st, &holes(), &[], &cfg);
+        let mut pc = ProjectConfig {
+            gt: cfg,
+            ..Default::default()
+        };
+        pc.rs.bm.size = [10.0, 10.0, 10.0];
+        let mut model = model_for(&st.results, &pc).unwrap();
+        estimate(&mut model, &st.results, &pc).unwrap();
+        let with_values = model.column("gt_rmr").unwrap().iter().filter(|v| v.is_finite()).count();
+        assert!(with_values > 3);
+        let r = crate::rsi18n::r();
+        let input = ViewInput {
+            axis: None,
+            points: &[],
+        };
+        // Cubes: one mesh per colour, every block with a value is drawn.
+        for attr in 0..4 {
+            pc.rs.bm.view_attr = GT_VIEW_ATTR + attr;
+            pc.rs.bm.view_mode = 3;
+            let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+            assert_eq!(out.cubes, Some((with_values, with_values)), "attribute {attr}");
+            assert!(!out.limited && !out.prims.is_empty());
+            assert!(out.prims.iter().all(|p| matches!(p.geom, Geom::Mesh { .. })));
+            let drawn: usize = out
+                .prims
+                .iter()
+                .map(|p| p.tag.get("blocks").and_then(|b| b.parse::<usize>().ok()).unwrap())
+                .sum();
+            assert_eq!(drawn, with_values);
+        }
+        // The class view uses the class colours.
+        pc.rs.bm.view_attr = GT_VIEW_ATTR + 3;
+        let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+        assert!(out
+            .prims
+            .iter()
+            .all(|p| (1..=5).any(|k| p.color == Some(class_color(k)))));
+        // A limit below the block count keeps an even sample and says so.
+        pc.rs.bm.view_limit = 2.0;
+        let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+        assert_eq!(out.cubes, Some((2, with_values)));
+        assert!(out.limited);
+        // Levels still draw polygons.
+        pc.rs.bm.view_mode = 0;
+        pc.rs.bm.view_limit = 20_000.0;
+        let out = view(&model, &pc, &input, r, LocalOrigin::default()).unwrap();
+        assert!(out.polygons > 0 && out.cubes.is_none());
+    }
+
+    /// Poor-rock filter, cutting plane and the confidence columns of the model view.
+    #[test]
+    fn view_filter_cut_and_confidence() {
+        use crate::resources::{view, ViewInput, GT_VIEW_ATTR};
+        let (cfg, mut st) = loaded("f");
+        st.results = classify_all(&st, &holes(), &[], &cfg);
+        let mut pc = ProjectConfig {
+            gt: cfg,
+            ..Default::default()
+        };
+        pc.rs.bm.size = [10.0, 10.0, 10.0];
+        let mut model = model_for(&st.results, &pc).unwrap();
+        let out = estimate(&mut model, &st.results, &pc).unwrap();
+        assert_eq!(
+            out.columns,
+            vec!["gt_rmr", "gt_gsi", "gt_logq", "gt_class", "gt_dist", "gt_n"]
+        );
+        // Confidence: every estimated block says how many records and how far.
+        let col = |m: &BlockModel, k: &str| m.column(k).unwrap().to_vec();
+        let (rmr, dist, n) = (col(&model, "gt_rmr"), col(&model, "gt_dist"), col(&model, "gt_n"));
+        for i in 0..model.len() {
+            assert_eq!(rmr[i].is_finite(), n[i].is_finite() && dist[i].is_finite(), "block {i}");
+            if rmr[i].is_finite() {
+                assert!(n[i] >= 1.0 && dist[i] >= 0.0);
+            }
+        }
+        // A new estimation replaces them (no stale columns).
+        let again = estimate(&mut model, &st.results, &pc).unwrap();
+        assert_eq!(again.columns.iter().filter(|c| **c == "gt_dist").count(), 1);
+        let total = rmr.iter().filter(|v| v.is_finite()).count();
+        let r = crate::rsi18n::r();
+        let input = ViewInput {
+            axis: None,
+            points: &[],
+        };
+        let drawn = |pc: &ProjectConfig| {
+            view(&model, pc, &input, r, LocalOrigin::default())
+                .unwrap()
+                .cubes
+                .map_or(0, |c| c.0)
+        };
+        pc.rs.bm.view_mode = 3;
+        pc.rs.bm.view_attr = GT_VIEW_ATTR;
+        assert_eq!(drawn(&pc), total);
+        // Only below an RMR: strictly fewer (the logging has both good and poor rock), never more.
+        let (lo, hi) = rmr
+            .iter()
+            .filter(|v| v.is_finite())
+            .fold((f32::MAX, f32::MIN), |a, v| (a.0.min(*v), a.1.max(*v)));
+        assert!(hi - lo > 5.0, "the example must span several RMR values");
+        let mid = ((lo + hi) / 2.0) as f64;
+        pc.rs.bm.view_filter = 1;
+        pc.rs.bm.view_threshold = mid;
+        let below = drawn(&pc);
+        pc.rs.bm.view_filter = 2;
+        let above = drawn(&pc);
+        assert!(below > 0 && above > 0 && below + above <= total && below < total && above < total);
+        // The class filter: "above class II" shows only classes III to V.
+        pc.rs.bm.view_filter = 2;
+        pc.rs.bm.view_attr = GT_VIEW_ATTR + 3;
+        pc.rs.bm.view_threshold = 2.0;
+        let poor = drawn(&pc);
+        let class = model.column("gt_class").unwrap();
+        assert_eq!(poor, class.iter().filter(|c| c.is_finite() && **c > 2.0).count());
+        // The filter never touches resource attributes.
+        pc.rs.bm.view_attr = 10;
+        assert!(
+            view(&model, &pc, &input, r, LocalOrigin::default()).is_err()
+                || drawn(&pc) == 0
+                || pc.rs.bm.view_filter == 2
+        );
+        pc.rs.bm.view_attr = GT_VIEW_ATTR;
+        pc.rs.bm.view_filter = 0;
+        // Cutting plane: a horizontal plane keeps one side; both sides add up to every block.
+        let g = model.geometry;
+        let zmid = g.origin[2] + g.n[2] as f64 * g.size[2] / 2.0;
+        pc.rs.bm.view_cut = true;
+        pc.rs.bm.view_cut_point = [g.origin[0], g.origin[1], zmid];
+        pc.rs.bm.view_cut_dip = 0.0;
+        pc.rs.bm.view_cut_side = 0;
+        let up = drawn(&pc);
+        pc.rs.bm.view_cut_side = 1;
+        let down = drawn(&pc);
+        assert!(up > 0 && down > 0 && up + down == total, "{up} + {down} != {total}");
+        // A vertical plane east of everything keeps nothing on its far side.
+        pc.rs.bm.view_cut_dip = 90.0;
+        pc.rs.bm.view_cut_dipdir = 90.0;
+        pc.rs.bm.view_cut_point = [g.origin[0] + 1.0e6, g.origin[1], zmid];
+        pc.rs.bm.view_cut_side = 0;
+        assert_eq!(drawn(&pc), 0);
+        pc.rs.bm.view_cut_side = 1;
+        assert_eq!(drawn(&pc), total);
+        // Confidence attributes are drawn too (far is red).
+        pc.rs.bm.view_cut = false;
+        for k in [4, 5] {
+            pc.rs.bm.view_attr = GT_VIEW_ATTR + k;
+            assert_eq!(drawn(&pc), total, "attribute {k}");
+        }
+    }
+
     #[test]
     fn block_model_columns() {
         let (cfg, mut st) = loaded("e");
@@ -913,7 +1086,10 @@ mod tests {
         model.columns.insert("tonnage".into(), vec![7.0; model.len()]);
         let out = estimate(&mut model, &st.results, &pc).unwrap();
         assert!(out.estimated > 0 && out.estimated <= out.total);
-        assert_eq!(out.columns, vec!["gt_rmr", "gt_gsi", "gt_logq", "gt_class"]);
+        assert_eq!(
+            out.columns,
+            vec!["gt_rmr", "gt_gsi", "gt_logq", "gt_class", "gt_dist", "gt_n"]
+        );
         assert!(
             model.column("tonnage").unwrap().iter().all(|t| *t == 7.0),
             "resource columns untouched"

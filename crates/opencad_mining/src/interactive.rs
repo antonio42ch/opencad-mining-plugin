@@ -284,6 +284,8 @@ pub enum SelectionKind {
     Projection,
     /// Axes of a geotechnical mapping by chainage.
     GtAxes,
+    /// Polygon on a vein long section.
+    VnPolygon,
 }
 
 /// Gathers a selection (pick or window) and hands it to a follow-up command.
@@ -319,6 +321,7 @@ impl InteractiveCommand for PickSelection {
             SelectionKind::DomainSolids => (Pending::DomainSolids(handles), "MIN_RS_SETSOLID_EXEC"),
             SelectionKind::Projection => (Pending::Projection(handles), "MIN_GM_PROJECT_EXEC"),
             SelectionKind::GtAxes => (Pending::GtAxes(handles), "MIN_GT_CLASSIFY_EXEC"),
+            SelectionKind::VnPolygon => (Pending::VnPolygon(handles), "MIN_VN_EDIT_EXEC"),
         };
         set_pending(pending);
         CommandStep::Dispatch(next.into())
@@ -363,5 +366,50 @@ impl InteractiveCommand for PickViewPoints {
                 color: Some([0.3, 0.8, 1.0, 1.0]),
             }]
         })
+    }
+}
+
+/// Two points (with a rubber line) handed to a follow-up command as
+/// `Pending::TwoPoints`.
+pub struct PickTwoPoints {
+    prompts: [String; 2],
+    first: Option<Vec3>,
+    next: &'static str,
+}
+
+impl PickTwoPoints {
+    pub fn new(prompts: [String; 2], next: &'static str) -> Self {
+        PickTwoPoints {
+            prompts,
+            first: None,
+            next,
+        }
+    }
+}
+
+impl InteractiveCommand for PickTwoPoints {
+    fn prompt(&self) -> String {
+        self.prompts[usize::from(self.first.is_some())].clone()
+    }
+    fn on_point(&mut self, pt: [f64; 3]) -> CommandStep {
+        match self.first {
+            None => {
+                self.first = Some(pt);
+                CommandStep::NeedPoint
+            }
+            Some(a) => {
+                set_pending(Pending::TwoPoints(a, pt));
+                CommandStep::Dispatch(self.next.into())
+            }
+        }
+    }
+    fn on_cursor_move(&mut self, pt: [f64; 3]) -> Vec<PreviewWire> {
+        match self.first {
+            Some(a) => vec![PreviewWire::Polyline {
+                points: vec![a, pt],
+                color: Some([0.3, 0.8, 1.0, 1.0]),
+            }],
+            None => Vec::new(),
+        }
     }
 }

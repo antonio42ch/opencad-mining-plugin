@@ -16,6 +16,9 @@ crates/
   blockmodel_engine/ C  rotated block model, domain regions (solids, surfaces), parallel
                         estimation, binary file, swath / grade-tonnage reports, views
   geotech_engine/    C  geotechnical tables, RMR89 / Q / GSI, Hoek-Brown, locating records
+  vein_engine/       C  narrow veins: vein frame, intercepts of holes and channels, wall surfaces with
+                        diagnostics, in-plane variography and prism model, dilution, blocks between
+                        levels and raises, category rules (tests include the documented example)
   openmining_ops/    C  one typed definition per operation: parameters bound to the project
                         settings, key=value / JSON argument parsing, JSON Schema, panel
                         layouts, result and error format, the generated docs/MCP.md

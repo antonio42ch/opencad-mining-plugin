@@ -1,5 +1,5 @@
 {
   "repo": "antonio42ch/opencad-mining-plugin",
   "name": "Open Mining",
-  "description": "Mining & geology: drillholes (CSV/XLSX import, validation, minimum-curvature desurvey, grade-coloured 3D traces), underground working solids and geological mapping. ES/EN/PT."
+  "description": "Mining & geology: drillholes and channel samples, narrow-vein model (surfaces, prisms, grades, dilution, tonnage by blocks and categories), underground workings, resource estimation, geotechnics, geological mapping; every action is also an operation for AI assistants (MCP). ES/EN/PT."
 }

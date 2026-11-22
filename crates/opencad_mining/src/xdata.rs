@@ -37,10 +37,18 @@ pub enum Class {
     RmDraw,
     /// A wedge of three discontinuity sets on a working.
     RmWedge,
+    /// Hanging-wall or footwall surface of a vein.
+    VnSurface,
+    /// Prism of a vein model.
+    VnPrism,
+    /// Long section of a vein model.
+    VnLong,
+    /// Block label or working drawn on a vein long section.
+    VnBlock,
 }
 
 impl Class {
-    pub const ALL: [Class; 19] = [
+    pub const ALL: [Class; 23] = [
         Class::Trace,
         Class::Collar,
         Class::Assay,
@@ -60,6 +68,10 @@ impl Class {
         Class::GtRec,
         Class::RmDraw,
         Class::RmWedge,
+        Class::VnSurface,
+        Class::VnPrism,
+        Class::VnLong,
+        Class::VnBlock,
     ];
 
     pub fn key(self) -> &'static str {
@@ -83,6 +95,10 @@ impl Class {
             Self::GtRec => "GT_REC",
             Self::RmDraw => "RM_DRAW",
             Self::RmWedge => "RM_WEDGE",
+            Self::VnSurface => "VN_SURFACE",
+            Self::VnPrism => "VN_PRISM",
+            Self::VnLong => "VN_LONG",
+            Self::VnBlock => "VN_BLOCK",
         }
     }
 

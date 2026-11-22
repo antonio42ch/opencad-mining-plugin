@@ -398,7 +398,7 @@ fn view_exec(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, r: &RsString
     };
     let out = rs::view(&model, cfg, &input, r, crate::drillholes::origin(cfg)).map_err(failed)?;
     let (planes, polygons, limited, cubes) = (out.planes, out.polygons, out.limited, out.cubes);
-    let mut sink = HostSink::new(host);
+    let mut sink = crate::host_sink::OpSink::new(host);
     sink.begin("MIN_RS_BMVIEW");
     let n = rs::draw_view(&mut sink, r, out);
     session::commit(&mut sink, crate::i18n::s(), tab, cfg);
@@ -406,9 +406,11 @@ fn view_exec(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig, r: &RsString
     if n == 0 {
         return Err(no_data(r.m_view_empty));
     }
-    Ok(OpResult::data(
-        json!({ "planes": planes, "polygons": polygons, "limited": limited, "cubes": cubes }),
-    ))
+    let created = std::mem::take(&mut sink.inner.created);
+    Ok(OpResult {
+        created,
+        ..OpResult::data(json!({ "planes": planes, "polygons": polygons, "limited": limited, "cubes": cubes }))
+    })
 }
 
 fn point(args: &Args, key: &str) -> Option<mining_core::Vec3> {

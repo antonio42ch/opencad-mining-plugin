@@ -43,6 +43,56 @@ MIN_DH_LIST
 MIN_DH_DRAW assay_attr=cu% scheme=rainbow
 ```
 
+**Channel samples of the workings** (converted into holes `CH-…` appended to the drillholes)
+
+```
+MIN_CH_CONVERT points="C:\data\topo_points.csv" sheet="C:\data\channels.csv"
+MIN_DH_DRAW assay_attr=au
+MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=1,1,0
+```
+
+**Narrow vein surfaces** (hanging wall and footwall from mapped contacts and vein intercepts)
+
+```
+MIN_VN_SURFACES vein=V1 hw_layer=VETA_TECHO fw_layer=VETA_PISO vein_attr=tipo vein_values=VETA step=2 radius=40
+```
+
+Read `diagnostics` and `worst`: fix the contacts it names, or change `radius`, `step` or
+`method`, and run it again.
+
+**Narrow vein prism model** (after the surfaces; edits are polygons drawn on the long section)
+
+```
+MIN_VN_VARIOGRAM vein=V1 grade=au thickness_col=potencia lag=10 nlags=10
+MIN_VN_ESTIMATE vein=V1 block_u=5 block_v=5 max_distance=40 density=2.7
+MIN_VN_LONG vein=V1
+MIN_VN_EDIT action=boundary polygon=<handle>
+MIN_VN_EDIT action=exclude polygon=<handle>
+```
+
+Check `validation` (cross-validation bias and correlation, composites against their
+prism) and the `out_*` counts of `summary` before accepting the model.
+
+**Narrow vein tonnage** (rules are the company's norms: test them before cubicating)
+
+```
+MIN_VN_RULES rules=[["Medido",3,15,"",""],["Indicado",2,30,"",""],["Inferido",1,"","",""]]
+MIN_VN_RULES sides=2 dist=20
+MIN_VN_CUBICATE vein=V1 level_layer=NIVELES raise_layer=CHIMENEAS mmw=0.8 overbreak_hw=0.1 recovery=90
+MIN_VN_BUILD vein=V1
+```
+
+Each block lists its sampled sides and `why` it missed the earlier rules.
+
+**Whole vein model in one call** (channels already converted; levels and raises are 3D polylines)
+
+```
+MIN_VN_BUILD vein=V1 vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia levels=<h1>,<h2> raises=<h3>
+```
+
+It accepts every argument of its steps; arguments given are stored, so the next call (or the
+panel) keeps them. Read each step's result in `steps` and the diagnostics before reporting.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -87,13 +137,25 @@ MIN_GT_VIEW attribute=class
 
 ## Project
 
+### `help` — `MIN_HELP`
+
+*Read-only.* Describe the Open Mining operations: the list (name, command, group, summary), or with `op` its parameters, JSON Schema and result; `workflows=true` adds the typical command sequences and the error codes. Use it to discover what can be done without the guide.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `op` | text |  | Operation name or command (gt_view, MIN_GT_VIEW): return its parameters, JSON Schema and result. Without it the list of operations. |
+| `group` | text |  | List only one group: project, drillholes, workings, axes, sections, geology, resources, geotechnics, veins. |
+| `workflows` | boolean |  | Also return the typical workflows (sequences of commands) and the error codes. |
+
+Result `data`: `groups`, `operations` (list of `{name, command, group, kind, summary}`); with `op`: the same plus `aliases`, `positional`, `parameters` (`{key, type, setting, required, help, options}`), `input_schema`, `result`; with `workflows`: `workflows` (text) and `error_codes` (code -> meaning).
+
 ### `status` — `MIN_STATUS`
 
-*Read-only.* What the project holds and what can be done next: drillholes, composites, domains and variogram models, block model, contact surfaces, geotechnical tables, axis being designed, drawing path. Call it first, and after an error with code no_data.
+*Read-only.* What the project holds and what can be done next: drillholes, channels and the narrow-vein model (surfaces, prisms, tonnage), composites, domains and variogram models, block model, contact surfaces, geotechnical tables, axis being designed, drawing path. Call it first, and after an error with code no_data.
 
 No arguments.
 
-Result `data`: `drawing` (path or null), `drillholes` (`loaded`, `holes`, `assay_attributes`, `geo_attributes`, `assay_attr`), `composites` (`count`, `variable`, `stale`), `domains` (list of `{name, values, density, model_saved}`), `surfaces`, `block_model` (`blocks`, `columns`) or null, `geotechnics` (`tables`, `classified`), `axis` (current axis or null), `next` (suggested operations with the reason).
+Result `data`: `drawing` (path or null), `drillholes` (`loaded`, `holes`, `assay_attributes`, `geo_attributes`, `assay_attr`), `composites` (`count`, `variable`, `stale`), `domains` (list of `{name, values, density, model_saved}`), `surfaces`, `block_model` (`blocks`, `columns`) or null, `geotechnics` (`tables`, `classified`), `axis` (current axis or null), `veins` (`{name, channels, surfaces, prisms, tonnage, rules}`: the active vein's progress), `next` (suggested operations with the reason).
 
 ### `entities` — `MIN_ENTITIES`
 
@@ -101,7 +163,7 @@ Result `data`: `drawing` (path or null), `drillholes` (`loaded`, `holes`, `assay
 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
-| `class` | text |  | Class key filter (DH_TRACE, DH_ASSAY, UG_SOLID, UG_SECTION, GM_TRACE, GM_PROJ, AX_AXIS, SC_CUT, SC_SHEET, RS_COMP, RS_SURFACE, RS_VIEW, GT_REC; comma-separated). |
+| `class` | text |  | Class key filter (DH_TRACE, DH_ASSAY, UG_SOLID, UG_SECTION, GM_TRACE, GM_PROJ, AX_AXIS, SC_CUT, SC_SHEET, RS_COMP, RS_SURFACE, RS_VIEW, GT_REC, VN_SURFACE, VN_PRISM, VN_LONG, VN_BLOCK; comma-separated). |
 | `layer` | text |  | Layer filter (exact name). |
 | `limit` | integer 1..10000 |  | Maximum entities returned (default 500). |
 | `offset` | integer ≥ 0 |  | Entities to skip (paging). |
@@ -178,6 +240,55 @@ Fill the geology colour table (geo_colors) with the distinct values of geo_attr 
 | `geo_attr` | name among the geology attributes | yes | Geology attribute whose values get a colour. |
 
 Result `data`: `values` (number of geology values), `colors` (value -> colour).
+
+### `ch_convert` — `MIN_CH_CONVERT`
+
+Convert a channel sampling sheet into drillhole data: each channel is located from a topographic point and a distance along the working (towards the next point or an azimuth), horizontal and perpendicular to the working by default, and becomes a short hole (id prefix CH-) with its samples, thickness (potencia), grades and sample type. The channels are appended to the loaded drillholes (replacing earlier channels), so dh_draw, rs_composite, gt_* and the vein model use them.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `points` | file path | yes | Topographic points table: id, east (X), north (Y), elevation (Z). |
+| `sheet` | file path | yes | One row per sample: channel, topographic point, distance from it, next point (or azimuth of the working), sample width (or from/to), vein thickness (potencia), grades; optional: position, height, sample type, working, sample id, channel azimuth / inclination. |
+| `prefix` | text | yes | Prefix added to the channel ids to make the hole ids (CH-). |
+| `anchor` | one of `centre`, `start` | yes | The channel is centred on the located position, or starts there. |
+| `height` | number | yes | Added to the point elevation when the sheet has no height column. |
+| `azimuth_offset` | number -360..360 | yes | Default channel azimuth = working direction + this (90 = perpendicular, across the vein when the working follows it). |
+| `inclination` | number -90..90 | yes | Default channel inclination, positive up (0 = horizontal). |
+| `auto` | boolean | yes | Convert the channels again (and append them) every time the drillholes are loaded. |
+| `write_files` | boolean | yes | Write the converted collar / survey / assays / geology CSV next to the drawing. |
+
+Positional form: `MIN_CH_CONVERT points sheet` (`-` skips one).
+
+Result `data`: `channels`, `samples`, `issues` (list of `{channel, row, message}` for skipped channels), `grade_columns`, `text_columns`, `holes` (drillholes + channels loaded), `files` (written CSV or null).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_CH_CONVERT points="C:\data\puntos_topograficos.csv" sheet="C:\data\muestreo_canales.csv"
+→ {"channels": 24, "samples": 72, "holes": 24, "grade_columns": ["AU", "AG"], "text_columns": [], "issues": [], "files": null}
+```
+
+### `ch_orient` — `MIN_CH_ORIENT`
+
+Set the orientation of one channel from two points (picked on screen, or given as p1 and p2): azimuth and inclination of the line p1 -> p2. It is kept in the orientations table and the channels are converted again.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `channel` | text | yes | Channel id (as in the sheet, without prefix) whose orientation is set. |
+| `orientations` | table `Channel | Azimuth | Inclination` | yes | Channel orientations that replace the default: rows of [channel, azimuth, inclination]. |
+| `p1` | point `x,y[,z]` |  | Start of the channel direction (drawing coordinates). With p1 and p2 no pick is needed. |
+| `p2` | point `x,y[,z]` |  | End of the channel direction. |
+
+Positional form: `MIN_CH_ORIENT channel` (`-` skips one).
+
+Result `data`: `channel`, `azimuth`, `inclination`, and the ch_convert result under `converted`.
+
+Example (values abbreviated with `…`):
+
+```
+MIN_CH_ORIENT channel=3950-101-03 p1=0,0,0 p2=0,10,0
+→ {"channel": "3950-101-03", "azimuth": 0.0, "inclination": 0.0, "converted": {"channels": 24, "samples": 72, "issues": [], …}}
+```
 
 ## Underground workings
 
@@ -672,7 +783,7 @@ Draw the block model: level plans, sections through 2 points or along an axis, o
 | Argument | Type | Setting | Description |
 |---|---|---|---|
 | `mode` | one of `levels`, `two_points`, `axis`, `cubes` | yes | View type. |
-| `attribute` | one of `grade_ok`, `ok_variance`, `kriging_efficiency`, `domain`, `pass`, `samples`, `distance`, `nn`, `idw`, `sk`, `tonnage`, `gt_rmr`, `gt_gsi`, `gt_logq`, `gt_class` | yes | Column that colours the blocks. |
+| `attribute` | one of `grade_ok`, `ok_variance`, `kriging_efficiency`, `domain`, `pass`, `samples`, `distance`, `nn`, `idw`, `sk`, `tonnage`, `gt_rmr`, `gt_gsi`, `gt_logq`, `gt_class`, `gt_dist`, `gt_n` | yes | Column that colours the blocks. |
 | `cutoff` | number | yes | Grade cut-off of the grade attributes. |
 | `domain` | name or index among the domains | yes | Domain shown (name or index; 0 = all). |
 | `z_from` | number | yes | Lowest level (mode levels; from = to = every block level). |
@@ -787,7 +898,7 @@ Result `data`: `gsi`, `records` (used for the median), `lab` (true when the lith
 
 ### `gt_estimate` — `MIN_GT_ESTIMATE`
 
-Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class. Density and tonnage are not touched. Needs gt_classify first.
+Interpolate RMR, GSI and log10 Q of the classified records into the block model (the resource model, its .ombm file, or a new one with the resource geometry and one Global domain); writes gt_rmr, gt_gsi, gt_logq, gt_class and the confidence columns gt_dist (mean distance to the records used, m) and gt_n (number of records used). Density and tonnage are not touched. Needs gt_classify first.
 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
@@ -806,15 +917,35 @@ Result `data`: `estimated`, `blocks` (in a domain), `no_domain` (records skipped
 
 ### `gt_view` — `MIN_GT_VIEW`
 
-Draw the block model coloured by a geotechnical column, with the view settings of the resource Model panel (levels, sections, cubes).
+Draw the block model coloured by a geotechnical column as level plans, vertical sections (2 points or along an axis) or cubes (mode=cubes: one cube per block with a value, grouped by colour, at most `limit`). Replaces the previous model view.
 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
-| `attribute` | one of `rmr`, `gsi`, `logq`, `class` | yes | Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red). |
+| `mode` | one of `levels`, `two_points`, `axis`, `cubes` | yes | levels = horizontal plans; two_points / axis = vertical sections; cubes = every block with a value as a cube (coloured meshes, one per colour). |
+| `attribute` | one of `rmr`, `gsi`, `logq`, `class`, `dist`, `n` | yes | Geotechnical column to colour the block model view with (class uses the class colours; others show poor rock in red). |
+| `z_from` | number | yes | Lowest level (mode levels; from = to = every block level). |
+| `z_to` | number | yes | Highest level (mode levels). |
+| `z_step` | number ≥ 0.1 | yes | Level spacing (mode levels, m). |
+| `spacing` | number ≥ 0.1 | yes | Spacing of parallel sections (mode two_points, m). |
+| `count` | number ≥ 1 | yes | Number of parallel sections (mode two_points). |
+| `interval` | number ≥ 0.1 | yes | Section spacing along the axis (mode axis, m). |
+| `limit` | number ≥ 1 | yes | Maximum polygons or cubes drawn; above it cubes are an even sample of the blocks. |
+| `show` | one of `all`, `below`, `above` | yes | Show every block, or only those whose attribute value is below / above `threshold` (e.g. attribute=class show=above threshold=3 shows classes IV and V; attribute=rmr show=below threshold=40 shows poor rock). |
+| `threshold` | number | yes | Threshold of `show`, in the units of the attribute (RMR, GSI, log Q, class number, metres, records). |
+| `cut` | boolean | yes | Keep only the blocks on one side of a plane, to see inside the model (a vertical plane to see a section, a horizontal one to remove the top). |
+| `cut_e` | number | yes | East of a point of the cutting plane (world). |
+| `cut_n` | number | yes | North of a point of the cutting plane. |
+| `cut_z` | number | yes | Elevation of a point of the cutting plane. |
+| `cut_dip` | number 0..90 | yes | Dip of the cutting plane (0 = horizontal, 90 = vertical). |
+| `cut_dipdir` | number 0..360 | yes | Dip direction of the cutting plane (azimuth); for a vertical plane it is the direction its normal points to. |
+| `cut_side` | one of `front`, `back` | yes | front = the side the plane faces (towards its dip direction, or up for a horizontal plane); back = the other side. |
+| `axis` | entity handle (hex) |  | Axis polyline (mode axis). Without it a pick is started. |
+| `p1` | point `x,y[,z]` |  | First point of the section line (mode two_points). |
+| `p2` | point `x,y[,z]` |  | Second point of the section line. |
 
 Positional form: `MIN_GT_VIEW attribute` (`-` skips one).
 
-Result `data`: `attribute`, `column`; the drawing itself is reported by the resource view.
+Result `data`: `attribute`, `column`, `mode`, and the view result: `planes`, `polygons`, `limited`, `cubes` (`[drawn, total]` in cubes mode).
 
 ### `st_stereonet` — `MIN_ST_STEREONET`
 
@@ -978,4 +1109,301 @@ Draw the last Kirsch or convergence-confinement chart in the DWG (frame, axes, c
 | `at` | point `x,y[,z]` |  | Lower-left corner of the chart (world; default 0,0,0). |
 
 Result `data`: `entities`.
+
+## Narrow veins
+
+### `vn_surfaces` — `MIN_VN_SURFACES`
+
+Build the hanging-wall and footwall surfaces of a narrow vein from the mapped contact polylines (by layer, or picked as hw= / fw=) and from the vein intercepts of the loaded drillholes and channels; they are interpolated in the vein frame (strike, dip, normal), drawn and saved, and diagnosed: fit to each contact (worst first), nodes where the footwall crosses above the hanging wall, nodes with one wall only, thickness range. Read the diagnostics and adjust step, radius, method or the contacts, then build again.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces and model are stored under it). |
+| `hw_layer` | text | yes | Layer of the mapped hanging-wall contact polylines (wildcards * ? allowed). Empty = none. |
+| `fw_layer` | text | yes | Layer of the mapped footwall contact polylines (wildcards allowed). Empty = none. |
+| `intercepts` | boolean | yes | Also use the vein intervals of the loaded drillholes and channels as hanging-wall / footwall contacts. |
+| `vein_attr` | text | yes | Geology attribute that marks the vein intervals (e.g. tipo, lito). |
+| `vein_values` | text | yes | Values of that attribute that are vein, separated by ; (e.g. VETA). |
+| `orientation` | one of `fit`, `typed` | yes | Plane of the vein frame: fitted to all contacts (least squares) or the dip / dip direction typed. |
+| `dip` | number 0..90 | yes | Dip of the reference plane (orientation=typed). |
+| `dipdir` | number 0..360 | yes | Dip direction of the reference plane (orientation=typed). |
+| `step` | number ≥ 0.1 | yes | Grid spacing on the vein plane. |
+| `margin` | number ≥ 0 | yes | Margin of the grid around the contacts. |
+| `radius` | number ≥ 0.1 | yes | Search radius; grid nodes farther from the contacts stay empty (maximum extrapolation). |
+| `min_contacts` | integer 1..50 | yes | Minimum contact points to estimate a node. |
+| `max_contacts` | integer 1..200 | yes | Maximum contact points used per node. |
+| `method` | one of `kriging`, `idw` | yes | Interpolation of the walls. |
+| `power` | number ≥ 0.1 | yes | Inverse distance power (method=idw). |
+| `range` | number ≥ 0 | yes | Range of the spherical model (method=kriging); 0 uses the search radius. |
+| `densify` | number ≥ 0 | yes | Points taken along the mapped polylines at least every this distance (0 = vertices only). |
+| `min_thickness` | number ≥ 0 | yes | Nodes thinner than this are reported as thin (diagnostic only). |
+| `hw` | handles `1A,2B` |  | Hanging-wall contact polylines picked instead of (or in addition to) the layer. |
+| `fw` | handles `1A,2B` |  | Footwall contact polylines picked instead of (or in addition to) the layer. |
+
+Positional form: `MIN_VN_SURFACES vein` (`-` skips one).
+
+Result `data`: `vein`, `plane` (`{dip, dipdir, origin}`), `contacts` (`{hanging_wall, footwall, from_layers, from_handles, from_intercepts}`), `grid` (`{nx, ny, step, nodes}`), `diagnostics` (`{both, one_side, crossings, thin, thickness_min, thickness_mean, thickness_max, rms_hw, rms_fw, unchecked}`), `worst` (list of `{source, side, residual, point}`), `file` (saved surfaces or null).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_SURFACES vein=EJ1 hw_layer= fw_layer= intercepts=true vein_attr=tipo vein_values=VETA step=2 radius=50
+→ {"vein": "EJ1", "plane": {"dip": 65.9, "dipdir": 299.8, "origin": [500033.26, 8500042.70, 3966.93]},
+ "contacts": {"hanging_wall": 24, "footwall": 24, "from_layers": 0, "from_handles": 0, "from_intercepts": 48},
+ "grid": {"nx": 74, "ny": 34, "step": 2.0, "nodes": 2516},
+ "diagnostics": {"both": 2338, "one_side": 18, "crossings": 0, "thin": 0, "thickness_min": 0.213, "thickness_mean": 0.720, "thickness_max": 1.337, "rms_hw": 0.032, "rms_fw": 0.038, "unchecked": 0},
+ "worst": [{"source": "CH-3950-101-02", "side": "hanging_wall", "residual": 0.087, "point": [500002.91, 8500006.40, 3950.0]}, …],
+ "file": "C:\\data\\proyecto_veta_EJ1.json"}
+```
+
+### `vn_variogram` — `MIN_VN_VARIOGRAM`
+
+Composites the vein intercepts of the loaded drillholes and channels (grade weighted by length, true thickness from the thickness column), computes the variograms of the accumulation (grade × thickness) on the vein plane (omnidirectional, along strike, down dip), fits a model and stores nugget, sill and both ranges for vn_estimate.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `grade` | text | yes | Assay column estimated (e.g. au, ag, cu%). |
+| `thickness_col` | text | yes | Assay column with the true vein thickness (channels: potencia). Empty or missing = length of the intercept along the vein normal. |
+| `lag` | number ≥ 0.1 | yes | Lag of the experimental variograms on the vein plane. |
+| `nlags` | integer 2..50 | yes | Number of lags. |
+| `kind` | one of `spherical`, `exponential`, `gaussian` | yes | Variogram model type. |
+
+Positional form: `MIN_VN_VARIOGRAM vein` (`-` skips one).
+
+Result `data`: `vein`, `composites`, `missing_grade`, `stats` (`{grade_mean, thickness_mean, acc_mean, acc_variance}`), `experimental` (`{omni, strike, dip}`: lists of `{lag, gamma, pairs}`), `model` (`{kind, nugget, sill, range_strike, range_dip}`).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_VARIOGRAM vein=EJ1 grade=au thickness_col=potencia lag=10 nlags=10 kind=spherical
+→ {"vein": "EJ1", "composites": 24,
+ "stats": {"grade_mean": 5.870, "thickness_mean": 0.772, "acc_mean": 4.535, "acc_variance": 28.32},
+ "experimental": {"omni": [{"lag": …, "gamma": …, "pairs": …}, …], "strike": […], "dip": […]},
+ "model": {"kind": "spherical", "nugget": 12.996, "sill": 21.245, "range_strike": 107.7, "range_dip": 107.7}}
+```
+
+### `vn_estimate` — `MIN_VN_ESTIMATE`
+
+Builds the prism model of the vein: a grid of prisms on the vein plane between the hanging-wall and footwall surfaces; accumulation and thickness are block-kriged with the same weights and grade = accumulation / thickness. The boundary polygon, the maximum distance and the long-section edits limit or override the prisms. Draws the prisms, saves them as CSV, redraws the long section if drawn, and validates against the composites (cross-validation and composite vs prism grade).
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `grade` | text | yes | Assay column estimated (e.g. au, ag, cu%). |
+| `thickness_col` | text | yes | Assay column with the true vein thickness (channels: potencia). Empty or missing = length of the intercept along the vein normal. |
+| `kind` | one of `spherical`, `exponential`, `gaussian` | yes | Variogram model type. |
+| `nugget` | number ≥ 0 | yes | Nugget of the accumulation variogram (vn_variogram fills it). |
+| `sill` | number ≥ 0 | yes | Partial sill of the accumulation variogram. |
+| `range_strike` | number ≥ 0.01 | yes | Range along strike. |
+| `range_dip` | number ≥ 0.01 | yes | Range down dip. |
+| `block_u` | number ≥ 0.1 | yes | Prism size along strike. |
+| `block_v` | number ≥ 0.1 | yes | Prism size down dip. |
+| `search_radius` | number ≥ 0.1 | yes | Search radius on the vein plane. |
+| `min_samples` | integer 1..50 | yes | Minimum composites to estimate a prism. |
+| `max_samples` | integer 1..200 | yes | Maximum composites per prism. |
+| `max_distance` | number ≥ 0 | yes | Prisms farther than this from every composite are left out. |
+| `disc` | integer 1..10 | yes | Points per side used for block kriging. |
+| `density` | number ≥ 0.1 | yes | Density of the vein. |
+| `color_by` | one of `grade`, `thickness`, `accumulation`, `distance`, `variance` | yes | Attribute that colours the prisms and the long section. |
+| `draw_prisms` | boolean | yes | Draw the prisms between the walls. |
+
+Positional form: `MIN_VN_ESTIMATE vein` (`-` skips one).
+
+Result `data`: `vein`, `summary` (`{prisms, area, volume, tonnes, grade, thickness, edited, out_boundary, out_distance, out_walls, out_edits, not_estimated}`), `validation` (`{cv_n, cv_mean_error, cv_correlation, n, mean_composite, mean_prism, correlation, worst: [{hole, composite, prism}]}`), `composites`, `file`.
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_ESTIMATE vein=EJ1 block_u=5 block_v=5 max_distance=40 density=2.7
+→ {"vein": "EJ1",
+ "summary": {"prisms": 321, "area": 8025.0, "volume": 5912.0, "tonnes": 15963.0, "grade": 6.818, "thickness": 0.737, "edited": 0, "out_boundary": 0, "out_distance": 69, "out_walls": 30, "out_edits": 0, "not_estimated": 0},
+ "validation": {"cv_n": 24, "cv_mean_error": -0.023, "cv_correlation": 0.045, "n": 24, "mean_composite": 5.578, "mean_prism": 6.098, "correlation": 0.602,
+   "worst": [{"hole": "CH-4000-201-03", "composite": 18.99, "prism": 7.694}, …]},
+ "composites": 24, "file": "C:\\data\\proyecto_veta_EJ1_prismas.csv"}
+```
+
+### `vn_long` — `MIN_VN_LONG`
+
+Draws the long section of the vein model flat in the drawing (along strike × up dip): prisms coloured by the chosen attribute, composites with labels, the boundary and the edit polygons. Polygons drawn on it are used by vn_edit.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `color_by` | one of `grade`, `thickness`, `accumulation`, `distance`, `variance` | yes | Attribute that colours the long section. |
+| `labels` | boolean | yes | Write hole and grade beside each composite. |
+| `at` | point `x,y[,z]` |  | Lower-left corner of the long section in the drawing. Default: the last one, or beside the model. |
+
+Positional form: `MIN_VN_LONG vein` (`-` skips one).
+
+Result `data`: `vein`, `at` (base point), `u0`, `v0`, `width`, `height`, `prisms`, `composites`.
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_LONG vein=EJ1 at=500200,8500000,0 color_by=grade
+→ {"vein": "EJ1", "at": [500200.0, 8500000.0, 0.0], "u0": -88.4, "v0": -23.8, "width": 145.0, "height": 65.0, "prisms": 321, "composites": 24}
+```
+
+### `vn_edit` — `MIN_VN_EDIT`
+
+Edits the prism model with a polygon drawn on the long section (polygon=handle, else the selection, else it asks to pick it): exclude prisms, set their grade or thickness, or set the boundary polygon; undo the last edit, clear all, or list them. The model is estimated again after each change.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `action` | one of `exclude`, `grade`, `thickness`, `boundary`, `undo`, `clear`, `list` | yes | What to do with the polygon drawn on the long section. |
+| `polygon` | entity handle (hex) |  | Closed polyline drawn on the long section (exclude, grade, thickness, boundary). |
+| `value` | number | yes | Grade or thickness for action=grade / thickness. |
+
+Positional form: `MIN_VN_EDIT action` (`-` skips one).
+
+Result `data`: `vein`, `edits` (list of `{action, value, vertices}`), `boundary` (vertex count), and the vn_estimate result in `estimate` (null for list).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_EDIT action=exclude polygon=1F4
+→ {"vein": "EJ1", "edits": [{"action": "exclude", "value": 0.0, "vertices": 4}], "boundary": 0,
+ "estimate": {"summary": {"prisms": …, "out_edits": …, …}, …}}
+```
+
+### `vn_cubicate` — `MIN_VN_CUBICATE`
+
+Tonnage of the estimated prism model: dilution (minimum mining width, hanging-wall / footwall overbreak with their grades) and recovery per prism; blocks between the levels (drifts) and raises picked or on their layers, projected on the vein plane, with sill and raise pillars kept apart; sampled sides per block (composites on the bounding workings); categories by the ordered rule table. Draws the workings and block labels on the long section and saves the blocks as CSV.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `mmw` | number ≥ 0 | yes | Thinner prisms are widened to this width, half on each wall. |
+| `overbreak_hw` | number ≥ 0 | yes | Overbreak on the hanging wall. |
+| `overbreak_fw` | number ≥ 0 | yes | Overbreak on the footwall. |
+| `grade_hw` | number ≥ 0 | yes | Grade of the diluting rock on the hanging wall. |
+| `grade_fw` | number ≥ 0 | yes | Grade of the diluting rock on the footwall. |
+| `density_waste` | number ≥ 0.1 | yes | Density of the diluting rock. |
+| `recovery` | number 0..100 | yes | Mining recovery applied to the diluted tonnes. |
+| `level_layer` | text | yes | Layer of the level polylines (wildcards allowed). Empty = none. |
+| `raise_layer` | text | yes | Layer of the raise polylines (wildcards allowed). Empty = none. |
+| `level_pillar` | number ≥ 0 | yes | Height of the pillar left above each level, along the vein (0 = none). |
+| `raise_pillar` | number ≥ 0 | yes | Total width of the pillar centred on each raise (0 = none). |
+| `side_tolerance` | number ≥ 0 | yes | A composite within this distance of a working samples that side of the block. |
+| `side_min` | integer 1..100 | yes | Composites needed on a side to count it as sampled. |
+| `rules` | table `Category | Sampled sides ≥ | Distance ≤ (m) | Samples ≥ | Diluted grade ≥` | yes | Ordered rules [category, min sampled sides, max mean distance, min samples, min diluted grade]; empty cells are not checked. Each block takes the first rule it meets; blocks that meet none are unclassified. Replace the example rules with the company's norms. |
+| `levels` | handles `1A,2B` |  | Level (drift) polylines picked instead of (or in addition to) the layer. |
+| `raises` | handles `1A,2B` |  | Raise polylines picked instead of (or in addition to) the layer. |
+
+Positional form: `MIN_VN_CUBICATE vein` (`-` skips one).
+
+Result `data`: `vein`, `workings` (`{levels, raises}`), `blocks` (list of `{name, category, sides: [lower, upper, left, right] (true / false / null), sampled, samples, dist, prisms, area, thickness, tonnes, grade, width, diluted_tonnes, diluted_grade, recovered, pillar_tonnes, why}`), `totals` (per category `{category, blocks, tonnes, grade, diluted_tonnes, diluted_grade, recovered}`, last = unclassified), `pillars` (`{tonnes, grade}`), `file`.
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_CUBICATE vein=EJ1 level_layer=NIVELES raise_layer=CHIMENEAS mmw=0.8 overbreak_hw=0.1 overbreak_fw=0.05 recovery=90
+→ {"vein": "EJ1", "workings": {"levels": 2, "raises": 1},
+ "blocks": [{"name": "L1-L2/>R1", "category": "Indicado", "sides": [true, true, true, null], "sampled": 3, "samples": 18, "dist": 19.62,
+             "prisms": 212, "area": 5300.0, "thickness": 0.825, "tonnes": 11801.0, "grade": 6.891, "width": 1.065,
+             "diluted_tonnes": 15119.0, "diluted_grade": 5.379, "recovered": 13607.0, "pillar_tonnes": 0.0,
+             "why": ["Medido: dist 19.6 > 15"]}, …],
+ "totals": [{"category": "Medido", "blocks": 0, …}, {"category": "Indicado", "blocks": 2, "tonnes": 13596.0, "grade": 6.825, "diluted_tonnes": 19137.0, "diluted_grade": 4.849, "recovered": 17223.0}, {"category": "Inferido", "blocks": 3, "tonnes": 2368.0, "grade": 6.777, …}, {"category": "Sin categoría", "blocks": 0, …}],
+ "pillars": {"tonnes": 0.0, "grade": null}, "file": "C:\\data\\proyecto_veta_EJ1_bloques.csv"}
+```
+
+### `vn_rules` — `MIN_VN_RULES`
+
+Lists the category rules (set them with rules=[[category, min_sides, max_dist, min_samples, min_grade], ...]) and, given sides / dist / samples / grade, tells which rule a block with those values meets and why each earlier rule fails.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `rules` | table `Category | Sampled sides ≥ | Distance ≤ (m) | Samples ≥ | Diluted grade ≥` | yes | Ordered rules [category, min sampled sides, max mean distance, min samples, min diluted grade]; empty cells are not checked. Each block takes the first rule it meets; blocks that meet none are unclassified. Replace the example rules with the company's norms. |
+| `sides` | integer 0..4 |  | Sampled sides of the block to test. |
+| `dist` | number ≥ 0 |  | Mean distance to the samples to test. |
+| `samples` | integer ≥ 0 |  | Samples of the block to test. |
+| `grade` | number |  | Diluted grade to test. |
+
+Result `data`: `rules` (list of `{category, min_sides, max_dist, min_samples, min_grade}`), `test` (`{values, rule, category, why}` or null).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_RULES sides=2 dist=20
+→ {"rules": [{"category": "Medido", "min_sides": 3, "max_dist": 15.0, "min_samples": null, "min_grade": null}, {"category": "Indicado", "min_sides": 2, "max_dist": 30.0, …}, {"category": "Inferido", "min_sides": 1, …}],
+ "test": {"values": {"sides": 2, "dist": 20.0, "samples": 0, "grade": null}, "rule": 2, "category": "Indicado", "why": ["Medido: sides 2 < 3, dist 20.0 > 15"]}}
+```
+
+### `vn_build` — `MIN_VN_BUILD`
+
+Runs the whole vein model: vn_surfaces, vn_variogram (if fit_variogram), vn_estimate and vn_cubicate (if tonnage). It accepts every argument of those steps (set them in the same call: contacts, step, radius, grade, block sizes, maximum distance, dilution, workings, rules…; omitted ones use the current settings) and stops at the first step that fails, naming it; otherwise returns every step's result.
+
+| Argument | Type | Setting | Description |
+|---|---|---|---|
+| `vein` | text | yes | Name of the vein (its surfaces must be built first). |
+| `fit_variogram` | boolean | yes | vn_build fits the in-plane variogram before estimating (otherwise uses the stored model: nugget, sill, range_strike, range_dip). |
+| `tonnage` | boolean | yes | vn_build ends with vn_cubicate. |
+| `hw_layer` | text | yes | Layer of the mapped hanging-wall contact polylines (wildcards * ? allowed). Empty = none. |
+| `fw_layer` | text | yes | Layer of the mapped footwall contact polylines (wildcards allowed). Empty = none. |
+| `intercepts` | boolean | yes | Also use the vein intervals of the loaded drillholes and channels as hanging-wall / footwall contacts. |
+| `vein_attr` | text | yes | Geology attribute that marks the vein intervals (e.g. tipo, lito). |
+| `vein_values` | text | yes | Values of that attribute that are vein, separated by ; (e.g. VETA). |
+| `orientation` | one of `fit`, `typed` | yes | Plane of the vein frame: fitted to all contacts (least squares) or the dip / dip direction typed. |
+| `dip` | number 0..90 | yes | Dip of the reference plane (orientation=typed). |
+| `dipdir` | number 0..360 | yes | Dip direction of the reference plane (orientation=typed). |
+| `step` | number ≥ 0.1 | yes | Grid spacing on the vein plane. |
+| `margin` | number ≥ 0 | yes | Margin of the grid around the contacts. |
+| `radius` | number ≥ 0.1 | yes | Search radius; grid nodes farther from the contacts stay empty (maximum extrapolation). |
+| `min_contacts` | integer 1..50 | yes | Minimum contact points to estimate a node. |
+| `max_contacts` | integer 1..200 | yes | Maximum contact points used per node. |
+| `method` | one of `kriging`, `idw` | yes | Interpolation of the walls. |
+| `power` | number ≥ 0.1 | yes | Inverse distance power (method=idw). |
+| `range` | number ≥ 0 | yes | Range of the spherical model (method=kriging); 0 uses the search radius. |
+| `densify` | number ≥ 0 | yes | Points taken along the mapped polylines at least every this distance (0 = vertices only). |
+| `min_thickness` | number ≥ 0 | yes | Nodes thinner than this are reported as thin (diagnostic only). |
+| `hw` | handles `1A,2B` |  | Hanging-wall contact polylines picked instead of (or in addition to) the layer. |
+| `fw` | handles `1A,2B` |  | Footwall contact polylines picked instead of (or in addition to) the layer. |
+| `grade` | text | yes | Assay column estimated (e.g. au, ag, cu%). |
+| `thickness_col` | text | yes | Assay column with the true vein thickness (channels: potencia). Empty or missing = length of the intercept along the vein normal. |
+| `lag` | number ≥ 0.1 | yes | Lag of the experimental variograms on the vein plane. |
+| `nlags` | integer 2..50 | yes | Number of lags. |
+| `kind` | one of `spherical`, `exponential`, `gaussian` | yes | Variogram model type. |
+| `nugget` | number ≥ 0 | yes | Nugget of the accumulation variogram (vn_variogram fills it). |
+| `sill` | number ≥ 0 | yes | Partial sill of the accumulation variogram. |
+| `range_strike` | number ≥ 0.01 | yes | Range along strike. |
+| `range_dip` | number ≥ 0.01 | yes | Range down dip. |
+| `block_u` | number ≥ 0.1 | yes | Prism size along strike. |
+| `block_v` | number ≥ 0.1 | yes | Prism size down dip. |
+| `search_radius` | number ≥ 0.1 | yes | Search radius on the vein plane. |
+| `min_samples` | integer 1..50 | yes | Minimum composites to estimate a prism. |
+| `max_samples` | integer 1..200 | yes | Maximum composites per prism. |
+| `max_distance` | number ≥ 0 | yes | Prisms farther than this from every composite are left out. |
+| `disc` | integer 1..10 | yes | Points per side used for block kriging. |
+| `density` | number ≥ 0.1 | yes | Density of the vein. |
+| `color_by` | one of `grade`, `thickness`, `accumulation`, `distance`, `variance` | yes | Attribute that colours the prisms and the long section. |
+| `draw_prisms` | boolean | yes | Draw the prisms between the walls. |
+| `mmw` | number ≥ 0 | yes | Thinner prisms are widened to this width, half on each wall. |
+| `overbreak_hw` | number ≥ 0 | yes | Overbreak on the hanging wall. |
+| `overbreak_fw` | number ≥ 0 | yes | Overbreak on the footwall. |
+| `grade_hw` | number ≥ 0 | yes | Grade of the diluting rock on the hanging wall. |
+| `grade_fw` | number ≥ 0 | yes | Grade of the diluting rock on the footwall. |
+| `density_waste` | number ≥ 0.1 | yes | Density of the diluting rock. |
+| `recovery` | number 0..100 | yes | Mining recovery applied to the diluted tonnes. |
+| `level_layer` | text | yes | Layer of the level polylines (wildcards allowed). Empty = none. |
+| `raise_layer` | text | yes | Layer of the raise polylines (wildcards allowed). Empty = none. |
+| `level_pillar` | number ≥ 0 | yes | Height of the pillar left above each level, along the vein (0 = none). |
+| `raise_pillar` | number ≥ 0 | yes | Total width of the pillar centred on each raise (0 = none). |
+| `side_tolerance` | number ≥ 0 | yes | A composite within this distance of a working samples that side of the block. |
+| `side_min` | integer 1..100 | yes | Composites needed on a side to count it as sampled. |
+| `rules` | table `Category | Sampled sides ≥ | Distance ≤ (m) | Samples ≥ | Diluted grade ≥` | yes | Ordered rules [category, min sampled sides, max mean distance, min samples, min diluted grade]; empty cells are not checked. Each block takes the first rule it meets; blocks that meet none are unclassified. Replace the example rules with the company's norms. |
+| `levels` | handles `1A,2B` |  | Level (drift) polylines picked instead of (or in addition to) the layer. |
+| `raises` | handles `1A,2B` |  | Raise polylines picked instead of (or in addition to) the layer. |
+
+Positional form: `MIN_VN_BUILD vein` (`-` skips one).
+
+Result `data`: `vein`, `steps` (`{surfaces, variogram, estimate, cubicate}`: each step's data or null when skipped).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_VN_BUILD vein=EJ1 vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia max_distance=40 recovery=90 fit_variogram=true tonnage=true
+→ {"vein": "EJ1", "steps": {"surfaces": {…}, "variogram": {…}, "estimate": {…}, "cubicate": {…}}}
+```
 

@@ -117,6 +117,33 @@ fn rows_of(codec: &str, cfg: &ProjectConfig) -> Vec<Vec<String>> {
             .into_iter()
             .map(|c| vec![c.name, c.above, c.below])
             .collect(),
+        "ch_orient" => cfg
+            .ch
+            .orient
+            .iter()
+            .map(|o| {
+                vec![
+                    o.channel.clone(),
+                    crate::resources::num(o.azimuth),
+                    crate::resources::num(o.inclination),
+                ]
+            })
+            .collect(),
+        "vn_rules" => cfg
+            .vn
+            .rules
+            .iter()
+            .map(|r| {
+                let o = |v: Option<f64>| v.map(crate::resources::num).unwrap_or_default();
+                vec![
+                    r.category.clone(),
+                    o(r.min_sides.map(|x| x as f64)),
+                    o(r.max_dist),
+                    o(r.min_samples.map(|x| x as f64)),
+                    o(r.min_grade),
+                ]
+            })
+            .collect(),
         "joint_sets" => cfg
             .rm
             .sets
@@ -166,6 +193,23 @@ fn json_of(codec: &str, rows: &[Vec<String>]) -> Option<Value> {
             .map(|(i, r)| {
                 let name = cell(r, 0);
                 json!({"name": if name.is_empty() { format!("C{}", i + 1) } else { name }, "above": cell(r, 1), "below": cell(r, 2)})
+            })
+            .collect::<Vec<_>>()),
+        "ch_orient" => json!(rows
+            .iter()
+            .filter_map(|r| {
+                let ch = cell(r, 0);
+                let az = r.get(1).and_then(|s| parse_num(s))?;
+                let inc = r.get(2).and_then(|s| parse_num(s)).unwrap_or(0.0);
+                (!ch.is_empty() && (-90.0..=90.0).contains(&inc)).then(|| json!({"channel": ch, "azimuth": az.rem_euclid(360.0), "inclination": inc}))
+            })
+            .collect::<Vec<_>>()),
+        "vn_rules" => json!(rows
+            .iter()
+            .filter(|r| !cell(r, 0).is_empty())
+            .map(|r| {
+                let n = |i: usize| r.get(i).and_then(|s| parse_num(s)).filter(|v| *v >= 0.0);
+                json!({"category": cell(r, 0), "min_sides": n(1).map(|v| v.round() as u64), "max_dist": n(2), "min_samples": n(3).map(|v| v.round() as u64), "min_grade": n(4)})
             })
             .collect::<Vec<_>>()),
         "joint_sets" => json!(rows
@@ -235,6 +279,9 @@ fn to_dialog(p: &Param, v: &Value, cfg: &ProjectConfig, lists: &Lists, l: ops::L
             index: v.as_u64().unwrap_or(0) as usize,
             text: String::new(),
         },
+        // A file picker only takes a path value: a text one is ignored, the picker
+        // stays empty and its empty value would wipe the setting on the next run.
+        Kind::Path { .. } => DialogValue::FilePath(v.as_str().unwrap_or("").to_string()),
         _ => DialogValue::Text(v.as_str().unwrap_or("").to_string()),
     }
 }
@@ -542,6 +589,15 @@ mod tests {
         c.gt.md_radii = [80.0, 60.0, 15.0];
         c.gt.md_domains = true;
         c.gt.md_attr = 3;
+        c.gt.view_mode = 3;
+        c.gt.view_limit = 500.0;
+        c.gt.view_z_step = 6.0;
+        c.gt.view_filter = 2;
+        c.gt.view_threshold = 2.5;
+        c.gt.view_cut = true;
+        c.gt.view_cut_e = 500_100.0;
+        c.gt.view_cut_dip = 45.0;
+        c.gt.view_cut_side = 1;
         let mut flat = HashMap::new();
         for id in panel_ids() {
             let p = panel(id, &c, &[]);
@@ -667,6 +723,58 @@ mod tests {
         assert_eq!(
             rows_of("contacts", &c),
             vec![vec!["C1".to_string(), "OX".into(), String::new()]]
+        );
+    }
+
+    /// Paths are pushed as path values (the only kind a file picker accepts),
+    /// so a path given as an argument survives the next panel read.
+    #[test]
+    fn paths_are_pushed_as_file_paths_and_read_back() {
+        let mut c = ProjectConfig::default();
+        c.ch.points = "/d/puntos.csv".into();
+        c.gt.logging = "/d/log.csv".into();
+        c.dh.collar = "/d/collar.csv".into();
+        let mut flat = HashMap::new();
+        for id in panel_ids() {
+            flat.extend(values(id, &c, &Lists::default()));
+        }
+        for k in ["ch.points", "gt.logging", "dh.collar"] {
+            assert!(
+                matches!(&flat[k], DialogValue::FilePath(p) if p.starts_with("/d/")),
+                "{k}: {:?}",
+                flat[k]
+            );
+        }
+        let mut back = ProjectConfig::default();
+        apply(&mut back, &flat);
+        assert_eq!(
+            (
+                back.ch.points.as_str(),
+                back.gt.logging.as_str(),
+                back.dh.collar.as_str()
+            ),
+            ("/d/puntos.csv", "/d/log.csv", "/d/collar.csv")
+        );
+    }
+
+    /// The category rules survive the panel table (empty cells = not checked).
+    #[test]
+    fn vein_rules_round_trip_through_the_table() {
+        let c = ProjectConfig::default();
+        let rows = rows_of("vn_rules", &c);
+        assert_eq!(rows[0], vec!["Medido", "3", "15", "", ""]);
+        let v = json_of("vn_rules", &rows).unwrap();
+        let back: Vec<crate::veinconfig::RuleCfg> = serde_json::from_value(v).unwrap();
+        assert_eq!(back, c.vn.rules);
+        let typed = vec![
+            vec!["Reserva".to_string(), "".into(), "".into(), "2".into(), "4,5".into()],
+            vec!["".to_string(), "1".into()],
+        ];
+        let r: Vec<crate::veinconfig::RuleCfg> = serde_json::from_value(json_of("vn_rules", &typed).unwrap()).unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(
+            (r[0].min_sides, r[0].min_samples, r[0].min_grade),
+            (None, Some(2), Some(4.5))
         );
     }
 }

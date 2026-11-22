@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "crates/drillhole_engine/tests/data"
 GT_DATA = ROOT / "crates/geotech_engine/tests/data"
 RESULT = "OPENMINING_RESULT "
-PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design"]
+PANELS = ["min_drillholes", "min_workings", "min_geomap", "min_axes", "min_sections", "min_rs_comp", "min_rs_vario", "min_rs_bm", "min_gt_data", "min_gt_hb", "min_gt_model", "min_rm_struct", "min_rm_design", "min_channels", "min_vein", "min_vein_model", "min_vein_tonnage"]
 
 
 class Server:
@@ -116,6 +116,8 @@ def main():
     data.mkdir()
     for f in ("collar.csv", "survey.csv", "assays.csv"):
         shutil.copy(DATA / f, data / f)
+    for f in ("ch_points.csv", "ch_sheet.csv"):
+        shutil.copy(DATA / f, data / f)
     for f in ("logging.csv", "lab.csv", "joints.csv"):
         shutil.copy(GT_DATA / f, data / ("gt_" + f))
 
@@ -167,6 +169,14 @@ def main():
             good = bool(r.get("ok")) and cond(r.get("data") or {})
             c.need(good, f"{what} ({json.dumps(r.get('data') if r.get('ok') else r.get('error'))[:240]})")
             return r
+
+        # 1a. The operations describe themselves (no guide needed).
+        run("MIN_HELP")
+        r = ok("help", "help lists the operations", lambda d: len(d.get("operations", [])) > 50 and "geotechnics" in d.get("groups", []))
+        run("MIN_HELP op=gt_view")
+        ok("help", "help op=gt_view gives its parameters and options", lambda d: any(p["key"] == "mode" and "cubes" in (p["options"] or []) for p in d.get("parameters", [])))
+        run("MIN_HELP op=nada")
+        c.need(result("help").get("error", {}).get("code") == "not_found", "help of an unknown operation is not_found")
 
         # 1b. Status of an empty project points at loading drillholes.
         run("MIN_STATUS")
@@ -269,6 +279,23 @@ def main():
         run("MIN_GT_VIEW attribute=class")
         c.need(result("gt_view").get("data", {}).get("column") == "gt_class" and count(layer("MIN_RS_VISTA")) >= 1,
                "gt_view draws the model coloured by rock mass class")
+        run("MIN_GT_VIEW mode=cubes attribute=rmr limit=1000")
+        r = ok("gt_view", "gt_view mode=cubes draws one cube mesh per colour", lambda d: d.get("mode") == "cubes" and d.get("cubes") and d["cubes"][0] == d["cubes"][1] > 0)
+        c.need(count(layer("MIN_RS_VISTA")) >= 1, "the cube meshes are on MIN_RS_VISTA")
+        run("MIN_BM_INFO")
+        ok("bm_info", "the model has the confidence columns gt_dist and gt_n", lambda d: "gt_dist" in d.get("columns", {}) and "gt_n" in d.get("columns", {}))
+        run("MIN_GT_VIEW mode=cubes attribute=dist")
+        ok("gt_view", "gt_view attribute=dist colours by the distance to the records", lambda d: d.get("column") == "gt_dist" and d.get("cubes", [0, 0])[0] > 0)
+        run("MIN_GT_VIEW mode=cubes attribute=rmr show=above threshold=1000")
+        r = result("gt_view")
+        c.need(r.get("ok") is False and r["error"]["code"] == "no_data", "a filter that leaves no block is reported as no_data")
+        run("MIN_GT_VIEW mode=cubes attribute=rmr show=all cut=true cut_dip=0 cut_z=-100000 cut_side=front")
+        ok("gt_view", "a horizontal cut below the model keeps every block", lambda d: d.get("cubes", [0, 0])[0] > 0)
+        run("MIN_GT_VIEW mode=cubes attribute=rmr cut=true cut_dip=0 cut_z=100000 cut_side=front")
+        r = result("gt_view")
+        c.need(r.get("ok") is False and r["error"]["code"] == "no_data", "a cut above the model leaves nothing")
+        run("MIN_GT_VIEW mode=levels attribute=class show=all cut=false")
+        ok("gt_view", "gt_view mode=levels still draws plans", lambda d: d.get("mode") == "levels" and d.get("polygons", 0) > 0)
         run("MIN_GT_SUMMARY")
         ok("gt_summary", "gt_summary repeats the classification", lambda d: d.get("with_rmr") == 5)
 
@@ -300,6 +327,95 @@ def main():
         ok("sm_span", "sm_span computes Carter's scaled span", lambda d: d.get("scaled_span", 0) > 0 and d.get("ratio") is not None)
         run("MIN_SM_DRAW chart=convergence at=200,0,0 size=100")
         ok("sm_draw", "sm_draw draws the convergence chart", lambda d: d.get("entities", 0) >= 3)
+        # 9. Channel samples converted into drillholes and appended to them.
+        run(f'MIN_CH_CONVERT points="{data / "ch_points.csv"}" sheet="{data / "ch_sheet.csv"}"')
+        ok("ch_convert", "ch_convert turns 3 channels (5 samples) into holes added to the 3 drillholes", lambda d: d.get("channels") == 3 and d.get("samples") == 5 and d.get("holes") == 6 and d.get("issues") == [])
+        run("MIN_DH_LIST hole=CH-C1")
+        ok("dh_list", "the channel CH-C1 is a hole with its 2 samples, potencia and grades", lambda d: len(d.get("assays", [])) == 2 and d["assays"][1]["values"].get("au") == 6.2 and d["assays"][1]["values"].get("potencia") == 0.6)
+        run("MIN_DH_DRAW assay_attr=au")
+        ok("dh_draw", "dh_draw draws the 6 holes (drillholes + channels)", lambda d: d.get("holes") == 6)
+        run("MIN_CH_ORIENT channel=C2 p1=0,0,0 p2=0,10,0")
+        ok("ch_orient", "ch_orient sets channel C2 to azimuth 0 and converts again", lambda d: abs(d.get("azimuth", -1)) < 1e-9 and d["converted"]["channels"] == 3)
+        # 10. Vein surfaces: hanging wall and footwall contacts mapped as 3D polylines
+        #     (a vertical vein striking north, 1.2 m thick, around the channels).
+        org = (result("dh_load").get("data") or {}).get("origin") or [0, 0, 0]
+        def poly(pts):
+            before = set(handles(s.send({"op": "query", "type": "Polyline3D"})))
+            run("3DPOLY " + " ".join(f"{x - org[0]},{y - org[1]},{z - org[2]}" for x, y, z in pts))
+            after = handles(s.send({"op": "query", "type": "Polyline3D"}))
+            return [h for h in after if h not in before]
+        hw, fw = [], []
+        for z in (3945, 3955):
+            hw += poly([(500000.6, 8500040, z), (500000.6, 8500060, z), (500000.6, 8500080, z)])
+            fw += poly([(499999.4, 8500040, z), (499999.4, 8500060, z), (499999.4, 8500080, z)])
+        c.need(len(hw) == 2 and len(fw) == 2, f"4 contact polylines drawn ({hw} {fw})")
+        run(f"MIN_VN_SURFACES vein=V1 hw={','.join(hw)} fw={','.join(fw)} hw_layer= fw_layer= intercepts=false step=1 radius=30 densify=2 method=idw")
+        ok("vn_surfaces", "vn_surfaces: vertical plane, ~1.2 m thick, no crossings", lambda d: abs(d["plane"]["dip"] - 90) < 5 and abs(d["diagnostics"]["thickness_mean"] - 1.2) < 0.3 and d["diagnostics"]["crossings"] == 0 and d["contacts"]["from_handles"] > 0)
+        c.need(count(layer("MIN_VN_TECHO")) >= 1 and count(layer("MIN_VN_PISO")) >= 1, "both vein surfaces are drawn")
+        run("MIN_VN_SURFACES vein=V1 hw_layer=NO_EXISTE fw_layer=NO_EXISTE intercepts=false")
+        c.need(result("vn_surfaces").get("error", {}).get("code") == "no_data", "no contacts is reported as no_data")
+
+        # 11. Vein prism model from the three channels (vein intercepts tipo=VETA, au).
+        run("MIN_VN_VARIOGRAM vein=V1 grade=au thickness_col=potencia lag=5 nlags=4")
+        ok("vn_variogram", "vn_variogram composites the 3 channel intercepts and fits a model", lambda d: d["composites"] == 3 and d["model"]["range_strike"] > 0)
+        run("MIN_VN_ESTIMATE vein=V1 nugget=0 sill=1 range_strike=30 range_dip=30 block_u=5 block_v=5 max_distance=0 search_radius=60 min_samples=2 draw_prisms=true")
+        ok("vn_estimate", "vn_estimate builds prisms with grades inside the channel range", lambda d: d["summary"]["prisms"] > 0 and 3.0 <= d["summary"]["grade"] <= 9.5 and d["validation"]["n"] == 3)
+        prisms = result("vn_estimate").get("data", {}).get("summary", {}).get("prisms", 0)
+        c.need(count(layer("MIN_VN_PRISMAS")) == prisms, f"the {prisms} prisms are drawn")
+        run("MIN_VN_LONG vein=V1 at=1000,1000,0")
+        ok("vn_long", "vn_long draws the long section at the base point", lambda d: d["at"][0] == 1000 and d["width"] > 0 and d["height"] > 0)
+        lg = result("vn_long").get("data", {})
+        c.need(count(layer("MIN_VN_LONG")) > prisms, "long section entities drawn")
+        w2, ht = lg.get("width", 0) / 2, lg.get("height", 0)
+        before = set(handles(s.send({"op": "query", "type": "Polyline3D"})))
+        run(f"3DPOLY 999,999,0 {1000 + w2},999,0 {1000 + w2},{1001 + ht},0 999,{1001 + ht},0 999,999,0")
+        poly_h = [h for h in handles(s.send({"op": "query", "type": "Polyline3D"})) if h not in before]
+        run(f"MIN_VN_EDIT action=exclude polygon={poly_h[0] if poly_h else '0'}")
+        ok("vn_edit", "vn_edit excludes the left half of the long section and estimates again", lambda d: len(d["edits"]) == 1 and d["estimate"]["summary"]["out_edits"] > 0 and d["estimate"]["summary"]["prisms"] < prisms)
+        run("MIN_VN_EDIT action=clear")
+        ok("vn_edit", "vn_edit clear restores the model", lambda d: len(d["edits"]) == 0 and d["estimate"]["summary"]["prisms"] == prisms)
+        run("MIN_VN_ESTIMATE vein=NOPE")
+        c.need(result("vn_estimate").get("error", {}).get("code") == "no_data", "a vein without surfaces is reported as no_data")
+        run("MIN_VN_ESTIMATE vein=V1")
+        tonnes = result("vn_estimate").get("data", {}).get("summary", {}).get("tonnes", 0)
+
+        # 12. Tonnage: two levels (the lower one along the channels) and a raise between them.
+        lv = poly([(500000, 8500030, 3950), (500000, 8500090, 3950)]) + poly([(500000, 8500030, 3958), (500000, 8500090, 3958)])
+        rs_ = poly([(500000, 8500060, 3940), (500000, 8500060, 3962)])
+        c.need(len(lv) == 2 and len(rs_) == 1, f"2 levels and 1 raise drawn ({lv} {rs_})")
+        run(f"MIN_VN_CUBICATE vein=V1 levels={','.join(lv)} raises={','.join(rs_)} level_layer= raise_layer= mmw=0.8 overbreak_hw=0.1 overbreak_fw=0.1 recovery=90 side_tolerance=3 side_min=1")
+        def blk(d, name):
+            return next((b for b in d.get("blocks", []) if b["name"] == name), None)
+        ok("vn_cubicate", "vn_cubicate splits the prisms into blocks between the levels and the raise", lambda d: d["workings"] == {"levels": 2, "raises": 1} and len(d["blocks"]) >= 4)
+        ok("vn_cubicate", "block L1-L2/<R1: lower level and raise sampled, classified", lambda d: blk(d, "L1-L2/<R1") is not None and blk(d, "L1-L2/<R1")["sides"][0] is True and blk(d, "L1-L2/<R1")["sides"][1] is False and blk(d, "L1-L2/<R1")["sampled"] >= 2 and blk(d, "L1-L2/<R1")["category"] is not None)
+        ok("vn_cubicate", "block tonnes add up to the model; dilution adds tonnes, recovery removes them", lambda d: abs(sum(b["tonnes"] for b in d["blocks"]) - tonnes) < 1e-6 * max(tonnes, 1) and sum(b["diluted_tonnes"] for b in d["blocks"]) > tonnes and all(b["recovered"] < b["diluted_tonnes"] for b in d["blocks"] if b["diluted_tonnes"] > 0))
+        c.need(count(layer("MIN_VN_BLOQUES")) > 0, "workings and block labels drawn on the long section")
+        run("MIN_VN_RULES sides=3 dist=5")
+        ok("vn_rules", "vn_rules: 3 sampled sides at 5 m meet the first example rule", lambda d: d["test"]["category"] == "Medido" and d["test"]["rule"] == 1)
+        run("MIN_VN_RULES sides=0 dist=5")
+        ok("vn_rules", "vn_rules: no sampled side meets no rule and says why", lambda d: d["test"]["category"] is None and len(d["test"]["why"]) == 3)
+        run(f"MIN_VN_BUILD vein=V1 hw={','.join(hw)} fw={','.join(fw)} levels={','.join(lv)} raises={','.join(rs_)} fit_variogram=false tonnage=true")
+        ok("vn_build", "vn_build runs surfaces, estimate and tonnage in one call", lambda d: d["steps"]["surfaces"] is not None and d["steps"]["variogram"] is None and d["steps"]["estimate"]["summary"]["prisms"] > 0 and len(d["steps"]["cubicate"]["blocks"]) >= 4)
+
+        # 13. The documented example (examples/canales -> examples/veta): the whole vein model
+        #     from the 24 channels, two levels and a raise, in one MIN_VN_BUILD.
+        ex = Path(__file__).resolve().parent.parent / "examples" / "canales"
+        run(f'MIN_CH_CONVERT points="{ex / "puntos_topograficos.csv"}" sheet="{ex / "muestreo_canales.csv"}"')
+        ok("ch_convert", "the example converts 24 channels (72 samples)", lambda d: d["channels"] == 24 and d["samples"] == 72 and not d["issues"])
+        pt = {"PT-101": (500000.0, 8500000.0, 3950.0), "PT-104": (500075.0, 8500129.9, 3951.2), "PT-201": (500020.0, 8499990.0, 4000.0), "PT-203": (500070.0, 8500076.6, 4000.6), "PT-103": (500050.0, 8500086.6, 3950.8)}
+        lv2 = poly([pt["PT-101"], pt["PT-104"]]) + poly([pt["PT-201"], pt["PT-203"]])
+        rs2 = poly([pt["PT-103"], pt["PT-203"]])
+        # The earlier sections left their own settings in the project: give the defaults explicitly.
+        defaults = "step=2 margin=5 radius=50 method=kriging range=0 min_contacts=2 max_contacts=12 densify=1 orientation=fit lag=10 nlags=10 kind=spherical search_radius=60 min_samples=2 max_samples=16 max_distance=40 disc=3 density=2.7 block_u=5 block_v=5 mmw=0.8 overbreak_hw=0.1 overbreak_fw=0.05 grade_hw=0 grade_fw=0 density_waste=2.6 recovery=90 level_pillar=0 raise_pillar=0 side_tolerance=3 side_min=1 fit_variogram=true tonnage=true"
+        run(f"MIN_VN_BUILD vein=EJ1 hw_layer= fw_layer= intercepts=true vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia {defaults} levels={','.join(lv2)} raises={','.join(rs2)} level_layer= raise_layer=")
+        ok("vn_build", "example: plane ~66/300, 24+24 intercept contacts, no crossings", lambda d: abs(d["steps"]["surfaces"]["plane"]["dip"] - 66) < 3 and abs(d["steps"]["surfaces"]["plane"]["dipdir"] - 300) < 5 and d["steps"]["surfaces"]["contacts"]["from_intercepts"] == 48 and d["steps"]["surfaces"]["diagnostics"]["crossings"] == 0)
+        ok("vn_build", "example: ~320 prisms, a fitted variogram and 5 blocks between the levels and the raise", lambda d: 300 < d["steps"]["estimate"]["summary"]["prisms"] < 340 and d["steps"]["variogram"]["composites"] == 24 and len(d["steps"]["cubicate"]["blocks"]) == 5 and all(b["category"] in ("Indicado", "Inferido") for b in d["steps"]["cubicate"]["blocks"]))
+        run("MIN_STATUS")
+        ok("status", "status reports the vein model: 24 channels, surfaces, prisms and tonnage", lambda d: d["veins"]["name"] == "EJ1" and d["veins"]["channels"] == 24 and d["veins"]["surfaces"] and d["veins"]["prisms"] > 300 and d["veins"]["tonnage"] and not any(n["op"].startswith("vn_") for n in d["next"]))
+
+        run("MIN_CH_CONVERT sheet=nothing.csv")
+        c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")
+
     finally:
         hist = s.control("history", quiet=True)
         entries = hist.get("entries", hist.get("result", {}).get("entries", []))
