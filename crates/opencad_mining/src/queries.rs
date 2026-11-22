@@ -44,7 +44,7 @@ fn point(args: &Args, key: &str) -> Option<mining_core::Vec3> {
 
 fn status(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig) -> Value {
     let doc = host.document_path(tab);
-    let (data, comps, rs_names, variable, model, surfaces, gt, axis) = state::with_tab(tab, |t| {
+    let (data, comps, rs_names, variable, model, surfaces, gt, axis, vein) = state::with_tab(tab, |t| {
         (
             t.data.clone(),
             t.rs.composites.len(),
@@ -64,8 +64,26 @@ fn status(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig) -> Value {
             t.axis
                 .as_ref()
                 .map(|a| json!({"axis": a.id, "elements": a.design.elements.len(), "length": a.design.length()})),
+            (
+                t.vein.name.clone(),
+                t.vein.surfaces.is_some(),
+                t.vein_model.vein.clone(),
+                t.vein_model.prisms.len(),
+                !t.vein_model.cats.is_empty(),
+            ),
         )
     });
+    let (vein_surfaces_of, has_surfaces, model_of, prisms, has_tonnage) = vein;
+    let vname = cfg.vn.name.trim().to_string();
+    let channels = data.as_ref().map_or(0, |d| {
+        d.collars
+            .iter()
+            .filter(|c| c.hole_id.starts_with(cfg.ch.prefix.as_str()))
+            .count()
+    });
+    let surfaces_built = has_surfaces && vein_surfaces_of == vname;
+    let prisms_built = model_of == vname && prisms > 0;
+    let tonnage_done = prisms_built && has_tonnage;
     let doms = rs::effective_domains(cfg);
     let stale = comps > 0 && rs::check_domains(&rs_names, cfg, crate::rsi18n::r()).is_err();
     let mut next: Vec<Value> = Vec::new();
@@ -103,6 +121,16 @@ fn status(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig) -> Value {
             }
         }
     }
+    // Narrow-vein model: channels (or the vein geology of the drillholes) → surfaces → prisms → tonnage.
+    if channels > 0 || surfaces_built {
+        if !surfaces_built {
+            suggest("vn_surfaces", format!("{channels} channels are loaded but the surfaces of vein {vname} are not built (or vn_build for every step)"));
+        } else if !prisms_built {
+            suggest("vn_estimate", format!("the surfaces of vein {vname} are built but there are no prisms (vn_variogram first to fit the model)"));
+        } else if !tonnage_done {
+            suggest("vn_cubicate", format!("the prisms of vein {vname} are estimated but not cubicated (test the category rules with vn_rules)"));
+        }
+    }
     let (log, map, lab, joints, classified) = gt;
     if log.is_some() || map.is_some() {
         if classified == 0 {
@@ -137,6 +165,7 @@ fn status(host: &mut dyn HostApi, tab: u64, cfg: &ProjectConfig) -> Value {
         },
         "geotechnics": {"tables": {"logging": log, "mapping": map, "lab_lithologies": lab, "joints": joints}, "classified": classified},
         "axis": axis,
+        "veins": {"name": vname, "channels": channels, "surfaces": surfaces_built, "prisms": if prisms_built { prisms } else { 0 }, "tonnage": tonnage_done, "rules": cfg.vn.rules.len()},
         "next": next,
     })
 }

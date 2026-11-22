@@ -130,7 +130,7 @@ const SURFACES: &[Param] = &[
         "Search radius; grid nodes farther from the contacts stay empty (maximum extrapolation).",
     ),
     setting(
-        "min_samples",
+        "min_contacts",
         Kind::Integer {
             min: Some(1),
             max: Some(50),
@@ -140,7 +140,7 @@ const SURFACES: &[Param] = &[
         "Minimum contact points to estimate a node.",
     ),
     setting(
-        "max_samples",
+        "max_contacts",
         Kind::Integer {
             min: Some(1),
             max: Some(200),
@@ -264,8 +264,8 @@ pub static PANELS: &[PanelSpec] = &[PanelSpec {
                 Item::Param("vn_surfaces", "method"),
                 Item::Param("vn_surfaces", "power"),
                 Item::Param("vn_surfaces", "range"),
-                Item::Param("vn_surfaces", "min_samples"),
-                Item::Param("vn_surfaces", "max_samples"),
+                Item::Param("vn_surfaces", "min_contacts"),
+                Item::Param("vn_surfaces", "max_contacts"),
                 Item::Param("vn_surfaces", "min_thickness"),
             ],
             collapsed: false,
@@ -886,6 +886,36 @@ const RULES_TEST: &[Param] = &[
     ),
 ];
 
+const fn same(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// The parameter `key` of a list (a compile error when it is missing).
+const fn pick(list: &[Param], key: &str) -> Param {
+    let mut i = 0;
+    while i < list.len() {
+        if same(list[i].key, key) {
+            return list[i];
+        }
+        i += 1;
+    }
+    panic!("no such parameter in the list")
+}
+
+/// `vn_build` accepts every setting of the steps it chains (surfaces, variogram,
+/// estimate, tonnage), so one call can set and run them all; a test checks that
+/// none is missing.
 const BUILD: &[Param] = &[
     VEIN,
     setting(
@@ -893,7 +923,7 @@ const BUILD: &[Param] = &[
         Kind::Bool,
         "/vn/build_fit",
         L::new("Ajustar el variograma", "Fit the variogram", "Ajustar o variograma"),
-        "vn_build fits the in-plane variogram before estimating (otherwise uses the stored model).",
+        "vn_build fits the in-plane variogram before estimating (otherwise uses the stored model: nugget, sill, range_strike, range_dip).",
     ),
     setting(
         "tonnage",
@@ -902,34 +932,65 @@ const BUILD: &[Param] = &[
         L::new("Cubicar", "Compute tonnage", "Cubar"),
         "vn_build ends with vn_cubicate.",
     ),
-    input(
-        "hw",
-        Kind::Handles,
-        false,
-        L::new("Polilíneas de techo", "Hanging-wall polylines", "Polilinhas de capa"),
-        "Passed to vn_surfaces.",
-    ),
-    input(
-        "fw",
-        Kind::Handles,
-        false,
-        L::new("Polilíneas de piso", "Footwall polylines", "Polilinhas de lapa"),
-        "Passed to vn_surfaces.",
-    ),
-    input(
-        "levels",
-        Kind::Handles,
-        false,
-        L::new("Niveles", "Levels", "Níveis"),
-        "Passed to vn_cubicate.",
-    ),
-    input(
-        "raises",
-        Kind::Handles,
-        false,
-        L::new("Chimeneas", "Raises", "Chaminés"),
-        "Passed to vn_cubicate.",
-    ),
+    // vn_surfaces
+    pick(SURFACES, "hw_layer"),
+    pick(SURFACES, "fw_layer"),
+    pick(SURFACES, "intercepts"),
+    pick(SURFACES, "vein_attr"),
+    pick(SURFACES, "vein_values"),
+    pick(SURFACES, "orientation"),
+    pick(SURFACES, "dip"),
+    pick(SURFACES, "dipdir"),
+    pick(SURFACES, "step"),
+    pick(SURFACES, "margin"),
+    pick(SURFACES, "radius"),
+    pick(SURFACES, "min_contacts"),
+    pick(SURFACES, "max_contacts"),
+    pick(SURFACES, "method"),
+    pick(SURFACES, "power"),
+    pick(SURFACES, "range"),
+    pick(SURFACES, "densify"),
+    pick(SURFACES, "min_thickness"),
+    pick(SURFACES, "hw"),
+    pick(SURFACES, "fw"),
+    // vn_variogram
+    pick(VARIO, "grade"),
+    pick(VARIO, "thickness_col"),
+    pick(VARIO, "lag"),
+    pick(VARIO, "nlags"),
+    pick(VARIO, "kind"),
+    // vn_estimate
+    pick(ESTIMATE, "nugget"),
+    pick(ESTIMATE, "sill"),
+    pick(ESTIMATE, "range_strike"),
+    pick(ESTIMATE, "range_dip"),
+    pick(ESTIMATE, "block_u"),
+    pick(ESTIMATE, "block_v"),
+    pick(ESTIMATE, "search_radius"),
+    pick(ESTIMATE, "min_samples"),
+    pick(ESTIMATE, "max_samples"),
+    pick(ESTIMATE, "max_distance"),
+    pick(ESTIMATE, "disc"),
+    pick(ESTIMATE, "density"),
+    pick(ESTIMATE, "color_by"),
+    pick(ESTIMATE, "draw_prisms"),
+    // vn_cubicate
+    pick(CUBICATE, "mmw"),
+    pick(CUBICATE, "overbreak_hw"),
+    pick(CUBICATE, "overbreak_fw"),
+    pick(CUBICATE, "grade_hw"),
+    pick(CUBICATE, "grade_fw"),
+    pick(CUBICATE, "density_waste"),
+    pick(CUBICATE, "recovery"),
+    pick(CUBICATE, "level_layer"),
+    pick(CUBICATE, "raise_layer"),
+    pick(CUBICATE, "level_pillar"),
+    pick(CUBICATE, "raise_pillar"),
+    pick(CUBICATE, "side_tolerance"),
+    pick(CUBICATE, "side_min"),
+    pick(CUBICATE, "rules"),
+    pick(CUBICATE, "levels"),
+    pick(CUBICATE, "raises"),
 ];
 
 pub static TONNAGE_OPS: &[OpDef] = &[
@@ -964,7 +1025,7 @@ pub static TONNAGE_OPS: &[OpDef] = &[
         label: L::new("Construir todo", "Build all", "Construir tudo"),
         group: Group::Veins,
         kind: OpKind::Action,
-        summary: "Runs the whole vein model with the current settings: vn_surfaces, vn_variogram (if fit_variogram), vn_estimate and vn_cubicate (if tonnage). Stops at the first step that fails and names it; otherwise returns every step's result.",
+        summary: "Runs the whole vein model: vn_surfaces, vn_variogram (if fit_variogram), vn_estimate and vn_cubicate (if tonnage). It accepts every argument of those steps (set them in the same call: contacts, step, radius, grade, block sizes, maximum distance, dilution, workings, rules…; omitted ones use the current settings) and stops at the first step that fails, naming it; otherwise returns every step's result.",
         params: BUILD,
         positional: &["vein"],
         result: "`vein`, `steps` (`{surfaces, variogram, estimate, cubicate}`: each step's data or null when skipped).",
@@ -1032,3 +1093,31 @@ pub static TONNAGE_PANELS: &[PanelSpec] = &[PanelSpec {
         Item::Status("vn_tonnage_status"),
     ],
 }];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `vn_build` must accept every setting of the steps it chains, under the same key and setting.
+    #[test]
+    fn vn_build_accepts_every_step_setting() {
+        let all: Vec<&OpDef> = OPS.iter().chain(MODEL_OPS).chain(TONNAGE_OPS).collect();
+        let build = all.iter().find(|o| o.name == "vn_build").unwrap();
+        for step in ["vn_surfaces", "vn_variogram", "vn_estimate", "vn_cubicate"] {
+            let def = all.iter().find(|o| o.name == step).unwrap();
+            for p in def.params.iter().filter(|p| p.setting.is_some()) {
+                let b = build
+                    .param(p.key)
+                    .unwrap_or_else(|| panic!("vn_build lacks {step}.{}", p.key));
+                assert_eq!(b.setting, p.setting, "{step}.{}", p.key);
+            }
+        }
+        // Keys are unique inside every operation.
+        for o in &all {
+            let mut keys: Vec<&str> = o.params.iter().map(|p| p.key).collect();
+            keys.sort();
+            keys.dedup();
+            assert_eq!(keys.len(), o.params.len(), "{}", o.name);
+        }
+    }
+}

@@ -61,7 +61,7 @@ pub static MANIFEST: PluginManifest = PluginManifest {
     id: "opencad.mining",
     name: "Open Mining",
     version: env!("CARGO_PKG_VERSION"),
-    description: "Mining & geology: drillholes, underground workings and geological mapping",
+    description: "Mining & geology: drillholes, channel samples, narrow-vein model, workings, resources, geotechnics and AI (MCP) operations",
     api_version: ApiVersion::CURRENT,
     ribbon_order: 40,
     xdata_apps: &[xdata::APP, xdata::APP_DOMAIN],

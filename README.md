@@ -1,36 +1,77 @@
 # Open Mining
 
-Mining and geology add-on for [Open CAD Studio](https://github.com/HakanSeven12/OpenCADStudio)
-(out-of-process `cdylib`, plugin API 23). Rust rewrite of PST_Sondajes,
-PST_SolidMine and GeoMapper.
+**English** · [Español](README.es.md)
 
-| Module | Commands | What it does |
+Mining and geology add-on for [Open CAD Studio](https://github.com/HakanSeven12/OpenCADStudio):
+drillholes and channel samples, underground workings, geological mapping, resource estimation,
+geotechnics, and a **narrow-vein model built from the data** (surfaces, prisms, grades, dilution,
+tonnage by blocks and categories). Everything can also be driven by an **AI assistant** through MCP.
+
+Free software, GPL-3.0. Version **0.10.0** · plugin API 23 · Windows, Linux and macOS (Apple Silicon).
+Panels and messages in Spanish, English and Portuguese.
+
+## Install (5 steps, from this page)
+
+1. Open **Open CAD Studio** and go to the **Plugin Manager**.
+2. Choose **Add repository** and paste this link (or just `antonio42ch/opencad-mining-plugin`):
+
+   ```
+   https://github.com/antonio42ch/opencad-mining-plugin
+   ```
+3. Pick the release **v0.10.0** and press **Install**.
+4. **Restart** Open CAD Studio.
+5. A **Mining** tab (*Minería* in Spanish) appears in the ribbon. To check it works, type `MIN_STATUS`
+   in the command line: it reports what is loaded and what to do next.
+
+Problems? See [docs/INSTALL.md](docs/INSTALL.md) (manual installation, troubleshooting, updating).
+Tested with Open CAD Studio v2026.46 (plugin API 23).
+
+## What you can do
+
+| | |
+|---|---|
+| **Drillholes** | Load collar / survey / assays / geology (CSV, XLSX), validate, desurvey, draw in 3D coloured by grade or geology |
+| **Channel samples** | Convert the sampling sheets of the workings (point + distance + width + *potencia* + grades) into drillhole data |
+| **Narrow veins** | Hanging-wall and footwall surfaces, 3D prisms with grades kriged on the vein plane, validation, long section with edits, dilution and recovery, blocks between levels and raises, categories by rules you define |
+| **Workings & sections** | Axes, closed solids, cuts and plans |
+| **Resources** | Composites, domains, variography, kriging, block models, grade-tonnage |
+| **Geotechnics** | RMR / Q / GSI, Hoek-Brown, geotechnical block model, stereonets, wedges, stress, convergence, pillars |
+| **Geological mapping** | Traces and projection along the dip |
+
+## First steps
+
+- **Try the narrow-vein example (10 minutes):** [examples/veta](examples/veta/README.md) goes from
+  24 channel samples to tonnage by category, with the numbers you should see.
+- **User guide:** [docs/GUIDE.md](docs/GUIDE.md) (English) · [docs/es/GUIA_USUARIO.md](docs/es/GUIA_USUARIO.md) (Spanish).
+- **Cheat sheet of commands:** [docs/COMMANDS.md](docs/COMMANDS.md) · [docs/es/COMANDOS.md](docs/es/COMANDOS.md).
+
+## Use it with an AI assistant (MCP)
+
+Open CAD Studio exposes the drawing to AI clients with `OpenCADStudio --mcp`. Every Open Mining action is
+a typed operation (`MIN_...` command with `key=value` arguments) that returns a machine-readable result
+with diagnostics, so an assistant can load data, build the vein model, read the diagnostics and fix its
+own inputs.
+
+- **[docs/AI_QUICKSTART.md](docs/AI_QUICKSTART.md)** — start here: connecting, conventions, complete workflows, how to read diagnostics.
+- **[AGENTS.md](AGENTS.md)** — rules for assistants: order of operations, what to verify, what never to invent.
+- **[docs/MCP.md](docs/MCP.md)** — every operation: arguments, results, error codes, one worked example each (generated from the code).
+- Ask the plugin itself: `MIN_HELP` lists the operations, `MIN_HELP op=vn_build` describes one.
+
+## Documentation
+
+| | English | Español |
 |---|---|---|
-| Drillholes | `MIN_DH_PANEL` `MIN_DH_LOAD` `MIN_DH_DRAW` `MIN_DH_CLEAR` `MIN_DH_GEOCOLORS` | CSV/XLSX import with column mapping, validation R01–R07, minimum-curvature desurvey, 3D traces coloured by grade or geology, labels |
-| Channels | `MIN_CH_PANEL` `MIN_CH_CONVERT` `MIN_CH_ORIENT` | Channel samples of the workings, located from topographic points and distances, converted into drillhole data (holes `CH-…`) appended to the drillholes — see [examples/canales](examples/canales/README.md) |
-| Veins | `MIN_VN_PANEL` `MIN_VN_SURFACES` `MIN_VN_MODEL_PANEL` `MIN_VN_VARIOGRAM` `MIN_VN_ESTIMATE` `MIN_VN_LONG` `MIN_VN_EDIT` `MIN_VN_TONNAGE_PANEL` `MIN_VN_CUBICATE` `MIN_VN_RULES` `MIN_VN_BUILD` | Narrow-vein model built from data: hanging-wall and footwall surfaces with diagnostics; 3D prisms between them with grades by accumulation kriged on the vein plane, validation against the channels, long section with polygon edits; dilution and recovery, blocks between levels and raises, categories by rules managed from MCP — see [docs/VEINS.md](docs/VEINS.md) |
-| Workings | `MIN_UG_PANEL` `MIN_UG_AXIS` `MIN_UG_HBOUND` `MIN_UG_VBOUND` | Closed solids (mesh) from an axis + section, or from four boundary polylines |
-| Axes | `MIN_AX_PANEL` `MIN_AX_LINE` `MIN_AX_CURVE` `MIN_AX_UNDO` `MIN_AX_NEW` `MIN_AX_PICKSTART` `MIN_AX_FROMPOLY` | Working axes as chains of straights and curves (radius + length or angle, right/left) with grade in % or °, drawn in series from the previous end |
-| Sections | `MIN_SC_PANEL` `MIN_SC_RUN` | Cut solids (meshes) with planes perpendicular to an axis, vertical through 2 points (+ parallels), horizontal levels or 3 points; 3D polylines in place and 2D sheets with grid, title and area |
-| Resources | `MIN_RS_COMP_PANEL` `MIN_RS_VARIO_PANEL` `MIN_RS_BM_PANEL` `MIN_RS_COMPOSITE` `MIN_RS_ESTIMATE` `MIN_RS_BMVIEW` … | Composites, domains (attribute, solids, contact surface), declustering, variography with auto-fit, ordinary/simple kriging, IDW and nearest neighbour on a rotated block model, validation (swath, grade-tonnage, cross-validation) and views — see [docs/RESOURCES.md](docs/RESOURCES.md) |
-| Geotechnics | `MIN_GT_DATA_PANEL` `MIN_GT_HB_PANEL` `MIN_GT_MODEL_PANEL` `MIN_GT_LOAD` `MIN_GT_CLASSIFY` `MIN_GT_HB` `MIN_GT_ESTIMATE` `MIN_GT_VIEW` | Logging, face mapping and laboratory tables, RMR89 / Q / GSI classification, Hoek-Brown strength and modulus, geotechnical block model and views — see [docs/GEOTECH.md](docs/GEOTECH.md) |
-| Structures & design | `MIN_RM_STRUCT_PANEL` `MIN_RM_DESIGN_PANEL` `MIN_ST_*` `MIN_SM_*` | Stereonets, discontinuity sets, kinematic analysis and wedges in workings; in situ stress, Kirsch, convergence-confinement with support, pillars and crown pillars — see [docs/GEOTECH.md](docs/GEOTECH.md) |
-| Geology | `MIN_GM_PANEL` `MIN_GM_TRACE` `MIN_GM_TRACE_PICK` `MIN_GM_PROJECT` | Structure/vein/contact traces from coordinates + bearing/azimuth + length, and projection of mapped traces to another height along their dip |
+| Install | [docs/INSTALL.md](docs/INSTALL.md) | [docs/es/INSTALAR.md](docs/es/INSTALAR.md) |
+| User guide | [docs/GUIDE.md](docs/GUIDE.md) | [docs/es/GUIA_USUARIO.md](docs/es/GUIA_USUARIO.md) |
+| Narrow veins | [docs/VEINS.md](docs/VEINS.md) | [docs/es/VETAS.md](docs/es/VETAS.md) |
+| Commands | [docs/COMMANDS.md](docs/COMMANDS.md) | [docs/es/COMANDOS.md](docs/es/COMANDOS.md) |
+| Geotechnics | [docs/GEOTECH.md](docs/GEOTECH.md) | |
+| Resources | [docs/RESOURCES.md](docs/RESOURCES.md) | |
 
-**AI clients (MCP).** Every action is a typed operation with `key=value` arguments and a
-machine-readable result line, so an assistant connected to `OpenCADStudio --mcp` can drive
-the whole plugin with the `run` tool and read the outcome — see [docs/MCP.md](docs/MCP.md)
-(generated from the definitions, with typical workflows). Read-only operations report the
-project status, drillholes, statistics, block-model values and the plugin's entities.
-
-UI in Spanish, English and Portuguese (`OPENMINING_LANG=es|en|pt`, else the
-system locale).
-
-## Install
-
-Open CAD Studio → **Plugin Manager → Add repository** → `antonio42ch/opencad-mining-plugin`,
-pick a release, **Install**, restart. Or copy the platform binary and
-`plugin.toml` from a release into the user plugins folder.
+For AI assistants: [AI_QUICKSTART](docs/AI_QUICKSTART.md), [AGENTS.md](AGENTS.md), [MCP.md](docs/MCP.md).
+Reference: [PLUGIN.md](docs/PLUGIN.md) (layers, XDATA, settings), [ARCHITECTURE.md](docs/ARCHITECTURE.md),
+[MIGRATION.md](docs/MIGRATION.md), [TESTING.md](docs/TESTING.md), [CHANGELOG.md](CHANGELOG.md).
+Examples: [veta](examples/veta/README.md), [canales](examples/canales/README.md), [geotechnics](examples/geotechnics/README.md).
 
 ## Develop
 
@@ -38,27 +79,11 @@ pick a release, **Install**, restart. Or copy the platform binary and
 cargo test --workspace                       # all engines + plugin logic (mock CAD)
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build -p opencad_mining --release      # target/release/libopencad_mining.{so,dll,dylib}
-cargo bench -p drillhole_engine              # 1 000 holes: validate ≈ 45 ms, desurvey+map ≈ 80 ms
-cargo bench -p blockmodel_engine             # 165 k-block OK estimation ≈ 0.4 s
-cargo run -p openmining_cli -- desurvey --collar collar.csv --survey survey.csv
 cargo run -p openmining_cli -- mcp-doc > docs/MCP.md   # regenerate the operations guide
-cargo run -p openmining_cli -- ops-schema gt_hb      # JSON Schema of an operation
 ```
 
-Release: bump `version` in `Cargo.toml` and `plugin.toml`, add a
-`CHANGELOG.md` entry, tag `vX.Y.Z`. CI builds Linux/Windows/macOS assets.
-
-## Documentation
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers, crates, data flow, design rules
-- [docs/RESOURCES.md](docs/RESOURCES.md) — resource estimation: methods, conventions, file format
-- [docs/MCP.md](docs/MCP.md) — every operation for AI clients: arguments, results, error codes, workflows
-- [docs/VEINS.md](docs/VEINS.md) — narrow veins: channels, surfaces (and the coming prism model)
-- [docs/GEOTECH.md](docs/GEOTECH.md) — geotechnics: tables, RMR89 / Q / GSI, Hoek-Brown, block model
-- [docs/PLUGIN.md](docs/PLUGIN.md) — commands, panels, layers, **XDATA schema**, settings storage
-- [docs/MIGRATION.md](docs/MIGRATION.md) — mapping from the legacy C# (AutoCAD) tools
-- [docs/TESTING.md](docs/TESTING.md) — test locally (WSL/WSLg or Windows) before releasing
-- [CHANGELOG.md](CHANGELOG.md)
+Release: see [docs/RELEASING.md](docs/RELEASING.md) (version, CHANGELOG, tag `vX.Y.Z`; CI builds the
+Linux / Windows / macOS assets).
 
 ## License
 

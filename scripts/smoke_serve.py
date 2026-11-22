@@ -397,6 +397,22 @@ def main():
         run(f"MIN_VN_BUILD vein=V1 hw={','.join(hw)} fw={','.join(fw)} levels={','.join(lv)} raises={','.join(rs_)} fit_variogram=false tonnage=true")
         ok("vn_build", "vn_build runs surfaces, estimate and tonnage in one call", lambda d: d["steps"]["surfaces"] is not None and d["steps"]["variogram"] is None and d["steps"]["estimate"]["summary"]["prisms"] > 0 and len(d["steps"]["cubicate"]["blocks"]) >= 4)
 
+        # 13. The documented example (examples/canales -> examples/veta): the whole vein model
+        #     from the 24 channels, two levels and a raise, in one MIN_VN_BUILD.
+        ex = Path(__file__).resolve().parent.parent / "examples" / "canales"
+        run(f'MIN_CH_CONVERT points="{ex / "puntos_topograficos.csv"}" sheet="{ex / "muestreo_canales.csv"}"')
+        ok("ch_convert", "the example converts 24 channels (72 samples)", lambda d: d["channels"] == 24 and d["samples"] == 72 and not d["issues"])
+        pt = {"PT-101": (500000.0, 8500000.0, 3950.0), "PT-104": (500075.0, 8500129.9, 3951.2), "PT-201": (500020.0, 8499990.0, 4000.0), "PT-203": (500070.0, 8500076.6, 4000.6), "PT-103": (500050.0, 8500086.6, 3950.8)}
+        lv2 = poly([pt["PT-101"], pt["PT-104"]]) + poly([pt["PT-201"], pt["PT-203"]])
+        rs2 = poly([pt["PT-103"], pt["PT-203"]])
+        # The earlier sections left their own settings in the project: give the defaults explicitly.
+        defaults = "step=2 margin=5 radius=50 method=kriging range=0 min_contacts=2 max_contacts=12 densify=1 orientation=fit lag=10 nlags=10 kind=spherical search_radius=60 min_samples=2 max_samples=16 max_distance=40 disc=3 density=2.7 block_u=5 block_v=5 mmw=0.8 overbreak_hw=0.1 overbreak_fw=0.05 grade_hw=0 grade_fw=0 density_waste=2.6 recovery=90 level_pillar=0 raise_pillar=0 side_tolerance=3 side_min=1 fit_variogram=true tonnage=true"
+        run(f"MIN_VN_BUILD vein=EJ1 hw_layer= fw_layer= intercepts=true vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia {defaults} levels={','.join(lv2)} raises={','.join(rs2)} level_layer= raise_layer=")
+        ok("vn_build", "example: plane ~66/300, 24+24 intercept contacts, no crossings", lambda d: abs(d["steps"]["surfaces"]["plane"]["dip"] - 66) < 3 and abs(d["steps"]["surfaces"]["plane"]["dipdir"] - 300) < 5 and d["steps"]["surfaces"]["contacts"]["from_intercepts"] == 48 and d["steps"]["surfaces"]["diagnostics"]["crossings"] == 0)
+        ok("vn_build", "example: ~320 prisms, a fitted variogram and 5 blocks between the levels and the raise", lambda d: 300 < d["steps"]["estimate"]["summary"]["prisms"] < 340 and d["steps"]["variogram"]["composites"] == 24 and len(d["steps"]["cubicate"]["blocks"]) == 5 and all(b["category"] in ("Indicado", "Inferido") for b in d["steps"]["cubicate"]["blocks"]))
+        run("MIN_STATUS")
+        ok("status", "status reports the vein model: 24 channels, surfaces, prisms and tonnage", lambda d: d["veins"]["name"] == "EJ1" and d["veins"]["channels"] == 24 and d["veins"]["surfaces"] and d["veins"]["prisms"] > 300 and d["veins"]["tonnage"] and not any(n["op"].startswith("vn_") for n in d["next"]))
+
         run("MIN_CH_CONVERT sheet=nothing.csv")
         c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")
 

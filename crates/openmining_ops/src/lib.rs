@@ -14,6 +14,7 @@
 
 pub mod defs;
 pub mod doc;
+pub mod examples;
 pub mod help;
 pub mod parse;
 pub mod result;

@@ -61,6 +61,15 @@ MIN_VN_BUILD vein=V1
 
 Each block lists its sampled sides and `why` it missed the earlier rules.
 
+**Whole vein model in one call** (channels already converted; levels and raises are 3D polylines)
+
+```
+MIN_VN_BUILD vein=V1 vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia levels=<h1>,<h2> raises=<h3>
+```
+
+It accepts every argument of its steps; arguments given are stored, so the next call (or the
+panel) keeps them. Read each step's result in `steps` and the diagnostics before reporting.
+
 **Resource estimation** (one variogram model saved per domain before estimating)
 
 ```
@@ -179,6 +188,13 @@ fn op(out: &mut String, d: &OpDef) {
         );
     }
     let _ = writeln!(out, "Result `data`: {}\n", d.result);
+    if let Some(e) = crate::examples::find(d.name) {
+        let _ = writeln!(
+            out,
+            "Example (values abbreviated with `…`):\n\n```\n{}\n→ {}\n```\n",
+            e.call, e.data
+        );
+    }
 }
 
 pub fn markdown() -> String {

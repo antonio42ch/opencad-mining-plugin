@@ -5,6 +5,9 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 
 ## [0.10.0] — unreleased
 
+First release since 0.8.0: it includes the geotechnical model view as cubes, the filter / cut and
+confidence columns, `MIN_HELP`, the channel samples and the narrow-vein model (stages A, B1–B3).
+
 ### Added
 - **Channel samples** (panel *Canales de muestreo*, `MIN_CH_CONVERT`, `MIN_CH_ORIENT`): the
   sampling sheet of the workings (channel, topographic point, distance along the working
@@ -34,15 +37,6 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
   MCP and tested with `MIN_VN_RULES` (example rules only, no company norm built in); totals
   per category, CSV and block labels on the long section. `MIN_VN_BUILD` runs the whole
   vein model in one call.
-
-### Fixed
-- A file path given as a command argument was wiped by the next command: file pickers
-  ignore text values, so the empty picker overwrote the setting. Paths are pushed as path
-  values.
-
-## [0.9.0] — unreleased
-
-### Added
 - **Filter and cut in the geotechnical model view:** show only the blocks below or above a
   threshold of the attribute (e.g. classes IV and V, RMR < 40) and keep one side of a plane
   (point, dip, dip direction), to see inside a cubes view. The colour scale stays that of
@@ -52,16 +46,31 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 - **`MIN_HELP`:** describes the operations (list, or one in full with its parameters,
   options and JSON Schema; `workflows=true` adds the command sequences and error codes), so
   an AI client can discover what Open Mining does without the guide.
-
-## [0.8.1] — unreleased
-
-### Added
 - **Geotechnical block model view as cubes** (and sections): `MIN_GT_VIEW` has its own
   mode in the *Modelo* panel — level plans, sections by two points, sections along an
   axis or cubes — with levels, section spacing and the maximum of polygons / cubes.
   Before, it used the view mode of the Resources panel (levels by default) and the
   geotechnical panel could not change it. Arguments: `mode=`, `z_from=`, `z_to=`,
   `z_step=`, `spacing=`, `count=`, `interval=`, `limit=`, `axis=`, `p1=`, `p2=`.
+
+- **Documentation for distribution:** README (English and Spanish) with the installation steps from the
+  repository link, installation guide, user guide, narrow-vein guide in Spanish, command cheat sheets, an
+  end-to-end vein example with the numbers to expect (`examples/veta`, checked by a test), a quick start
+  for AI assistants (`docs/AI_QUICKSTART.md`) and `AGENTS.md`; `docs/MCP.md` now carries a worked example
+  (call and result) for the main operations.
+- **`MIN_STATUS` reports the vein model** (`veins`: channels, surfaces, prisms, tonnage) and suggests the next
+  vein operation; `MIN_ENTITIES` accepts the vein classes (`VN_SURFACE`, `VN_PRISM`, `VN_LONG`, `VN_BLOCK`).
+- **`MIN_VN_BUILD` accepts the arguments of all its steps** (contacts, step, radius, grade, block sizes,
+  dilution, workings, rules…), so a whole vein model is set and built in one call.
+
+### Changed
+- `MIN_VN_SURFACES`: the contact limits are `min_contacts` / `max_contacts` (they clashed with the estimation
+  limits `min_samples` / `max_samples` once the steps share one call).
+
+### Fixed
+- A file path given as a command argument was wiped by the next command: file pickers
+  ignore text values, so the empty picker overwrote the setting. Paths are pushed as path
+  values.
 
 ## [0.8.0] — 2026-11-21
 

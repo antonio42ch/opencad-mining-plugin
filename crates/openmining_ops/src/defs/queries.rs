@@ -90,7 +90,7 @@ const HELP: &[Param] = &[
 ];
 
 const ENTITIES: &[Param] = &[
-    input("class", Kind::Text, false, L::same("class"), "Class key filter (DH_TRACE, DH_ASSAY, UG_SOLID, UG_SECTION, GM_TRACE, GM_PROJ, AX_AXIS, SC_CUT, SC_SHEET, RS_COMP, RS_SURFACE, RS_VIEW, GT_REC; comma-separated)."),
+    input("class", Kind::Text, false, L::same("class"), "Class key filter (DH_TRACE, DH_ASSAY, UG_SOLID, UG_SECTION, GM_TRACE, GM_PROJ, AX_AXIS, SC_CUT, SC_SHEET, RS_COMP, RS_SURFACE, RS_VIEW, GT_REC, VN_SURFACE, VN_PRISM, VN_LONG, VN_BLOCK; comma-separated)."),
     input("layer", Kind::Text, false, L::same("layer"), "Layer filter (exact name)."),
     input("limit", Kind::Integer { min: Some(1), max: Some(10_000) }, false, L::same("limit"), "Maximum entities returned (default 500)."),
     input("offset", Kind::Integer { min: Some(0), max: None }, false, L::same("offset"), "Entities to skip (paging)."),
@@ -131,9 +131,9 @@ pub static OPS: &[OpDef] = &[
         "status",
         "MIN_STATUS",
         Group::Project,
-        "What the project holds and what can be done next: drillholes, composites, domains and variogram models, block model, contact surfaces, geotechnical tables, axis being designed, drawing path. Call it first, and after an error with code no_data.",
+        "What the project holds and what can be done next: drillholes, channels and the narrow-vein model (surfaces, prisms, tonnage), composites, domains and variogram models, block model, contact surfaces, geotechnical tables, axis being designed, drawing path. Call it first, and after an error with code no_data.",
         &[],
-        "`drawing` (path or null), `drillholes` (`loaded`, `holes`, `assay_attributes`, `geo_attributes`, `assay_attr`), `composites` (`count`, `variable`, `stale`), `domains` (list of `{name, values, density, model_saved}`), `surfaces`, `block_model` (`blocks`, `columns`) or null, `geotechnics` (`tables`, `classified`), `axis` (current axis or null), `next` (suggested operations with the reason).",
+        "`drawing` (path or null), `drillholes` (`loaded`, `holes`, `assay_attributes`, `geo_attributes`, `assay_attr`), `composites` (`count`, `variable`, `stale`), `domains` (list of `{name, values, density, model_saved}`), `surfaces`, `block_model` (`blocks`, `columns`) or null, `geotechnics` (`tables`, `classified`), `axis` (current axis or null), `veins` (`{name, channels, surfaces, prisms, tonnage, rules}`: the active vein's progress), `next` (suggested operations with the reason).",
     ),
     q(
         "dh_list",

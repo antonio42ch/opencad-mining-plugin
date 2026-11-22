@@ -1,5 +1,7 @@
 # Narrow veins
 
+[Español](es/VETAS.md) · [Example with numbers](../examples/veta/README.md) · [Operations for AI](MCP.md)
+
 Narrow veins are not modelled with the regular block model. The vein model is
 built from data in stages, each an operation an AI assistant can run, check and
 adjust (see [MCP.md](MCP.md)):
@@ -11,6 +13,24 @@ adjust (see [MCP.md](MCP.md)):
 | B2 — prisms and grades | done | 3D prisms between the surfaces, grades by accumulation on the vein plane, in-plane variography, validation against channels, boundary polygon, maximum distance, edits on the long section (`MIN_VN_VARIOGRAM`, `MIN_VN_ESTIMATE`, `MIN_VN_LONG`, `MIN_VN_EDIT`) |
 | B3 — tonnage | done | Dilution and recovery, blocks between levels and raises with pillars, sampled sides, categories by an ordered rule table managed from MCP (`MIN_VN_CUBICATE`, `MIN_VN_RULES`, `MIN_VN_BUILD`) |
 | B4 — branches | planned | Several veins, overlaps reported, incremental update when channels are added |
+
+**Order of work:** channels (or drillholes) loaded → surfaces → variogram → prisms → (long section, edits) →
+tonnage. `MIN_VN_BUILD` runs everything after the data load in one call; each stage can also be re-run alone
+after changing a setting. Every stage reads the stored settings of the vein (panel values), so what you set in a
+panel, in a command or through an assistant is the same.
+
+**Layers and files**
+
+| Layer | Content | Colour |
+|---|---|---|
+| `VETA_TECHO`, `VETA_PISO` | *your* mapped contact polylines (the names are settings) | — |
+| `NIVELES`, `CHIMENEAS` | *your* level and raise polylines (settings) | — |
+| `MIN_VN_TECHO` / `MIN_VN_PISO` | hanging-wall / footwall surfaces | 30 / 4 |
+| `MIN_VN_PRISMAS` | prisms | by attribute |
+| `MIN_VN_LONG` | long section, samples, edit polygons | 7 |
+| `MIN_VN_BLOQUES` | workings and block labels on the long section | 1 |
+
+Files next to the drawing: `<drawing>_veta_<name>.json` (surfaces), `_prismas.csv`, `_bloques.csv`.
 
 ## B1 — Hanging-wall and footwall surfaces
 
@@ -36,7 +56,7 @@ handled like flat ones.
 **Surfaces.** The normal offset `w` of each wall is interpolated on a common grid of
 `step` metres over the contacts plus a margin, by ordinary kriging (spherical model,
 sill = variance of the offsets, range = the search radius unless given) or inverse
-distance. Nodes with fewer than `min_samples` contacts within the search radius stay
+distance. Nodes with fewer than `min_contacts` contacts within the search radius stay
 empty: the radius is the maximum extrapolation. Both walls are drawn as meshes on
 `MIN_VN_TECHO` and `MIN_VN_PISO` (XDATA `VN_SURFACE`: `vein`, `side`) and saved as
 `<drawing>_veta_<name>.json` for the prism model.
@@ -153,5 +173,31 @@ long section, the workings (red) and the block labels coloured by category
 is coloured by category too.
 
 **Build all** (`MIN_VN_BUILD`): runs `vn_surfaces`, `vn_variogram` (if `fit_variogram`),
-`vn_estimate` and `vn_cubicate` (if `tonnage`) with the current settings, stops at the
-first failing step and names it.
+`vn_estimate` and `vn_cubicate` (if `tonnage`), stops at the first failing step and names it. It
+accepts every argument of those steps (`step=`, `radius=`, `grade=`, `block_u=`, `max_distance=`,
+`mmw=`, `levels=`, `rules=`…); the ones you give are stored, the others keep their current value.
+
+## Reading the diagnostics
+
+| You see | It means | What to do |
+|---|---|---|
+| `crossings > 0` (surfaces) | footwall above the hanging wall at some nodes | look at `worst`: a contact on the wrong wall or a mislogged `tipo` interval; fix or remove it |
+| `one_side > 0` | a wall is defined where the other is not | raise `radius`, or map / sample more there |
+| large `rms_hw` / `rms_fw`, big `worst[0].residual` | the surface does not follow some contact | check that contact (source name); try the other `method` or a smaller `radius` |
+| `thin > 0` | nodes thinner than `min_thickness` | pinch-out: bound it with a polygon, or accept it |
+| `from_intercepts = 0` | the vein intervals were not found | check `vein_attr` / `vein_values` against the geology column, and that channels / holes are loaded |
+| `composites < 3` | too few intercepts with grade | load more data; `missing_grade` says how many have no assay |
+| `cv_correlation` near 0, high nugget | the grades have little spatial continuity at this spacing | treat local grades with caution and look at the variogram (nugget, range) |
+| `mean_composite` ≠ `mean_prism` by > 10 % | the estimate is biased against the samples | check the variogram ranges, `max_distance`, clustered samples; `worst` names the holes |
+| `out_distance`, `out_walls` large | many cells dropped | raise `max_distance` or `radius`, or accept the limit |
+| a block is not in the category you expect | a rule failed | read the block's `why`; test with `MIN_VN_RULES` |
+
+## Limits
+
+- One vein at a time (`vein=` names it; several can be kept in the same drawing, one after another).
+  Branches and overlap checks between veins are planned (B4).
+- Contacts and workings must exist as polylines (or come from intercepts); the plugin does not trace the
+  contacts by itself.
+- Grades are interpolated, not simulated; there are no resource classes by kriging variance: categories come from
+  your rule table.
+- The rules shipped in the table are examples, not a standard.
