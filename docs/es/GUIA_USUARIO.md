@@ -89,6 +89,12 @@ con las reglas y todos los parámetros: **[VETAS.md](VETAS.md)**; ejemplo con la
   la línea de comandos.
 - **Secciones**: cortan los sólidos con planos perpendiculares a un eje, verticales por dos puntos, niveles
   horizontales o tres puntos; polilíneas 3D en su lugar y planos 2D con cuadrícula, título y área.
+- **Terreno en las secciones**: elija un terreno —una superficie TIN de Civil del dibujo (`CREATESURFACE`)— en la
+  sección *Terreno* del panel de Secciones (**Buscar terrenos** actualiza la lista). Cada sección vertical muestra
+  además el **perfil del terreno** y cada planta su **curva de nivel**, en verde en `MIN_SC_TERRENO`, con el rango
+  de cotas en cada lámina. El terreno se dibuja sobre la extensión de los sólidos más un margen (20 m por
+  defecto; en las verticales solo a lo largo de la sección, nunca en altura); sin sólidos seleccionados, solo se
+  corta el terreno. Ejemplo: [examples/terreno](../../examples/terreno/README.md).
 
 ## 5. Mapeo geológico
 

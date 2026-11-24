@@ -7,7 +7,7 @@ drillholes and channel samples, underground workings, geological mapping, resour
 geotechnics, and a **narrow-vein model built from the data** (surfaces, prisms, grades, dilution,
 tonnage by blocks and categories). Everything can also be driven by an **AI assistant** through MCP.
 
-Free software, GPL-3.0. Version **0.10.0** · plugin API 23 · Windows, Linux and macOS (Apple Silicon).
+Free software, GPL-3.0. Version **0.11.0** · plugin API 28 · Windows, Linux and macOS (Apple Silicon).
 Panels and messages in Spanish, English and Portuguese.
 
 ## Install (5 steps, from this page)
@@ -18,13 +18,13 @@ Panels and messages in Spanish, English and Portuguese.
    ```
    https://github.com/antonio42ch/opencad-mining-plugin
    ```
-3. Pick the release **v0.10.0** and press **Install**.
+3. Pick the release **v0.11.0** and press **Install**.
 4. **Restart** Open CAD Studio.
 5. A **Mining** tab (*Minería* in Spanish) appears in the ribbon. To check it works, type `MIN_STATUS`
    in the command line: it reports what is loaded and what to do next.
 
 Problems? See [docs/INSTALL.md](docs/INSTALL.md) (manual installation, troubleshooting, updating).
-Tested with Open CAD Studio v2026.46 (plugin API 23).
+Needs Open CAD Studio **v2026.47 or newer** (plugin API 28); for v2026.46 and older use release v0.10.0.
 
 ## What you can do
 
@@ -33,7 +33,7 @@ Tested with Open CAD Studio v2026.46 (plugin API 23).
 | **Drillholes** | Load collar / survey / assays / geology (CSV, XLSX), validate, desurvey, draw in 3D coloured by grade or geology |
 | **Channel samples** | Convert the sampling sheets of the workings (point + distance + width + *potencia* + grades) into drillhole data |
 | **Narrow veins** | Hanging-wall and footwall surfaces, 3D prisms with grades kriged on the vein plane, validation, long section with edits, dilution and recovery, blocks between levels and raises, categories by rules you define |
-| **Workings & sections** | Axes, closed solids, cuts and plans |
+| **Workings & sections** | Axes, closed solids, cuts and plans; sections also cut the **terrains** (Civil TIN surfaces): profile and contours |
 | **Resources** | Composites, domains, variography, kriging, block models, grade-tonnage |
 | **Geotechnics** | RMR / Q / GSI, Hoek-Brown, geotechnical block model, stereonets, wedges, stress, convergence, pillars |
 | **Geological mapping** | Traces and projection along the dip |
@@ -54,7 +54,7 @@ own inputs.
 
 - **[docs/AI_QUICKSTART.md](docs/AI_QUICKSTART.md)** — start here: connecting, conventions, complete workflows, how to read diagnostics.
 - **[AGENTS.md](AGENTS.md)** — rules for assistants: order of operations, what to verify, what never to invent.
-- **[docs/MCP.md](docs/MCP.md)** — every operation: arguments, results, error codes, one worked example each (generated from the code).
+- **[docs/MCP.md](docs/MCP.md)** — every operation: arguments, results, error codes, one worked example each (generated from the code). With Open CAD Studio v2026.47+ every operation is also a native AI tool with its JSON Schema.
 - Ask the plugin itself: `MIN_HELP` lists the operations, `MIN_HELP op=vn_build` describes one.
 
 ## Documentation
@@ -71,7 +71,7 @@ own inputs.
 For AI assistants: [AI_QUICKSTART](docs/AI_QUICKSTART.md), [AGENTS.md](AGENTS.md), [MCP.md](docs/MCP.md).
 Reference: [PLUGIN.md](docs/PLUGIN.md) (layers, XDATA, settings), [ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [MIGRATION.md](docs/MIGRATION.md), [TESTING.md](docs/TESTING.md), [CHANGELOG.md](CHANGELOG.md).
-Examples: [veta](examples/veta/README.md), [canales](examples/canales/README.md), [geotechnics](examples/geotechnics/README.md).
+Examples: [veta](examples/veta/README.md), [terreno](examples/terreno/README.md), [canales](examples/canales/README.md), [geotechnics](examples/geotechnics/README.md).
 
 ## Develop
 

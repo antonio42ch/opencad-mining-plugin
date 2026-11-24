@@ -142,6 +142,10 @@ pub struct SectionsConfig {
     pub sheet_x: f64,
     pub sheet_y: f64,
     pub replace: bool,
+    /// Terrain (a Civil TIN surface) cut with the same planes; empty = none.
+    pub terrain: String,
+    pub terrain_margin: f64,
+    pub terrain_width: f64,
 }
 
 impl Default for SectionsConfig {
@@ -166,6 +170,9 @@ impl Default for SectionsConfig {
             sheet_x: 0.0,
             sheet_y: 0.0,
             replace: true,
+            terrain: String::new(),
+            terrain_margin: 20.0,
+            terrain_width: 100.0,
         }
     }
 }

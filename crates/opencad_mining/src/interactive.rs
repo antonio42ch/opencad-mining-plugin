@@ -159,6 +159,8 @@ impl InteractiveCommand for PickAxisStart {
 pub struct SectionPick {
     mode: usize,
     solids: Vec<Handle>,
+    /// A terrain was chosen: the solids may be left out.
+    solids_optional: bool,
     axis: Option<Handle>,
     points: Vec<Vec3>,
     prompt_solids: String,
@@ -177,12 +179,24 @@ impl SectionPick {
         SectionPick {
             mode,
             solids,
+            solids_optional: false,
             axis: None,
             points: Vec::new(),
             prompt_solids,
             prompt_axis,
             prompt_points,
         }
+    }
+
+    /// With a terrain chosen the solids are not required: nothing selected means a terrain-only run.
+    pub fn solids_optional(mut self, optional: bool) -> Self {
+        self.solids_optional = optional;
+        self
+    }
+
+    /// Still waiting for the solids.
+    fn gathering(&self) -> bool {
+        self.solids.is_empty() && !self.solids_optional
     }
 
     /// Inputs already known (command arguments); only the rest is picked.
@@ -201,7 +215,7 @@ impl SectionPick {
     }
 
     pub fn is_complete(&self) -> bool {
-        !self.solids.is_empty() && (self.mode != 0 || self.axis.is_some()) && self.points.len() >= self.points_needed()
+        !self.gathering() && (self.mode != 0 || self.axis.is_some()) && self.points.len() >= self.points_needed()
     }
 
     pub fn into_pending(self) -> Pending {
@@ -228,7 +242,7 @@ impl SectionPick {
 
 impl InteractiveCommand for SectionPick {
     fn prompt(&self) -> String {
-        if self.solids.is_empty() {
+        if self.gathering() {
             self.prompt_solids.clone()
         } else if self.mode == 0 && self.axis.is_none() {
             self.prompt_axis.clone()
@@ -237,7 +251,7 @@ impl InteractiveCommand for SectionPick {
         }
     }
     fn is_selection_gathering(&self) -> bool {
-        self.solids.is_empty()
+        self.gathering()
     }
     fn accepts_drag_selection(&self) -> bool {
         true
@@ -247,14 +261,14 @@ impl InteractiveCommand for SectionPick {
         self.step()
     }
     fn needs_object_pick(&self) -> bool {
-        !self.solids.is_empty() && self.mode == 0 && self.axis.is_none()
+        !self.gathering() && self.mode == 0 && self.axis.is_none()
     }
     fn on_object_pick(&mut self, handle: Handle, _pt: [f64; 3]) -> CommandStep {
         self.axis = Some(handle);
         self.step()
     }
     fn on_point(&mut self, pt: [f64; 3]) -> CommandStep {
-        if self.solids.is_empty() || self.needs_object_pick() {
+        if self.gathering() || self.needs_object_pick() {
             return CommandStep::NeedPoint;
         }
         self.points.push(pt);

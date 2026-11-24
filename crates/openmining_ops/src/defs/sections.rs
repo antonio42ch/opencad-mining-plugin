@@ -203,6 +203,27 @@ const SC_RUN: &[Param] = &[
         L::new("Eje", "Axis", "Eixo"),
         "Axis polyline (mode axis).",
     ),
+    setting(
+        "terrain",
+        Kind::Name { source: "terrains" },
+        "/sc/terrain",
+        L::new("Terreno", "Terrain", "Terreno"),
+        "Terrain (a Civil TIN surface of the drawing, by name or handle) cut with the same planes: its profile (sections) or contours (levels) is drawn with the solids. Empty or - = none; tr_list lists the terrains.",
+    ),
+    setting(
+        "terrain_margin",
+        Kind::num(Some(0.0), None, 5.0),
+        "/sc/terrain_margin",
+        L::new("Margen del terreno (m)", "Terrain margin (m)", "Margem do terreno (m)"),
+        "The terrain is drawn over the extent of the solids in each plane plus this margin on each side (m); in vertical sections only along the section, never in height.",
+    ),
+    setting(
+        "terrain_width",
+        Kind::num(Some(1.0), None, 10.0),
+        "/sc/terrain_width",
+        L::new("Ancho del terreno sin sólidos (m)", "Terrain width without solids (m)", "Largura do terreno sem sólidos (m)"),
+        "Half-width of the terrain profile (m on each side of the plane's origin) when there are no solids to size it; vertical sections only.",
+    ),
     input(
         "p1",
         Kind::Point,
@@ -229,8 +250,12 @@ const SC_RUN: &[Param] = &[
 pub static OPS: &[OpDef] = &[
 OpDef { name: "sc_run", command: "MIN_SC_RUN", aliases: &[],
             label: L::new("Generar secciones", "Generate sections", "Gerar seções"), group: Group::Sections, kind: OpKind::Action,
-            summary: "Cut solids (meshes) with planes: perpendicular to an axis every interval, vertical through 2 points (+ parallels), horizontal levels, or through 3 points. Draws 3D polylines in place and/or 2D sheets with grid, title and area.", params: SC_RUN,
-            positional: &[], result: "`planes`, `cut` (planes that intersect), `polylines`, `sheets`." },
+            summary: "Cut solids (meshes) and, optionally, a terrain (a Civil TIN surface, `terrain=`) with planes: perpendicular to an axis every interval, vertical through 2 points (+ parallels), horizontal levels, or through 3 points. Draws 3D polylines in place and/or 2D sheets with grid, title and area; the terrain gives its profile in each vertical section and its contours in the level plans, limited to the extent of the solids plus `terrain_margin` (with a terrain, the solids may be left out).", params: SC_RUN,
+            positional: &[], result: "`planes`, `cut` (planes that intersect), `polylines`, `sheets`, and with a terrain `terrain` (`{name, handle, planes_cut, polylines, min_elevation, max_elevation, missed}`)." },
+OpDef { name: "tr_list", command: "MIN_TR_LIST", aliases: &[],
+            label: L::new("Buscar terrenos", "Find terrains", "Buscar terrenos"), group: Group::Sections, kind: OpKind::Query,
+            summary: "List the terrains of the drawing: the TIN surfaces of the Civil tools (CREATESURFACE), with their name, handle, triangles and elevation range. The names are the values of `terrain` in sc_run.", params: &[],
+            positional: &[], result: "`terrains`: list of `{handle, name, vertices, triangles, min, max, min_elevation, max_elevation}`." },
 ];
 
 pub static PANELS: &[PanelSpec] = &[PanelSpec {
@@ -255,6 +280,17 @@ pub static PANELS: &[PanelSpec] = &[PanelSpec {
             collapsed: false,
         },
         Item::Section {
+            id: "sc_terrain",
+            title: L::new("Terreno", "Terrain", "Terreno"),
+            items: &[
+                Item::Param("sc_run", "terrain"),
+                Item::Button("tr_list"),
+                Item::Param("sc_run", "terrain_margin"),
+                Item::Param("sc_run", "terrain_width"),
+            ],
+            collapsed: false,
+        },
+        Item::Section {
             id: "sc_output",
             title: L::new("Resultado", "Output", "Resultado"),
             items: &[
@@ -272,9 +308,9 @@ pub static PANELS: &[PanelSpec] = &[PanelSpec {
             collapsed: false,
         },
         Item::Info(L::new(
-            "Seleccione los sólidos (mallas) antes o durante el comando.",
-            "Select the solids (meshes) before or during the command.",
-            "Selecione os sólidos (malhas) antes ou durante o comando.",
+            "Seleccione los sólidos (mallas) antes o durante el comando; con un terreno elegido pueden omitirse.",
+            "Select the solids (meshes) before or during the command; with a terrain chosen they can be left out.",
+            "Selecione os sólidos (malhas) antes ou durante o comando; com um terreno escolhido podem ser omitidos.",
         )),
         Item::Button("sc_run"),
     ],

@@ -55,8 +55,8 @@ jobs:
   host-smoke:
     runs-on: ubuntu-latest
     env:
-      # Host release whose plugin API matches plugin.toml (api_version 23).
-      OCS_VERSION: v2026.46
+      # Host release whose plugin API matches plugin.toml (api_version 28).
+      OCS_VERSION: v2026.47
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

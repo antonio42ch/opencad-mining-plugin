@@ -3,14 +3,14 @@
 The plugin is found in `<config>/OpenCADStudio/plugins/opencad.mining/`
 (`plugin.toml` + one library). `OCS_PLUGINS_DIR` overrides the folder. The
 host must be a **release with the same plugin API** as `plugin.toml`
-(currently 23 = host v2026.46).
+(currently 28 = host v2026.47).
 
 ## A. Linux host inside WSL (WSLg) — fastest loop
 
 ```bash
 # once: download the host and extract it (no FUSE needed)
 mkdir -p ~/ocs && cd ~/ocs
-curl -LO https://github.com/HakanSeven12/OpenCADStudio/releases/download/v2026.46/OpenCADStudio-v2026.46-linux-x86_64.AppImage
+curl -LO https://github.com/HakanSeven12/OpenCADStudio/releases/download/v2026.47/OpenCADStudio-v2026.47-linux-x86_64.AppImage
 chmod +x OpenCADStudio-*.AppImage && ./OpenCADStudio-*.AppImage --appimage-extract
 
 # every change
@@ -204,3 +204,15 @@ attribute such as `AU`, geology with e.g. `ROCK_TYPE` = OXIDO/SULFURO).
 53. Edit the rule table (e.g. Medido with 4 sides) → Cubicar → blocks move down a category and their `why`
     names the failed condition. `MIN_VN_RULES sides=2 dist=20` in the command line tells the rule met.
 54. *Colorear por* = *Categoría* → the long section is coloured by category. **Construir todo** runs every step.
+
+## Terrains in the sections (v0.11)
+
+55. New drawing. `CREATEPOINTS 0,0,100 50,0,102 100,0,101 0,50,103 50,50,105 100,50,104 0,100,102 50,100,104 100,100,103`,
+    select the 9 points, `CREATESURFACE`, Enter, Enter → *Surface 1*. Sections panel → *Terreno* section →
+    **Buscar terrenos**: the list shows *Surface 1* (the same on opening the panel).
+56. *Planos* = *Verticales por 2 puntos*, points `0,50,0` and `100,50,0`, *Terreno* = Surface 1 → **Generar secciones**:
+    a green profile on `MIN_SC_TERRENO` in 3D and on a sheet labelled `Terreno: 103.0 – 105.0`.
+57. *Horizontales (niveles)* 101 to 104 step 1 → four contours. With solids selected (a gallery) the profile
+    covers the gallery plus *Margen del terreno* and the whole height above it; raise the margin → longer profile.
+58. *Terreno* = `—` → the sections are as in 0.10 (solids only). Type a wrong name with `MIN_SC_RUN … terrain=Nada` →
+    `not_found` listing the terrains.

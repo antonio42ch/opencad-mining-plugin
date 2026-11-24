@@ -11,6 +11,7 @@
 pub mod alignment;
 pub mod axis;
 pub mod boundary;
+pub mod clip;
 pub mod cut;
 pub mod error;
 pub mod frame;

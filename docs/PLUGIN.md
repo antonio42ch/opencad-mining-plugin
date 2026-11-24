@@ -1,7 +1,7 @@
 # Open Mining — plugin reference
 
 Plugin id `opencad.mining`, command prefix `MIN_`, XDATA application
-`OPENMINING`, plugin API 23.
+`OPENMINING`, plugin API 28 (Open CAD Studio v2026.47+).
 
 ## Commands
 
@@ -30,7 +30,8 @@ forms below (positional paths, picks) keep working.
 | `MIN_AX_PICKSTART` | Pick the start point and a second point for the azimuth |
 | `MIN_AX_FROMPOLY` | Pick a polyline: its end point and end azimuth become the start. An Open Mining axis is recovered from its XDATA and continued |
 | `MIN_SC_PANEL` | Show/hide the section generator |
-| `MIN_SC_RUN` | Cut the selected (or picked) meshes with the configured planes |
+| `MIN_SC_RUN` | Cut the selected (or picked) meshes — and the chosen terrain, `terrain=` — with the configured planes |
+| `MIN_TR_LIST` | List the terrains of the drawing (Civil TIN surfaces): name, handle, triangles, elevation range |
 | `MIN_AX_SETSTART` / `MIN_AX_SETFROMPOLY` / `MIN_SC_EXEC` | Internal follow-ups of the interactive picks |
 | `MIN_UG_RUN` / `MIN_GM_RUN` / `MIN_GM_PROJECT_EXEC` | Internal: follow-ups of the interactive picks |
 
@@ -138,6 +139,7 @@ offsets/elevations as labels), title, area and the axis marker. With
 | `MIN_GM_PROYECCION` | projected traces | 30 |
 | `MIN_AX_EJE` | designed axes (3D polylines) | 6 |
 | `MIN_SC_CORTE` | 3D sections in place | 1 |
+| `MIN_SC_TERRENO` | terrain profiles and contours (3D and on the sheets), cut from a Civil TIN surface | 3 |
 | `MIN_RS_COMP_<VAR>` | composites | per grade |
 | `MIN_RS_CONTACTO` | contact surface | 30 |
 | `MIN_RS_VISTA` | block model views | per value |

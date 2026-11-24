@@ -81,6 +81,16 @@ pub static EXAMPLES: &[Example] = &[
         call: r#"MIN_VN_BUILD vein=EJ1 vein_attr=tipo vein_values=VETA grade=au thickness_col=potencia max_distance=40 recovery=90 fit_variogram=true tonnage=true"#,
         data: r#"{"vein": "EJ1", "steps": {"surfaces": {…}, "variogram": {…}, "estimate": {…}, "cubicate": {…}}}"#,
     },
+    Example {
+        op: "tr_list",
+        call: "MIN_TR_LIST",
+        data: r#"{"terrains": [{"handle": "754", "name": "Surface 1", "vertices": 9, "triangles": 8, "min": [0.0, 0.0, 100.0], "max": [100.0, 100.0, 105.0], "min_elevation": 100.0, "max_elevation": 105.0}]}"#,
+    },
+    Example {
+        op: "sc_run",
+        call: r#"MIN_SC_RUN mode=two_points p1=0,50,0 p2=100,50,0 count=1 terrain="Surface 1""#,
+        data: r#"{"planes": 1, "cut": 0, "polylines": 0, "terrain": {"name": "Surface 1", "handle": "754", "planes_cut": 1, "polylines": 1, "min_elevation": 103.0, "max_elevation": 105.0, "missed": []}}"#,
+    },
 ];
 
 pub fn find(op: &str) -> Option<&'static Example> {
