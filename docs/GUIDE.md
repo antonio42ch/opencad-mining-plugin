@@ -86,6 +86,12 @@ rules and every setting: **[VEINS.md](VEINS.md)**; worked example with the numbe
   **H boundaries / V boundaries** make one from four polylines. The volume is printed in the command line.
 - **Sections**: cut the solids with planes perpendicular to an axis, vertical through two points, horizontal
   levels or three points; 3D polylines in place and 2D sheets with grid, title and area.
+- **Terrain in the sections**: choose a terrain — a Civil TIN surface of the drawing (`CREATESURFACE`) — in the
+  *Terreno* section of the Sections panel (**Find terrains** refreshes the list). Each vertical section also
+  shows the **terrain profile** and each level plan its **contour**, in green on `MIN_SC_TERRENO`, with the
+  elevation range on every sheet. The terrain is drawn over the extent of the solids plus a margin (20 m by
+  default; in vertical sections only along the section, never in height); with no solids selected, only the
+  terrain is cut. Example: [examples/terreno](../examples/terreno/README.md).
 
 ## 5. Geological mapping
 

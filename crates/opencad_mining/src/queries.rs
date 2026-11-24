@@ -491,6 +491,21 @@ pub fn run(host: &mut dyn HostApi, name: &str, args: &Args, tab: u64, cfg: &mut 
             Ok(OpResult::data(d))
         }
         "entities" => entities(host, args),
+        "tr_list" => {
+            let t = crate::terrain::t();
+            let list = crate::terrain::refresh(host, tab);
+            host.push_info(&if list.is_empty() {
+                t.m_none.to_string()
+            } else {
+                crate::i18n::fmt(
+                    t.m_found,
+                    &[&list.iter().map(|x| x.name.as_str()).collect::<Vec<_>>().join(", ")],
+                )
+            });
+            Ok(OpResult::data(
+                json!({ "terrains": list.iter().map(crate::terrain::info).collect::<Vec<_>>() }),
+            ))
+        }
         other => Err(OpError::new(
             ErrorCode::UnknownCommand,
             format!("unknown query {other}"),

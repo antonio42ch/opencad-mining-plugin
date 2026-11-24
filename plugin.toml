@@ -3,14 +3,14 @@
 [plugin]
 id = "opencad.mining"
 name = "Open Mining"
-version = "0.10.0"
+version = "0.11.0"
 description = "Mining & geology: drillholes, channel samples, narrow-vein model, workings, resources, geotechnics and AI (MCP) operations"
 author = "Open Mining contributors"
 license = "GPL-3.0-only"
 repository = "antonio42ch/opencad-mining-plugin"
 
 [opencad]
-api_version = 23
+api_version = 28
 ribbon_order = 40
 command_prefixes = ["MIN_"]
 xdata_apps = ["OPENMINING", "OPENMINING_DOM"]

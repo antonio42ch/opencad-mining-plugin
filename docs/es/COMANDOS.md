@@ -16,7 +16,7 @@ indica qué hacer a continuación.
 | **Vetas — cubicación** | `MIN_VN_TONNAGE_PANEL` `MIN_VN_CUBICATE` `MIN_VN_RULES` `MIN_VN_BUILD` | dilución y recuperación, bloques entre niveles y chimeneas, categorías por sus reglas; construir todo |
 | **Labores** | `MIN_UG_PANEL` `MIN_UG_AXIS` `MIN_UG_HBOUND` `MIN_UG_VBOUND` | sólidos cerrados desde un eje + sección, o desde cuatro polilíneas de contorno |
 | **Ejes** | `MIN_AX_PANEL` `MIN_AX_LINE` `MIN_AX_CURVE` `MIN_AX_UNDO` `MIN_AX_NEW` `MIN_AX_PICKSTART` `MIN_AX_FROMPOLY` | ejes de labores como rectas y curvas con pendiente |
-| **Secciones** | `MIN_SC_PANEL` `MIN_SC_RUN` | cortar sólidos con planos: perpendiculares a un eje, dos puntos, niveles, tres puntos |
+| **Secciones** | `MIN_SC_PANEL` `MIN_SC_RUN` `MIN_TR_LIST` | cortar sólidos —y un terreno (`terrain=`, superficie TIN de Civil: perfil y curvas de nivel)— con planos: perpendiculares a un eje, dos puntos, niveles, tres puntos; listar los terrenos |
 | **Recursos** | `MIN_RS_COMP_PANEL` `MIN_RS_VARIO_PANEL` `MIN_RS_BM_PANEL` `MIN_RS_COMPOSITE` `MIN_RS_STATS` `MIN_RS_VARIO` `MIN_RS_FIT` `MIN_RS_MODELSAVE` `MIN_RS_ESTIMATE` `MIN_BM_RESOURCES` `MIN_BM_SAMPLE` `MIN_RS_BMVIEW` | compósitos, dominios, variogramas, kriging / IDW, modelo de bloques, recursos y vistas — vea [RESOURCES.md](../RESOURCES.md) |
 | **Geotecnia** | `MIN_GT_DATA_PANEL` `MIN_GT_HB_PANEL` `MIN_GT_MODEL_PANEL` `MIN_GT_LOAD` `MIN_GT_CLASSIFY` `MIN_GT_HB` `MIN_GT_ESTIMATE` `MIN_GT_VIEW` | RMR89 / Q / GSI, Hoek-Brown, modelo geotécnico de bloques y vistas — vea [GEOTECH.md](../GEOTECH.md) |
 | **Estructuras y diseño** | `MIN_RM_STRUCT_PANEL` `MIN_RM_DESIGN_PANEL` `MIN_ST_*` `MIN_SM_*` | estereogramas, familias, cinemática, cuñas; esfuerzos, Kirsch, convergencia, pilares |

@@ -35,6 +35,8 @@ Start with [docs/AI_QUICKSTART.md](docs/AI_QUICKSTART.md); the reference is [doc
   state clearly that they are defaults (mmw 0.8 m, overbreak 0.10 / 0.05 m, recovery 90 %, density 2.7 t/m³).
 - Do not fill in missing data (grades, thickness, geology): the plugin reports them, you report them too.
 - Do not claim a validation that was not run, and do not compare with results you have not read.
+- A terrain is whatever Civil surface the user has in the drawing: do not create or edit terrains on your own to
+  make a section work; if `terrain=` is `not_found`, list them with `MIN_TR_LIST` and ask which one is meant.
 
 ## Safe use
 

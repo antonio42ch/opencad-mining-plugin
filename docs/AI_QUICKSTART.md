@@ -137,14 +137,43 @@ MIN_VN_CUBICATE vein=EJ1
 Columns: category, minimum sampled sides, maximum mean distance (m), minimum samples, minimum diluted grade;
 empty = not checked; the first rule a block meets wins.
 
-## 6. Other modules
+## 6. Terrains and sections
+
+A **terrain** is a Civil TIN surface of the drawing. The plugin reads it (it never changes it) and cuts it with the
+sections' planes: the profile in vertical sections, the contours in level plans.
+
+```
+MIN_TR_LIST                                   → name, handle, triangles, elevation range of each terrain
+MIN_SC_RUN mode=axis axis=<handle> solids=<h1>,<h2> interval=10 terrain="Surface 1" terrain_margin=20
+MIN_SC_RUN mode=two_points p1=0,50,0 p2=100,50,0 count=1 terrain="Surface 1"      (terrain only: no solids)
+MIN_SC_RUN mode=levels z_from=100 z_to=110 z_step=2 terrain="Surface 1"
+```
+
+Read `data.terrain`: `planes_cut`, `polylines`, `min_elevation`, `max_elevation` and `missed` (titles of the
+planes the terrain does not cross: check the planes, the terrain's extent in `MIN_TR_LIST` and `terrain_width`).
+`terrain=` (empty) or `—` turns it off; an unknown name is `not_found` and lists the terrains. To create a terrain
+to try (Open CAD Studio's own commands): `CREATEPOINTS x,y,z x,y,z …`, select the points, then start
+`CREATESURFACE` and answer *selection*, *enter*, *enter* (see [examples/terreno](../examples/terreno/README.md)).
+Everything the plugin draws for the terrain goes on layer `MIN_SC_TERRENO`.
+
+## 7. Native tools (Open CAD Studio v2026.47+)
+
+Besides the `MIN_…` commands, every operation is a native tool of the host's AI bridge, with its JSON Schema:
+list them with the `plugins` read op (each installed plugin lists its `tools`; Open Mining's names are the
+operation names: `vn_build`, `sc_run`, `tr_list`…) and call one with the `plugin_call` execute op
+`{plugin: "opencad.mining", tool: "vn_rules", arguments: {"sides": 2, "dist": 20}}`. Arguments are typed JSON
+(numbers, booleans, lists, tables as arrays of rows), checked against the schema before the call, and the answer
+is the same result object as the result line (`ok`, `status`, `data`, `created`, `warnings`, `error`). Each call is
+one undo step. Use whichever you prefer; they run the same code.
+
+## 8. Other modules
 
 Resources (`MIN_RS_*`, `MIN_BM_*`) and geotechnics (`MIN_GT_*`, `MIN_ST_*`, `MIN_SM_*`) follow the same
 conventions; their sequences are in [MCP.md](MCP.md#typical-workflows), the methods in
 [RESOURCES.md](RESOURCES.md) and [GEOTECH.md](GEOTECH.md). The read-only operations (`MIN_STATUS`, `MIN_HELP`,
 `MIN_ENTITIES`, `MIN_DH_LIST`, `MIN_RS_STATS`, `MIN_BM_SAMPLE`, `MIN_BM_RESOURCES`…) never change the drawing.
 
-## 7. Before you report a result
+## 9. Before you report a result
 
 1. Say which **inputs** you used (files, layers, handles) and which **settings** differ from the defaults.
 2. Quote the **diagnostics** that support the number (RMS, crossings, validation, `out_*`) and any warning.

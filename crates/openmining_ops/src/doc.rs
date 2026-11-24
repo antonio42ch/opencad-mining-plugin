@@ -94,6 +94,17 @@ MIN_UG_AXIS axis=<handle of the axis> profile=horseshoe width=4 height=4
 MIN_SC_RUN mode=axis axis=<handle> solids=<solid handle> interval=10
 ```
 
+**Sections with a terrain** (a terrain is a Civil TIN surface of the drawing; `MIN_TR_LIST` names them)
+
+```
+MIN_TR_LIST
+MIN_SC_RUN mode=axis axis=<handle> solids=<h1>,<h2> interval=10 terrain="Surface 1" terrain_margin=20
+MIN_SC_RUN mode=levels z_from=100 z_to=110 z_step=2 terrain="Surface 1"
+```
+
+Each vertical section gets the terrain profile (limited to the solids' extent plus the margin),
+each level plan its contour; `terrain=` (empty) turns it off. Without solids, only the terrain is cut.
+
 **Geological mapping**
 
 ```

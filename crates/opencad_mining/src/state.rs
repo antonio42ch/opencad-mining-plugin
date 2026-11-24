@@ -26,6 +26,8 @@ pub struct TabState {
     pub rm: crate::rmcommands::RmState,
     pub vein: crate::veincommands::VeinState,
     pub vein_model: crate::veinmodel::ModelState,
+    /// Names of the terrains found in the drawing (the first entry means none), for the panels' lists.
+    pub terrains: Vec<String>,
 }
 
 /// What an interactive pick hands over to the follow-up command.

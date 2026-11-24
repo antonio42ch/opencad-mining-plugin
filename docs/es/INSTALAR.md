@@ -4,7 +4,7 @@
 
 ## Requisitos
 
-- **Open CAD Studio** con API de plugins 23 (probado con v2026.46).
+- **Open CAD Studio v2026.47 o superior** (API de plugins 28). Para v2026.46 y anteriores, instale la versión v0.10.0.
 - Windows (x86_64), Linux (x86_64) o macOS con Apple Silicon (aarch64). No hay versión para macOS Intel.
 - Nada más: el plugin es un solo archivo, sin bibliotecas adicionales ni licencias.
 
@@ -18,10 +18,10 @@
    ```
 
    (también sirve la forma corta `antonio42ch/opencad-mining-plugin`).
-3. Elija la versión **v0.10.0** y pulse **Instalar** (*Install*). El administrador descarga el archivo de su
+3. Elija la versión **v0.11.0** y pulse **Instalar** (*Install*). El administrador descarga el archivo de su
    sistema operativo.
 4. **Reinicie** Open CAD Studio.
-5. Compruebe: la cinta tiene la pestaña **Minería**, el administrador lista *Open Mining 0.10.0* como
+5. Compruebe: la cinta tiene la pestaña **Minería**, el administrador lista *Open Mining 0.11.0* como
    habilitado y al escribir `MIN_STATUS` en la línea de comandos aparece lo que hay cargado.
 
 El plugin guarda su configuración **dentro de cada dibujo**: un dibujo abierto en otro equipo con el plugin
@@ -38,7 +38,7 @@ agrega cada versión.
 
 Úsela si el Administrador de plugins no llega a GitHub.
 
-1. En la página **Releases** del repositorio abra v0.10.0 y descargue los dos archivos de su sistema:
+1. En la página **Releases** del repositorio abra v0.11.0 y descargue los dos archivos de su sistema:
 
    | Sistema | Archivo del plugin | Además |
    |---|---|---|
@@ -58,7 +58,7 @@ entorno `OPENMINING_LANG` como `es`, `en` o `pt` antes de abrir Open CAD Studio.
 
 | Síntoma | Qué revisar |
 |---|---|
-| No aparece la pestaña *Minería* tras reiniciar | El administrador debe listar *Open Mining* como habilitado; si muestra un error, suele ser un programa anterior a la API 23: actualice Open CAD Studio. |
+| No aparece la pestaña *Minería* tras reiniciar | El administrador debe listar *Open Mining* como habilitado; si muestra un error, suele ser un programa anterior a v2026.47 (API 28): actualice Open CAD Studio, o instale la versión v0.10.0. |
 | Falta solo en macOS | Solo hay versión para Apple Silicon. |
 | `MIN_STATUS` dice *comando desconocido* | El plugin no está cargado: vea las dos filas anteriores. |
 | Un comando de carga dice que no puede leer el archivo | Ponga entre comillas las rutas con espacios (`"C:\Mis datos\collar.csv"`); el CSV puede usar `;` o `,` y coma decimal: se reconocen ambos. |

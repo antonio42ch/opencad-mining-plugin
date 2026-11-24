@@ -342,6 +342,34 @@ fn run_sections(host: &mut dyn HostApi, s: &Strings, tab: u64, cfg: &ProjectConf
     };
     let ents = host.entities_batch(&solids).unwrap_or_default();
     let meshes = crate::meshes_of(&ents);
+    // The terrain chosen in the panel (or by `terrain=`): a Civil TIN surface of the drawing.
+    let terrains = if crate::terrain::is_none(&cfg.sc.terrain) {
+        Vec::new()
+    } else {
+        crate::terrain::refresh(host, tab)
+    };
+    let terrain = if crate::terrain::is_none(&cfg.sc.terrain) {
+        None
+    } else {
+        let t = crate::terrain::t();
+        let found = crate::terrain::find(&terrains, &cfg.sc.terrain).ok_or_else(|| {
+            let known = terrains.iter().map(|x| x.name.as_str()).collect::<Vec<_>>().join(", ");
+            let msg = if terrains.is_empty() {
+                t.m_none.to_string()
+            } else {
+                crate::i18n::fmt(t.m_unknown, &[&cfg.sc.terrain, &known])
+            };
+            OpError::new(ErrorCode::NotFound, msg).at("terrain")
+        })?;
+        if found.triangles == 0 {
+            return Err(OpError::new(ErrorCode::NoData, crate::i18n::fmt(t.m_empty, &[&found.name])).at("terrain"));
+        }
+        Some(found)
+    };
+    let terrain_in = terrain.map(|t| sections::TerrainInput {
+        name: &t.name,
+        mesh: &t.mesh,
+    });
     let axis_pts = match axis {
         Some(h) => Some(
             crate::fetch_points(host, &[h])
@@ -361,6 +389,7 @@ fn run_sections(host: &mut dyn HostApi, s: &Strings, tab: u64, cfg: &ProjectConf
             axis: axis_pts.as_deref(),
             points: &points,
         },
+        terrain_in.as_ref(),
     );
     if report.is_some() {
         session::commit(&mut sink, s, tab, cfg);
@@ -370,10 +399,22 @@ fn run_sections(host: &mut dyn HostApi, s: &Strings, tab: u64, cfg: &ProjectConf
         std::mem::take(&mut sink.errors),
         std::mem::take(&mut sink.inner.created),
     );
-    let data = report.as_ref().map_or(
-        Value::Null,
-        |r| json!({ "planes": r.planes, "cut": r.with_hits, "polylines": r.loops }),
-    );
+    let data = report.as_ref().map_or(Value::Null, |r| {
+        let mut d = json!({ "planes": r.planes, "cut": r.with_hits, "polylines": r.loops });
+        if let (Some(tr), Some(t)) = (&r.terrain, terrain) {
+            let fin = |x: f64| if x.is_finite() { json!(x) } else { Value::Null };
+            d["terrain"] = json!({
+                "name": t.name,
+                "handle": format!("{:X}", t.handle.value()),
+                "planes_cut": tr.planes_cut,
+                "polylines": tr.polylines,
+                "min_elevation": fin(tr.min_elevation),
+                "max_elevation": fin(tr.max_elevation),
+                "missed": tr.missed,
+            });
+        }
+        d
+    });
     finish(host, report.is_some(), errors, created, data)
 }
 
@@ -388,7 +429,8 @@ fn sections_op(host: &mut dyn HostApi, s: &Strings, args: &Args, tab: u64, cfg: 
         s.pick_axis.to_string(),
         s.pick_plane_points.map(str::to_string),
     )
-    .with_inputs(handle(args, "axis"), points);
+    .with_inputs(handle(args, "axis"), points)
+    .solids_optional(!crate::terrain::is_none(&cfg.sc.terrain));
     if pick.is_complete() {
         state::set_pending(pick.into_pending());
         return run_sections(host, s, tab, cfg);

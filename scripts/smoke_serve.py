@@ -413,6 +413,45 @@ def main():
         run("MIN_STATUS")
         ok("status", "status reports the vein model: 24 channels, surfaces, prisms and tonnage", lambda d: d["veins"]["name"] == "EJ1" and d["veins"]["channels"] == 24 and d["veins"]["surfaces"] and d["veins"]["prisms"] > 300 and d["veins"]["tonnage"] and not any(n["op"].startswith("vn_") for n in d["next"]))
 
+        # 14. Terrains (Civil TIN surfaces): created with the host's own Civil commands, read by
+        #     the plugin and cut by the sections.
+        ext = lambda: set(handles(s.send({"op": "query", "type": "Extended Entity", "limit": 10000})))
+        before = ext()
+        run("CREATEPOINTS 0,0,100 50,0,102 100,0,101 0,50,103 50,50,105 100,50,104 0,100,102 50,100,104 100,100,103")
+        pts9 = sorted(ext() - before)
+        c.need(len(pts9) == 9, f"9 COGO points created ({len(pts9)})")
+        s.send({"op": "select", "handles": pts9})
+        s.control("start", cmd="CREATESURFACE", document_id=doc)
+        for kind in ("selection", "enter", "enter"):
+            s.control("input", kind=kind, document_id=doc)
+        s.send({"op": "select", "handles": [], "clear": True})
+        run("MIN_TR_LIST")
+        ok("tr_list", "tr_list reads the Civil surface: 8 triangles, elevation 100 to 105", lambda d: len(d["terrains"]) == 1 and d["terrains"][0]["triangles"] == 8 and d["terrains"][0]["min_elevation"] == 100 and d["terrains"][0]["max_elevation"] == 105)
+        tname = (result("tr_list").get("data", {}).get("terrains") or [{}])[0].get("name", "Surface 1")
+        run(f'MIN_SC_RUN mode=two_points p1=0,50,0 p2=100,50,0 count=1 terrain="{tname}"')
+        ok("sc_run", "sections cut the terrain alone: one profile, elevation 103 to 105", lambda d: d["terrain"]["planes_cut"] == 1 and d["terrain"]["polylines"] == 1 and d["terrain"]["min_elevation"] == 103 and d["terrain"]["max_elevation"] == 105)
+        run(f'MIN_SC_RUN mode=levels z_from=101 z_to=104 z_step=1 terrain="{tname}"')
+        ok("sc_run", "level plans give 4 contours of the terrain", lambda d: d["planes"] == 4 and d["terrain"]["planes_cut"] == 4)
+        c.need(count(layer("MIN_SC_TERRENO")) >= 4, "the terrain contours are drawn on MIN_SC_TERRENO")
+        run("MIN_SC_RUN mode=levels z_from=101 z_to=104 z_step=1 terrain=Nada")
+        c.need(result("sc_run").get("error", {}).get("code") == "not_found", "an unknown terrain is reported as not_found")
+        run("MIN_SC_RUN mode=levels z_from=101 z_to=104 z_step=1 terrain=")
+        c.need(result("sc_run").get("error", {}).get("code") != "not_found", "an empty terrain means none (back to solids only)")
+        # Without solids and without a terrain the run waits for the user to pick solids: cancel that pick.
+        s.control("cancel", document_id=doc, force=True, quiet=True)
+
+        # 15. Native AI tools (plugin API 25+): listed by the host and called with typed arguments.
+        pl = s.control("plugins", document_id=doc, quiet=True)
+        mining = next((p for p in pl.get("installed", []) if p.get("id") == "opencad.mining"), {})
+        tools = {t["name"] for t in mining.get("tools", [])}
+        c.need(len(tools) > 60 and {"vn_build", "sc_run", "tr_list", "status"} <= tools, f"native AI tools listed by the host ({len(tools)})")
+        r = s.control("plugin_call", plugin="opencad.mining", tool="vn_rules", arguments={"sides": 2, "dist": 20}, document_id=doc, quiet=True)
+        inner = (r.get("result") or {}).get("result") or {}
+        c.need(r.get("ok") and inner.get("ok") and inner["data"]["test"]["category"] == "Indicado", "native tool vn_rules answers Indicado for 2 sides at 20 m")
+        r = s.control("plugin_call", plugin="opencad.mining", tool="tr_list", arguments={}, document_id=doc, quiet=True)
+        inner = (r.get("result") or {}).get("result") or {}
+        c.need(r.get("ok") and len(inner.get("data", {}).get("terrains", [])) == 1, "native tool tr_list finds the terrain")
+
         run("MIN_CH_CONVERT sheet=nothing.csv")
         c.need(result("ch_convert").get("error", {}).get("code") == "not_found", "a missing sheet is reported as not_found")
 

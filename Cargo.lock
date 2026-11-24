@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "acadrust"
 version = "0.6.8"
-source = "git+https://github.com/hakanaktt/acadrust.git?rev=f946e8d#f946e8d0c15508c4581b228a1efe44c18dc96234"
+source = "git+https://github.com/hakanaktt/acadrust.git?rev=14f7da106cdd20fac94ffbdc238e3012bbe4a553#14f7da106cdd20fac94ffbdc238e3012bbe4a553"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -25,6 +25,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.21",
  "web-time",
+ "whichever",
 ]
 
 [[package]]
@@ -138,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "blockmodel_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "criterion",
  "geostat_engine",
@@ -444,7 +445,7 @@ checksum = "c2db04e74f0a9a93103b50e90b96024c9b2bdca8bce6a632ec71b88736d3d359"
 
 [[package]]
 name = "drillhole_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "calamine",
  "criterion",
@@ -574,14 +575,14 @@ dependencies = [
 
 [[package]]
 name = "geomap_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "mining_core",
 ]
 
 [[package]]
 name = "geostat_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "drillhole_engine",
  "mining_core",
@@ -591,7 +592,7 @@ dependencies = [
 
 [[package]]
 name = "geotech_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "drillhole_engine",
  "mining_core",
@@ -875,7 +876,7 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mining_core"
-version = "0.10.0"
+version = "0.11.0"
 
 [[package]]
 name = "miniz_oxide"
@@ -915,7 +916,7 @@ dependencies = [
 [[package]]
 name = "ocs_plugin_api"
 version = "0.2.1"
-source = "git+https://github.com/HakanSeven12/OpenCADStudio?rev=8b4d270#8b4d27046040b27eb07d3faed7b7472bd7bdaea9"
+source = "git+https://github.com/HakanSeven12/OpenCADStudio?rev=8e5f39f#8e5f39f6ee0468a7e29260d57b5390d7d01207e8"
 dependencies = [
  "bincode",
  "cargo-lock",
@@ -957,7 +958,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "opencad_mining"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "blockmodel_engine",
  "drillhole_engine",
@@ -976,7 +977,7 @@ dependencies = [
 [[package]]
 name = "opencaddocument"
 version = "0.1.0"
-source = "git+https://github.com/HakanSeven12/opencaddocument.git?rev=ae40a59#ae40a5921f678aa94bf143aaf39d01e739db58bb"
+source = "git+https://github.com/HakanSeven12/opencaddocument.git?rev=663bc3a1a2075f939eadafd7fb16683de39a473f#663bc3a1a2075f939eadafd7fb16683de39a473f"
 dependencies = [
  "acadrust",
  "serde",
@@ -984,7 +985,7 @@ dependencies = [
 
 [[package]]
 name = "openmining_cli"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "drillhole_engine",
  "mining_core",
@@ -994,7 +995,7 @@ dependencies = [
 
 [[package]]
 name = "openmining_ops"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde_json",
 ]
@@ -1427,7 +1428,7 @@ checksum = "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
 
 [[package]]
 name = "solids_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "mining_core",
 ]
@@ -1681,7 +1682,7 @@ dependencies = [
 
 [[package]]
 name = "vein_engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "drillhole_engine",
  "geostat_engine",
@@ -1771,6 +1772,26 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "whichever"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68887c9512981e597d730f1d95b2eb6abdd53385e4e76c35a95e7121e16232b0"
+dependencies = [
+ "whichever-macros",
+]
+
+[[package]]
+name = "whichever-macros"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb15ad553239d9fdefac12e31e16c7682dc62a2106ba035aec69c5dd15835a7b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
 ]
 
 [[package]]

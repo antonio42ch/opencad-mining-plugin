@@ -41,6 +41,10 @@ fn resolve_names(def: &OpDef, args: &mut Args, lists: &crate::opsbind::Lists) ->
         let Some(name) = args.get(p.key).and_then(|v| v.as_str()).map(str::to_string) else {
             continue;
         };
+        // An empty name clears a name setting (e.g. `terrain=` is no terrain).
+        if all.is_none() && name.trim().is_empty() {
+            continue;
+        }
         let list = lists.get(source);
         match all {
             None if list.is_empty() => {}
@@ -144,6 +148,12 @@ pub fn try_dispatch(host: &mut dyn HostApi, line_text: &str, tab: u64, cfg: &mut
     else {
         return false;
     };
+    // Terrain names are read from the drawing right before they are resolved.
+    if def.name == "tr_list"
+        || (def.name == "sc_run" && (line_text.contains("terrain=") || !crate::terrain::is_none(&cfg.sc.terrain)))
+    {
+        crate::terrain::refresh(host, tab);
+    }
     let r = parse_command(def, line_text).and_then(|mut args| {
         apply_settings(host, def, &mut args, tab, cfg)?;
         handler(host, def, &args, tab, cfg)

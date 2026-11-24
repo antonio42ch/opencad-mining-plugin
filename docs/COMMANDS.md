@@ -15,7 +15,7 @@ AI assistant. `MIN_HELP` lists them; `MIN_HELP op=<name>` describes one; `MIN_ST
 | **Veins — tonnage** | `MIN_VN_TONNAGE_PANEL` `MIN_VN_CUBICATE` `MIN_VN_RULES` `MIN_VN_BUILD` | dilution and recovery, blocks between levels and raises, categories by your rules; build everything |
 | **Workings** | `MIN_UG_PANEL` `MIN_UG_AXIS` `MIN_UG_HBOUND` `MIN_UG_VBOUND` | closed solids from an axis + section, or from four boundary polylines |
 | **Axes** | `MIN_AX_PANEL` `MIN_AX_LINE` `MIN_AX_CURVE` `MIN_AX_UNDO` `MIN_AX_NEW` `MIN_AX_PICKSTART` `MIN_AX_FROMPOLY` | working axes as straights and curves with grade |
-| **Sections** | `MIN_SC_PANEL` `MIN_SC_RUN` | cut solids by planes: perpendicular to an axis, two points, levels, three points |
+| **Sections** | `MIN_SC_PANEL` `MIN_SC_RUN` `MIN_TR_LIST` | cut solids — and a terrain (`terrain=`, a Civil TIN surface: profile and contours) — by planes: perpendicular to an axis, two points, levels, three points; list the terrains |
 | **Resources** | `MIN_RS_COMP_PANEL` `MIN_RS_VARIO_PANEL` `MIN_RS_BM_PANEL` `MIN_RS_COMPOSITE` `MIN_RS_STATS` `MIN_RS_VARIO` `MIN_RS_FIT` `MIN_RS_MODELSAVE` `MIN_RS_ESTIMATE` `MIN_BM_RESOURCES` `MIN_BM_SAMPLE` `MIN_RS_BMVIEW` | composites, domains, variograms, kriging / IDW, block model, resources and views — see [RESOURCES.md](RESOURCES.md) |
 | **Geotechnics** | `MIN_GT_DATA_PANEL` `MIN_GT_HB_PANEL` `MIN_GT_MODEL_PANEL` `MIN_GT_LOAD` `MIN_GT_CLASSIFY` `MIN_GT_HB` `MIN_GT_ESTIMATE` `MIN_GT_VIEW` | RMR89 / Q / GSI, Hoek-Brown, geotechnical block model and views — see [GEOTECH.md](GEOTECH.md) |
 | **Structures & design** | `MIN_RM_STRUCT_PANEL` `MIN_RM_DESIGN_PANEL` `MIN_ST_*` `MIN_SM_*` | stereonets, sets, kinematics, wedges; stress, Kirsch, convergence, pillars |

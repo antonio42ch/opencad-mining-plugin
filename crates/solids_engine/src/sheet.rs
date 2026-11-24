@@ -28,6 +28,10 @@ pub enum Role {
     Area,
     Section,
     Marker,
+    /// Terrain profile or contour (open or closed polyline).
+    Terrain,
+    /// Elevation range of the terrain on a sheet.
+    TerrainLabel,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,6 +52,8 @@ pub struct SheetInput<'a> {
     pub title: &'a str,
     pub loops: &'a [SectionLoop],
     pub marker: Option<Vec2>,
+    /// The terrain cut by the same plane (already limited to the window).
+    pub terrain: &'a [SectionLoop],
 }
 
 fn fmt_coord(v: f64) -> String {
@@ -59,7 +65,13 @@ fn fmt_coord(v: f64) -> String {
 }
 
 /// Builds every sheet. `area_label` formats the total closed area.
-pub fn layout(inputs: &[SheetInput], cfg: &SheetConfig, area_label: &dyn Fn(f64) -> String) -> Vec<SheetItem> {
+/// `terrain_label` formats the lowest and highest elevation of a sheet's terrain.
+pub fn layout(
+    inputs: &[SheetInput],
+    cfg: &SheetConfig,
+    area_label: &dyn Fn(f64) -> String,
+    terrain_label: &dyn Fn(f64, f64) -> String,
+) -> Vec<SheetItem> {
     let g = if cfg.grid > 0.0 { cfg.grid } else { 1.0 };
     let h = if cfg.text_height > 0.0 {
         cfg.text_height
@@ -71,7 +83,12 @@ pub fn layout(inputs: &[SheetInput], cfg: &SheetConfig, area_label: &dyn Fn(f64)
     let ranges: Vec<Option<(Vec2, Vec2)>> = inputs
         .iter()
         .map(|s| {
-            let pts = s.loops.iter().flat_map(|l| l.points_2d.iter().copied()).chain(s.marker);
+            let pts = s
+                .loops
+                .iter()
+                .chain(s.terrain)
+                .flat_map(|l| l.points_2d.iter().copied())
+                .chain(s.marker);
             let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
             let mut any = false;
             for p in pts {
@@ -173,6 +190,32 @@ pub fn layout(inputs: &[SheetInput], cfg: &SheetConfig, area_label: &dyn Fn(f64)
                 },
             );
         }
+        for l in s.terrain {
+            push(
+                &mut out,
+                Role::Terrain,
+                SheetGeom::Polyline {
+                    points: l.points_2d.iter().map(|p| map(*p)).collect(),
+                    closed: l.closed,
+                },
+            );
+        }
+        let (zlo, zhi) = s
+            .terrain
+            .iter()
+            .flat_map(|l| l.points.iter())
+            .fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p[2]), b.max(p[2])));
+        if zlo <= zhi {
+            push(
+                &mut out,
+                Role::TerrainLabel,
+                SheetGeom::Text {
+                    at: [x0 + w * 0.5, y0 + hh + 0.5 * h],
+                    height: h * 0.8,
+                    value: terrain_label(zlo, zhi),
+                },
+            );
+        }
         if let Some(m) = s.marker {
             let c = map(m);
             let d = h * 0.6;
@@ -238,16 +281,19 @@ mod tests {
                 title: "0+010.00",
                 loops: &a,
                 marker: Some([0.0, 4200.0]),
+                terrain: &[],
             },
             SheetInput {
                 title: "0+020.00",
                 loops: &b,
                 marker: None,
+                terrain: &[],
             },
             SheetInput {
                 title: "vacía",
                 loops: &[],
                 marker: None,
+                terrain: &[],
             },
         ];
         let cfg = SheetConfig {
@@ -257,7 +303,9 @@ mod tests {
             grid: 2.0,
             text_height: 0.5,
         };
-        let items = layout(&inputs, &cfg, &|a| format!("A = {a:.2}"));
+        let items = layout(&inputs, &cfg, &|a| format!("A = {a:.2}"), &|lo, hi| {
+            format!("T {lo:.1}-{hi:.1}")
+        });
         let of = |sheet, role| items.iter().filter(move |i| i.sheet == sheet && i.role == role);
         // Empty sections get no sheet.
         assert_eq!(items.iter().filter(|i| i.sheet == 2).count(), 0);
@@ -286,5 +334,55 @@ mod tests {
         assert!(f1.0[0] > f0.1[0]);
         assert_eq!(f0.0[1], f1.0[1]);
         assert_eq!(of(0, Role::Marker).count(), 2);
+    }
+
+    #[test]
+    fn terrain_widens_the_sheet_and_gets_its_elevation_label() {
+        let sol = [square(0.0, 4200.0, 2.0)];
+        // A terrain profile running 20 m to each side and 30 m above the solid.
+        let pts2 = vec![[-20.0, 4228.0], [0.0, 4232.0], [20.0, 4236.0]];
+        let terrain = [SectionLoop {
+            points: pts2.iter().map(|q| [q[0], 0.0, q[1]]).collect(),
+            points_2d: pts2,
+            closed: false,
+        }];
+        let cfg = SheetConfig {
+            origin: [0.0, 0.0],
+            columns: 1,
+            gap: 5.0,
+            grid: 2.0,
+            text_height: 0.5,
+        };
+        let with = [SheetInput {
+            title: "t",
+            loops: &sol,
+            marker: None,
+            terrain: &terrain,
+        }];
+        let without = [SheetInput {
+            title: "t",
+            loops: &sol,
+            marker: None,
+            terrain: &[],
+        }];
+        let a = layout(&with, &cfg, &|a| format!("{a}"), &|lo, hi| format!("T {lo:.0}-{hi:.0}"));
+        let b = layout(&without, &cfg, &|a| format!("{a}"), &|lo, hi| {
+            format!("T {lo:.0}-{hi:.0}")
+        });
+        let height = |items: &[SheetItem]| match &items.iter().find(|i| i.role == Role::Frame).unwrap().geom {
+            SheetGeom::Polyline { points, .. } => points[2][1] - points[0][1],
+            _ => unreachable!(),
+        };
+        assert!(
+            height(&a) > height(&b) + 25.0,
+            "the frame covers the terrain: {} vs {}",
+            height(&a),
+            height(&b)
+        );
+        assert_eq!(a.iter().filter(|i| i.role == Role::Terrain).count(), 1);
+        assert!(a.iter().any(|i| matches!(&i.geom, SheetGeom::Text { value, .. } if i.role == Role::TerrainLabel && value == "T 4228-4236")));
+        assert!(b
+            .iter()
+            .all(|i| i.role != Role::Terrain && i.role != Role::TerrainLabel));
     }
 }

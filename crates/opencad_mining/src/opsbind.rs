@@ -41,29 +41,33 @@ pub struct Lists {
     pub assay: Vec<String>,
     pub geo: Vec<String>,
     pub domains: Vec<String>,
+    pub terrains: Vec<String>,
 }
 
 impl Lists {
     /// Lists of a tab: attributes of its loaded drillholes, domains of `cfg`.
     pub fn of(tab: u64, cfg: &ProjectConfig) -> Lists {
-        let (assay, geo) = crate::state::with_tab(tab, |t| {
-            t.data.as_ref().map_or((Vec::new(), Vec::new()), |d| {
+        let (assay, geo, terrains) = crate::state::with_tab(tab, |t| {
+            let (a, g) = t.data.as_ref().map_or((Vec::new(), Vec::new()), |d| {
                 (
                     drillhole_engine::import::assay_attributes(&d.assays),
                     drillhole_engine::import::geo_attributes(&d.geo),
                 )
-            })
+            });
+            (a, g, t.terrains.clone())
         });
         Lists {
             assay,
             geo,
             domains: cfg.rs.domain_names(),
+            terrains,
         }
     }
     pub fn get(&self, source: &str) -> &[String] {
         match source {
             "assay attributes" => &self.assay,
             "geology attributes" => &self.geo,
+            "terrains" => &self.terrains,
             _ => &self.domains,
         }
     }
@@ -653,6 +657,7 @@ mod tests {
             assay: vec!["CU".into(), "AU".into()],
             geo: vec![],
             domains: c.rs.domain_names(),
+            terrains: vec!["—".into(), "Surface 1".into()],
         };
         let mut flat = HashMap::new();
         for id in panel_ids() {

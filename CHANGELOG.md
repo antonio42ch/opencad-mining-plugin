@@ -3,7 +3,29 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
-## [0.10.0] — unreleased
+## [0.11.0] — unreleased
+
+Requires Open CAD Studio **v2026.47 or newer** (plugin API 28); for v2026.46 and older keep 0.10.x.
+
+### Added
+- **Terrains in the sections.** The Civil TIN surfaces of the drawing (`CREATESURFACE`) can be cut with the same
+  planes as the solids: the **terrain profile** in the vertical sections (perpendicular to an axis, through two
+  points, through three points) and the **contours** in the level plans, in 3D in place and in the 2D sheets, on
+  layer `MIN_SC_TERRENO`, with the elevation range of each sheet. The terrain is chosen by name in the new
+  *Terreno* section of the Sections panel (`terrain=` in `MIN_SC_RUN`); it is drawn over the extent of the solids
+  plus a margin (`terrain_margin`, vertical sections only along the section, never in height), or a fixed width
+  (`terrain_width`) when there are no solids; with a terrain, the solids may be left out. The result reports the
+  planes the terrain crosses and misses and its elevation range. Example in `examples/terreno`.
+- **`MIN_TR_LIST`** lists the terrains (name, handle, triangles, elevation range); the panel's list is filled
+  when the Sections panel opens.
+- **Native AI tools** (plugin API 25+): every operation is also a tool of Open CAD Studio's AI bridge with its JSON
+  Schema (`plugin_call`); the `MIN_…` commands work as before.
+
+### Changed
+- The plugin is built against the host API of Open CAD Studio v2026.47 (plugin API 28) and no longer loads in
+  v2026.46 or older; release 0.10.0 stays available for them.
+
+## [0.10.0] — 2026-11-22
 
 First release since 0.8.0: it includes the geotechnical model view as cubes, the filter / cut and
 confidence columns, `MIN_HELP`, the channel samples and the narrow-vein model (stages A, B1–B3).

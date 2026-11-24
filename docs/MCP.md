@@ -117,6 +117,17 @@ MIN_UG_AXIS axis=<handle of the axis> profile=horseshoe width=4 height=4
 MIN_SC_RUN mode=axis axis=<handle> solids=<solid handle> interval=10
 ```
 
+**Sections with a terrain** (a terrain is a Civil TIN surface of the drawing; `MIN_TR_LIST` names them)
+
+```
+MIN_TR_LIST
+MIN_SC_RUN mode=axis axis=<handle> solids=<h1>,<h2> interval=10 terrain="Surface 1" terrain_margin=20
+MIN_SC_RUN mode=levels z_from=100 z_to=110 z_step=2 terrain="Surface 1"
+```
+
+Each vertical section gets the terrain profile (limited to the solids' extent plus the margin),
+each level plan its contour; `terrain=` (empty) turns it off. Without solids, only the terrain is cut.
+
 **Geological mapping**
 
 ```
@@ -422,7 +433,7 @@ Result `data`: `start` (`[x,y,z]`), `azimuth`, `restored` (true when an Open Min
 
 ### `sc_run` — `MIN_SC_RUN`
 
-Cut solids (meshes) with planes: perpendicular to an axis every interval, vertical through 2 points (+ parallels), horizontal levels, or through 3 points. Draws 3D polylines in place and/or 2D sheets with grid, title and area.
+Cut solids (meshes) and, optionally, a terrain (a Civil TIN surface, `terrain=`) with planes: perpendicular to an axis every interval, vertical through 2 points (+ parallels), horizontal levels, or through 3 points. Draws 3D polylines in place and/or 2D sheets with grid, title and area; the terrain gives its profile in each vertical section and its contours in the level plans, limited to the extent of the solids plus `terrain_margin` (with a terrain, the solids may be left out).
 
 | Argument | Type | Setting | Description |
 |---|---|---|---|
@@ -447,11 +458,36 @@ Cut solids (meshes) with planes: perpendicular to an axis every interval, vertic
 | `replace` | boolean | yes | Replace the sections and sheets drawn before. |
 | `solids` | handles `1A,2B` |  | Meshes to cut. Without it: the selection, or a pick. |
 | `axis` | entity handle (hex) |  | Axis polyline (mode axis). |
+| `terrain` | name among the terrains | yes | Terrain (a Civil TIN surface of the drawing, by name or handle) cut with the same planes: its profile (sections) or contours (levels) is drawn with the solids. Empty or - = none; tr_list lists the terrains. |
+| `terrain_margin` | number ≥ 0 | yes | The terrain is drawn over the extent of the solids in each plane plus this margin on each side (m); in vertical sections only along the section, never in height. |
+| `terrain_width` | number ≥ 1 | yes | Half-width of the terrain profile (m on each side of the plane's origin) when there are no solids to size it; vertical sections only. |
 | `p1` | point `x,y[,z]` |  | First plane point (modes two_points, three_points). |
 | `p2` | point `x,y[,z]` |  | Second plane point. |
 | `p3` | point `x,y[,z]` |  | Third plane point (mode three_points). |
 
-Result `data`: `planes`, `cut` (planes that intersect), `polylines`, `sheets`.
+Result `data`: `planes`, `cut` (planes that intersect), `polylines`, `sheets`, and with a terrain `terrain` (`{name, handle, planes_cut, polylines, min_elevation, max_elevation, missed}`).
+
+Example (values abbreviated with `…`):
+
+```
+MIN_SC_RUN mode=two_points p1=0,50,0 p2=100,50,0 count=1 terrain="Surface 1"
+→ {"planes": 1, "cut": 0, "polylines": 0, "terrain": {"name": "Surface 1", "handle": "754", "planes_cut": 1, "polylines": 1, "min_elevation": 103.0, "max_elevation": 105.0, "missed": []}}
+```
+
+### `tr_list` — `MIN_TR_LIST`
+
+*Read-only.* List the terrains of the drawing: the TIN surfaces of the Civil tools (CREATESURFACE), with their name, handle, triangles and elevation range. The names are the values of `terrain` in sc_run.
+
+No arguments.
+
+Result `data`: `terrains`: list of `{handle, name, vertices, triangles, min, max, min_elevation, max_elevation}`.
+
+Example (values abbreviated with `…`):
+
+```
+MIN_TR_LIST
+→ {"terrains": [{"handle": "754", "name": "Surface 1", "vertices": 9, "triangles": 8, "min": [0.0, 0.0, 100.0], "max": [100.0, 100.0, 105.0], "min_elevation": 100.0, "max_elevation": 105.0}]}
+```
 
 ## Geological mapping
 

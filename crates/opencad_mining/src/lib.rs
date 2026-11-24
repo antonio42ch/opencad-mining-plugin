@@ -43,6 +43,7 @@ pub mod sections;
 pub mod session;
 pub mod solids;
 pub mod state;
+pub mod terrain;
 pub mod veincommands;
 pub mod veinconfig;
 pub mod veinmodel;
@@ -224,6 +225,13 @@ impl BuiltinPlugin for MiningPlugin {
             _ => None,
         };
         if let Some(p) = panel {
+            if p == panels::SC {
+                // The terrains of the drawing fill the panel's list.
+                let tab = host.tab_id();
+                terrain::refresh(host, tab);
+                let cfg = session::config(host, s);
+                opsbind::push_one(host, &cfg, p, None);
+            }
             host.toggle_panel_for_plugin(MANIFEST.id, p, None);
             return true;
         }
